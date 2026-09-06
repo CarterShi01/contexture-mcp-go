@@ -56,3 +56,22 @@ func TestServeArgumentsShareTheSafeTransportPolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestInspectControlsItsRealDisclosureReplay(t *testing.T) {
+	status, stdout, stderr := runDemo(t, "inspect", "--all", "--read", "--no-discover", "--json")
+	if status != 0 || stderr != "" {
+		t.Fatalf("inspect = %d, %q, %q", status, stdout, stderr)
+	}
+	if strings.Contains(stdout, `"call": "contexture_discover"`) {
+		t.Fatalf("--no-discover was ignored: %q", stdout)
+	}
+	if count := strings.Count(stdout, `"call": "contexture_invoke_read_only"`); count != 2 {
+		t.Fatalf("--read ran %d content calls, want 2: %q", count, stdout)
+	}
+	if status, _, _ := runDemo(t, "inspect", "--all", "--roster-budget", "0"); status != 1 {
+		t.Fatalf("truncated roster status = %d, want 1", status)
+	}
+	if status, _, stderr := runDemo(t, "inspect", "--roster-budget", "-1"); status != 2 || !strings.Contains(stderr, "roster-budget") {
+		t.Fatalf("negative roster budget = %d, %q", status, stderr)
+	}
+}

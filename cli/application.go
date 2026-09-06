@@ -13,6 +13,7 @@ import (
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 	"github.com/CarterShi01/contexture-mcp-go/inspection"
 	"github.com/CarterShi01/contexture-mcp-go/server"
+	"github.com/CarterShi01/contexture-mcp-go/server/instructions"
 )
 
 // RunApplication runs project-owned commands over one statically declared Go application.
@@ -79,8 +80,11 @@ func RunApplication(ctx context.Context, application *contexture.Application, ar
 }
 
 func runInspect(ctx context.Context, application *server.RuntimeApplication, arguments []string, stdout, stderr io.Writer) int {
-	refs, all, asJSON, summary := []string{}, false, false, false
-	for _, argument := range arguments {
+	refs, all, asJSON, summary, includeRead, includeDiscover := []string{}, false, false, false, false, true
+	rosterBudget := instructions.RosterBudget
+	for len(arguments) > 0 {
+		argument := arguments[0]
+		arguments = arguments[1:]
 		switch argument {
 		case "--all":
 			all = true
@@ -88,9 +92,23 @@ func runInspect(ctx context.Context, application *server.RuntimeApplication, arg
 			asJSON = true
 		case "--summary":
 			summary = true
+		case "--read":
+			includeRead = true
+		case "--no-discover":
+			includeDiscover = false
+		case "--roster-budget":
+			if len(arguments) == 0 || strings.HasPrefix(arguments[0], "--") {
+				return fail(stderr, 2, "--roster-budget needs a non-negative integer.")
+			}
+			parsed, err := strconv.Atoi(arguments[0])
+			arguments = arguments[1:]
+			if err != nil || parsed < 0 {
+				return fail(stderr, 2, "--roster-budget needs a non-negative integer.")
+			}
+			rosterBudget = parsed
 		default:
 			if strings.HasPrefix(argument, "--") {
-				return fail(stderr, 2, "use inspect [REF ...] [--all] [--summary] [--json].")
+				return fail(stderr, 2, "use inspect [REF ...] [--all] [--read] [--summary] [--json] [--no-discover] [--roster-budget BYTES].")
 			}
 			refs = append(refs, argument)
 		}
@@ -101,11 +119,11 @@ func runInspect(ctx context.Context, application *server.RuntimeApplication, arg
 	if all {
 		refs = inspection.EveryRef(application.Disclosure)
 	}
-	text, err := application.Publications.Instructions(contexture.AllRoots())
+	text, err := instructions.Build(application.Disclosure, contexture.AllRoots(), rosterBudget)
 	if err != nil {
 		return fail(stderr, 1, err.Error())
 	}
-	trace := inspection.Replay(ctx, application.Disclosure, application.Runtime, refs, true, false, text)
+	trace := inspection.Replay(ctx, application.Disclosure, application.Runtime, refs, includeDiscover, includeRead, text)
 	if asJSON {
 		rendered, err := inspection.AsJSON(trace)
 		if err != nil {

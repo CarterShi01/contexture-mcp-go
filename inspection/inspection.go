@@ -185,7 +185,7 @@ func Replay(ctx context.Context, disclosure *contexture.Disclosure, runtime *con
 	for _, ref := range refs {
 		opened := OpenStep(disclosure, ref)
 		steps = append(steps, opened)
-		if includeRead && runtime != nil && !opened.Refused {
+		if includeRead && isContent(runtime, ref) && !opened.Refused {
 			steps = append(steps, ReadStep(ctx, runtime, ref))
 		}
 	}
@@ -194,6 +194,25 @@ func Replay(ctx context.Context, disclosure *contexture.Disclosure, runtime *con
 		total = total.Add(item.Cost)
 	}
 	return Trace{Steps: steps, Total: total}
+}
+
+// isContent identifies an executable Resource-equivalent: a read-only Tool
+// whose schema takes no arguments. Inspection must never guess arguments or
+// call parameterized diagnostics merely because --read was requested.
+func isContent(runtime *contexture.Runtime, ref string) bool {
+	if runtime == nil {
+		return false
+	}
+	tool, err := runtime.Tool(ref)
+	if err != nil || !tool.ReadOnly {
+		return false
+	}
+	binding, err := tool.Binding()
+	if err != nil {
+		return false
+	}
+	properties, _ := binding.Schema()["properties"].(map[string]any)
+	return len(properties) == 0
 }
 
 // Render prints a trace without requiring callers to parse JSON.
