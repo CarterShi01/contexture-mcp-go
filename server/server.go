@@ -80,6 +80,9 @@ func gatewaySchema(name contexture.GatewayName) map[string]any {
 }
 
 func callGateway(ctx context.Context, gateway *contexture.Gateway, name contexture.GatewayName, raw json.RawMessage, selection contexture.RootSelection) (any, error) {
+	if principal := PrincipalOf(ctx); principal != nil {
+		ctx = contexture.WithPrincipal(ctx, principal)
+	}
 	if len(raw) == 0 {
 		raw = json.RawMessage("{}")
 	}

@@ -57,3 +57,13 @@ func (value Auth) Middleware() (func(http.Handler) http.Handler, error) {
 		return &auth.TokenInfo{UserID: principal.Subject(), Scopes: principal.Scopes(), Expiration: time.Unix(int64(exp), 0), Extra: map[string]any{"contexture.principal": principal}}, nil
 	}, &auth.RequireBearerTokenOptions{Scopes: append([]string(nil), value.RequiredScopes...), ResourceMetadataURL: value.Resource + "/.well-known/oauth-protected-resource"}), nil
 }
+
+// PrincipalOf recovers the business identity installed by Auth's SDK middleware.
+func PrincipalOf(ctx context.Context) *contexture.Principal {
+	info := auth.TokenInfoFromContext(ctx)
+	if info == nil || info.Extra == nil {
+		return nil
+	}
+	principal, _ := info.Extra["contexture.principal"].(*contexture.Principal)
+	return principal
+}

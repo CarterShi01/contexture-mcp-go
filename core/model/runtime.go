@@ -141,9 +141,11 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 		return nil, err
 	}
 	graph := &SelectedGraph{index: runtime.index, selection: selection}
+	principal := CurrentPrincipal(ctx)
 	ctx = context.WithValue(ctx, graphKey, graph)
 	ctx = context.WithValue(ctx, selectionKey, selection)
 	ctx = context.WithValue(ctx, telemetryKey, runtime.telemetry)
+	ctx = context.WithValue(ctx, principalKey, principal)
 	value, callErr := binding.Call(ctx, arguments)
 	if runtime.telemetry != nil {
 		_ = runtime.telemetry.Record(CallEvent{Ref: ref, Failed: callErr != nil})
