@@ -185,6 +185,22 @@ func TestGoDemoMatchesDiscoverOpenAndRefusalGoldens(t *testing.T) {
 	}
 }
 
+func TestGoDemoFixedGatewayMatchesToolGolden(t *testing.T) {
+	gateway, _ := goldenDemo(t)
+	tools := gateway.Tools()
+	expected := goldenJSON(t, "tools.json").([]any)
+	if len(tools) != len(expected) {
+		t.Fatalf("gateway tool count = %d, want %d", len(tools), len(expected))
+	}
+	for position, tool := range tools {
+		entry := expected[position].(map[string]any)
+		annotations := entry["annotations"].(map[string]any)
+		if string(tool.Name) != entry["name"] || tool.Description != entry["description"] || tool.ReadOnly != annotations["read_only_hint"] {
+			t.Fatalf("gateway tool[%d] = %#v, golden %#v", position, tool, entry)
+		}
+	}
+}
+
 func TestGoDemoMatchesPublicationGoldens(t *testing.T) {
 	_, publications := goldenDemo(t)
 	prompts, err := publications.PromptCards(contexture.AllRoots())
@@ -276,8 +292,6 @@ func TestGoDemoMatchesPublicationGoldens(t *testing.T) {
 }
 
 func TestDisclosureOnlyOmitsSchemasAndExecution(t *testing.T) {
-	gateway, _ := goldenDemo(t)
-	_ = gateway
 	tool, err := contexture.NewTool("tool", "Tool.", true, func(context.Context, noInput) (string, error) { return "", nil })
 	if err != nil {
 		t.Fatal(err)
