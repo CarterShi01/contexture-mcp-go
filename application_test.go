@@ -45,9 +45,9 @@ func TestApplicationDeclarationIsLazy(t *testing.T) {
 	constructions := 0
 	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
 		Name: "operations",
-		Roots: []contexture.RoleFactory{func() contexture.Role {
+		Roots: []contexture.Factory{func() contexture.Node {
 			constructions++
-			return contexture.Role{
+			return &contexture.Role{
 				Name:         "operations",
 				Description:  "Handle routine operational questions.",
 				Instructions: "Inspect first.",
