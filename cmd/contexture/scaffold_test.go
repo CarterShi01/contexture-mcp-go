@@ -1,11 +1,32 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestRunReportsVersionAndCreatesProject(t *testing.T) {
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	if status := run([]string{"--version"}, stdout, stderr); status != 0 || stdout.String() != cliVersion+"\n" {
+		t.Fatalf("version = status %d stdout %q stderr %q", status, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if status := run([]string{"new", "My Context", "--into", t.TempDir()}, stdout, stderr); status != 0 {
+		t.Fatalf("new = status %d stdout %q stderr %q", status, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Wrote ") {
+		t.Fatalf("new output = %q", stdout.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if status := run([]string{"new"}, stdout, stderr); status != 2 || !strings.HasPrefix(stderr.String(), "contexture: ") {
+		t.Fatalf("usage = status %d stdout %q stderr %q", status, stdout.String(), stderr.String())
+	}
+}
 
 func TestDeriveNames(t *testing.T) {
 	names, err := DeriveNames("My Context")
