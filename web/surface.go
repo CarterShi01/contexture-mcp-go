@@ -29,6 +29,21 @@ type WebRequest struct {
 // result rejects the request without choosing application authorization policy.
 type Authenticator func(context.Context, WebRequest) *contexture.Principal
 
+// RejectedError is an intentional business rejection returned by a Tool. It
+// becomes a 422 rejected REST problem without exposing an internal failure.
+type RejectedError struct{ Detail string }
+
+// Error reports the client-safe rejection detail.
+func (err *RejectedError) Error() string {
+	if err == nil || err.Detail == "" {
+		return "Request was rejected."
+	}
+	return err.Detail
+}
+
+// Reject marks a Tool outcome as a client-correctable business rejection.
+func Reject(detail string) error { return &RejectedError{Detail: detail} }
+
 // RestRouterOptions configures optional HTTP-boundary behavior.
 type RestRouterOptions struct {
 	Authenticator Authenticator
@@ -125,8 +140,9 @@ func (router *RestRouter) Routes() []RestRoute {
 
 // ServeHTTP serves only exact allowlisted method/path pairs.
 func (router *RestRouter) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	route, exists := router.routes[routeKey(request.Method, request.URL.Path)]
-	if !exists && request.Method == http.MethodHead {
+	method := strings.ToUpper(request.Method)
+	route, exists := router.routes[routeKey(method, request.URL.Path)]
+	if !exists && method == http.MethodHead {
 		route, exists = router.routes[routeKey(http.MethodGet, request.URL.Path)]
 	}
 	if !exists {
@@ -159,7 +175,7 @@ func (router *RestRouter) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		router.invokeProblem(writer, err)
 		return
 	}
-	jsonResponse(writer, route.Status, value, request.Method == http.MethodHead)
+	jsonResponse(writer, route.Status, value, method == http.MethodHead)
 }
 
 // Serve holds the Runtime's Channels open for the entire HTTP serving scope.
@@ -179,7 +195,8 @@ type requestFailure struct {
 }
 
 func (router *RestRouter) requestArguments(writer http.ResponseWriter, request *http.Request) (json.RawMessage, *requestFailure) {
-	if request.Method == http.MethodGet || request.Method == http.MethodHead {
+	method := strings.ToUpper(request.Method)
+	if method == http.MethodGet || method == http.MethodHead {
 		arguments := make(map[string]any, len(request.URL.Query()))
 		for key, values := range request.URL.Query() {
 			if len(values) == 1 {
@@ -232,7 +249,7 @@ func newWebRequest(request *http.Request) WebRequest {
 	for key, values := range request.URL.Query() {
 		query[key] = append([]string(nil), values...)
 	}
-	return WebRequest{Method: request.Method, Path: request.URL.Path, Headers: headers, Query: query}
+	return WebRequest{Method: strings.ToUpper(request.Method), Path: request.URL.Path, Headers: headers, Query: query}
 }
 
 func cloneWebRequest(request WebRequest) WebRequest {
@@ -247,6 +264,11 @@ func cloneWebRequest(request WebRequest) WebRequest {
 }
 
 func (router *RestRouter) invokeProblem(writer http.ResponseWriter, err error) {
+	var rejected *RejectedError
+	if errors.As(err, &rejected) {
+		problem(writer, http.StatusUnprocessableEntity, "rejected", rejected.Error())
+		return
+	}
 	if errors.Is(err, contexture.ErrInvalidInput) {
 		problem(writer, http.StatusUnprocessableEntity, "invalid-arguments", err.Error())
 		return

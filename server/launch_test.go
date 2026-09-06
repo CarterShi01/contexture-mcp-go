@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -79,6 +80,72 @@ func TestApplicationServerServesGatewayOverStreamableHTTP(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("streamable HTTP server did not stop after context cancellation")
+	}
+}
+
+func TestApplicationServerHoldsChannelsAcrossRealMCPHTTPRequests(t *testing.T) {
+	channels := &launchChannels{}
+	tool, err := contexture.NewTool("status", "Read status.", true, func(_ context.Context, input applicationInput) (string, error) {
+		if !channels.isLive() {
+			return "", errors.New("Tool ran outside the Channels lifetime")
+		}
+		return "live:" + input.Value, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "launch-lifecycle", Channels: channels, Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "assistant", Description: "Answer requests.", Instructions: "Read first.", Tools: []contexture.Factory{func() contexture.Node { return tool }}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assembly, err := server.BuildServer(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	errs := make(chan error, 1)
+	go func() { errs <- assembly.ServeListener(ctx, listener, options) }()
+	client := mcp.NewClient(&mcp.Implementation{Name: "channels-client", Version: "0.0.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: "http://" + listener.Addr().String() + "/mcp"}, nil)
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	for _, value := range []string{"one", "two"} {
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: string(contexture.InvokeReadOnlyGatewayName), Arguments: map[string]any{"ref": "assistant/status", "arguments": map[string]any{"value": value}}})
+		if err != nil || result.IsError || len(result.Content) != 1 {
+			_ = session.Close()
+			cancel()
+			t.Fatalf("MCP Tool call = %#v, %v", result, err)
+		}
+	}
+	if opened, closed, live := channels.snapshot(); opened != 1 || closed != 0 || !live {
+		_ = session.Close()
+		cancel()
+		t.Fatalf("channels while serving = opened %d, closed %d, live %v", opened, closed, live)
+	}
+	_ = session.Close()
+	cancel()
+	select {
+	case err := <-errs:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("streamable HTTP Channels did not close after context cancellation")
+	}
+	if opened, closed, live := channels.snapshot(); opened != 1 || closed != 1 || live {
+		t.Fatalf("channels after serving = opened %d, closed %d, live %v", opened, closed, live)
 	}
 }
 
@@ -172,4 +239,37 @@ func TestApplicationServerSelectsIndependentRootsPerAuthenticatedHTTPClient(t *t
 	case <-time.After(time.Second):
 		t.Fatal("streamable HTTP server did not stop after context cancellation")
 	}
+}
+
+type launchChannels struct {
+	mu             sync.Mutex
+	opened, closed int
+	live           bool
+}
+
+func (channels *launchChannels) Open(context.Context, contexture.CleanupRegistrar) error {
+	channels.mu.Lock()
+	defer channels.mu.Unlock()
+	channels.opened++
+	channels.live = true
+	return nil
+}
+
+func (channels *launchChannels) Close(context.Context) error {
+	channels.mu.Lock()
+	defer channels.mu.Unlock()
+	channels.closed++
+	channels.live = false
+	return nil
+}
+
+func (channels *launchChannels) isLive() bool {
+	_, _, live := channels.snapshot()
+	return live
+}
+
+func (channels *launchChannels) snapshot() (int, int, bool) {
+	channels.mu.Lock()
+	defer channels.mu.Unlock()
+	return channels.opened, channels.closed, channels.live
 }

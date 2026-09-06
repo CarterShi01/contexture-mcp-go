@@ -42,6 +42,9 @@ func normalizeRestRoute(route RestRoute) (RestRoute, error) {
 	if route.Status < 100 || route.Status > 599 {
 		return RestRoute{}, fmt.Errorf("a Contexture REST route status must be an HTTP status")
 	}
+	if !jsonBodyStatus(route.Status) {
+		return RestRoute{}, fmt.Errorf("Contexture REST route status %d cannot carry a JSON response body", route.Status)
+	}
 	return route, nil
 }
 
@@ -52,4 +55,8 @@ func supportedMethod(method string) bool {
 	default:
 		return false
 	}
+}
+
+func jsonBodyStatus(status int) bool {
+	return status >= 200 && status != http.StatusNoContent && status != http.StatusResetContent && status != http.StatusNotModified
 }

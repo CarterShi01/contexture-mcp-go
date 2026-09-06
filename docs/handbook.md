@@ -265,9 +265,18 @@ snapshot of lower-case headers and repeated query values. A non-nil principal
 is placed in the Tool's `context.Context` (`contexture.CurrentPrincipal`), and
 the same HTTP snapshot is available through `web.CurrentRequest`.
 
+The Go adapter rejects 1xx, 204, 205, and 304 route statuses at construction:
+unlike the ASGI reference surface, `net/http` cannot faithfully emit those
+bodyless statuses together with Contexture's required JSON representation.
+Use a normal final JSON status such as 200 or 202. A Tool can deliberately
+return `web.Reject("client-safe reason")` to produce a 422 `rejected` problem;
+unexpected Go errors remain 500 `controller-failed` problems.
+
 Call `surface.Serve` around the actual serving loop so Contexture Channels are
-opened once and closed after the loop. Calling `ServeHTTP` directly is useful
-for tests but does not establish that application lifetime.
+opened once for all requests and closed after the loop. The same surface may
+be served again, which establishes a fresh Channel lifetime. Calling
+`ServeHTTP` directly is useful for tests but does not establish that
+application lifetime.
 
 ## 10. Keep the contract honest
 

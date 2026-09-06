@@ -234,8 +234,14 @@ object，并拒绝其他 media type、无效 JSON、非 object body 和超过配
 authenticator 会收到 lower-case header 与重复 query value 的 snapshot。非空 principal 会放入 Tool 的
 `context.Context`（`contexture.CurrentPrincipal`），同一 HTTP snapshot 可通过 `web.CurrentRequest` 获取。
 
+Go adapter 会在构造时拒绝 1xx、204、205 与 304 route status：与 ASGI reference surface 不同，
+`net/http` 无法在这些无 body status 下忠实输出 Contexture 所要求的 JSON representation。应使用普通的
+最终 JSON status，例如 200 或 202。Tool 可以显式返回 `web.Reject("client-safe reason")`，从而产生
+422 的 `rejected` problem；未预期的 Go error 仍会成为 500 的 `controller-failed` problem。
+
 应使用 `surface.Serve` 包住实际 serving loop，这样 Contexture Channels 只打开一次，并在 loop 结束后关闭。
-直接调用 `ServeHTTP` 适合测试，但不会建立 application lifetime。
+同一 surface 可以再次 serving，并建立一个新的 Channel lifetime。直接调用 `ServeHTTP` 适合测试，但不会
+建立 application lifetime。
 
 ## 10. 保持合同真实
 
