@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -46,6 +47,37 @@ func TestHeaderRootSelectorAttenuatesButNeverWidensTheCeiling(t *testing.T) {
 	}
 	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "release"}, nil); err == nil || !strings.Contains(err.Error(), "effective root selection is empty") {
 		t.Fatalf("widened selection error = %v", err)
+	}
+}
+
+func TestHeaderRootSelectorDefaultsToAllAndNormalizesHeaderRoots(t *testing.T) {
+	index := selectorIndex(t)
+	selector := server.HeaderRootSelector{}
+	all, err := selector.Select(index, nil, nil)
+	if err != nil || !all.IsAll() || !all.ContainsRef("diagnose") || !all.ContainsRef("release") {
+		t.Fatalf("missing header without ceiling = %#v, %v", all, err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "header-normalization", Roots: []contexture.Factory{
+		func() contexture.Node {
+			return &contexture.Role{Name: "alpha", Description: "Alpha.", Instructions: "Read."}
+		},
+		func() contexture.Node {
+			return &contexture.Role{Name: "beta", Description: "Beta.", Instructions: "Read."}
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	normalizedIndex, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := selector.Select(normalizedIndex, map[string]string{"contexture-roots": " beta, alpha,beta "}, nil)
+	if err != nil {
+		t.Fatalf("trimmed/deduplicated header selection = %#v, %v", selected, err)
+	}
+	if got := selected.Names(); selected.IsAll() || !reflect.DeepEqual(got, []string{"alpha", "beta"}) {
+		t.Fatalf("trimmed/deduplicated header selection = %#v", selected)
 	}
 }
 
