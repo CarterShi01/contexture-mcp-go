@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/server/instructions"
 )
 
 // PromptCard describes one MCP Prompt publication.
@@ -171,43 +172,7 @@ func (publications *Publications) Read(ctx context.Context, uri string, selectio
 
 // Instructions describes selected model-controlled roles and their navigation door.
 func (publications *Publications) Instructions(selection contexture.RootSelection) (string, error) {
-	effective, err := publications.effective(selection)
-	if err != nil {
-		return "", err
-	}
-	lines := []string{
-		"Everything this server offers is behind contexture_open. Start from the list",
-		"below: open the role that fits the task to see its skills, tools and",
-		"sub-roles, then open the skill you chose for its procedure. Each call",
-		"reveals one level; keep opening down the branch that fits.",
-		"Run a tool with contexture_invoke_read_only or contexture_invoke, whichever its",
-		"card says, passing the ref and arguments from that card.",
-		"Collect evidence before stating a cause; never assert system state you have",
-		"not read.", "", "Capabilities:",
-	}
-	queue := publications.disclosure.Index().ModelRoots()
-	for len(queue) > 0 {
-		node := queue[0]
-		queue = queue[1:]
-		ref, _ := publications.disclosure.Index().RefOf(node)
-		if !effective.ContainsRef(ref) {
-			continue
-		}
-		lines = append(lines, fmt.Sprintf("- %s: %s", ref, node.NodeDescription()))
-		if role, ok := node.(*contexture.Role); ok {
-			children, childErr := publications.disclosure.Index().ChildrenOf(role)
-			if childErr != nil {
-				return "", childErr
-			}
-			for _, child := range children {
-				if child.Kind() == contexture.RoleKind {
-					queue = append(queue, child)
-				}
-			}
-		}
-	}
-	lines = append(lines, "", "Every card carries a `ref`. Pass it back to contexture_open to open that node; never assemble a ref yourself.")
-	return strings.Join(lines, "\n"), nil
+	return instructions.Build(publications.disclosure, selection, instructions.RosterBudget)
 }
 
 func (publications *Publications) effective(selection contexture.RootSelection) (contexture.RootSelection, error) {
