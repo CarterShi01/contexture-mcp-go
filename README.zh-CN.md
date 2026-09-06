@@ -111,6 +111,9 @@ func main() {
 `server` 包拥有官方 MCP Go SDK，`web` 包拥有显式 `net/http` REST 适配器。请求级事实通过
 `context.Context` 传递，应用依赖通过 `Channels` 管理并按逆序清理。
 
+`contexture.Contexture(declaration)` 是 `contexture.DeclareApplication` 的具名公开别名；
+两者创建相同的惰性 application 声明。
+
 ## Host 配置
 
 Host 配置应当指向启动服务器的命令，而不是复制应用已经声明的 context。`server.Launch`

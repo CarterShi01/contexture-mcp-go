@@ -115,6 +115,9 @@ package is SDK-neutral; `server` owns the official MCP Go SDK and `web` owns
 explicit `net/http` REST adapters. Request-local facts use `context.Context`, and
 application dependencies use `Channels` with reverse-order cleanup.
 
+`contexture.Contexture(declaration)` is the named public alias for
+`contexture.DeclareApplication`; both create the same lazy application declaration.
+
 ## Host configuration
 
 Keep host configuration as a pointer to the server command, rather than a copy
