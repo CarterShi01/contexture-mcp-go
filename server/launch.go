@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
+	serverinstructions "github.com/CarterShi01/contexture-mcp-go/server/instructions"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -18,22 +19,36 @@ const packageVersion = "0.12.0rc1"
 
 // ApplicationServer owns one compiled declaration and its official MCP transport assembly.
 type ApplicationServer struct {
-	application *RuntimeApplication
-	identity    Identity
-	buildOnce   sync.Once
-	adapter     *ContextureMCPServer
-	buildErr    error
+	application  *RuntimeApplication
+	identity     Identity
+	instructions *string
+	buildOnce    sync.Once
+	adapter      *ContextureMCPServer
+	buildErr     error
+}
+
+// ApplicationServerOptions controls host-facing facts fixed when an
+// application is compiled for serving.
+type ApplicationServerOptions struct {
+	// Instructions replaces Contexture's generated root roster. A nil value
+	// derives instructions from each selected root surface.
+	Instructions *string
 }
 
 type rootSelectionContextKey struct{}
 
 // BuildServer compiles one lazy declaration for serving.
 func BuildServer(application *contexture.Application) (*ApplicationServer, error) {
+	return BuildServerWithOptions(application, ApplicationServerOptions{})
+}
+
+// BuildServerWithOptions compiles one lazy declaration with explicit Host-facing options.
+func BuildServerWithOptions(application *contexture.Application, options ApplicationServerOptions) (*ApplicationServer, error) {
 	compiled, err := CompileApplication(application)
 	if err != nil {
 		return nil, err
 	}
-	return &ApplicationServer{application: compiled, identity: Identity{Name: application.Name(), Version: packageVersion}}, nil
+	return &ApplicationServer{application: compiled, identity: Identity{Name: application.Name(), Version: packageVersion}, instructions: options.Instructions}, nil
 }
 
 // Build constructs a fresh official-SDK server for one Contexture transport service.
@@ -61,7 +76,18 @@ func (server *ApplicationServer) BuildForRoots(selection contexture.RootSelectio
 	if err != nil {
 		return nil, err
 	}
-	return NewContextureMCPServerForRoots(server.identity, gateway, selection, server.application.Publications), nil
+	instructions, err := server.instructionsFor(selection)
+	if err != nil {
+		return nil, err
+	}
+	return newContextureMCPServerForRoots(server.identity, gateway, selection, instructions, server.application.Publications), nil
+}
+
+func (server *ApplicationServer) instructionsFor(selection contexture.RootSelection) (string, error) {
+	if server.instructions != nil {
+		return *server.instructions, nil
+	}
+	return serverinstructions.Build(server.application.Disclosure, selection, serverinstructions.RosterBudget)
 }
 
 // Start blocks while serving stdio or streamable HTTP with Channels open for the lifetime.
@@ -135,8 +161,7 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 		return &ServeError{Message: "ServeListener requires transport='streamable-http'."}
 	}
 	slog.Info("Serving MCP", "url", fmt.Sprintf("http://%s", listener.Addr()))
-	gateway, err := server.application.Gateway()
-	if err != nil {
+	if _, err := server.application.Gateway(); err != nil {
 		return err
 	}
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
@@ -144,7 +169,13 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 		if selected, ok := request.Context().Value(rootSelectionContextKey{}).(contexture.RootSelection); ok {
 			selection = selected
 		}
-		return NewContextureMCPServerForRoots(server.identity, gateway, selection, server.application.Publications).Server
+		adapter, err := server.BuildForRoots(selection)
+		if err != nil {
+			// Selection middleware validates every request before this factory;
+			// this defensive fallback only covers a future programming error.
+			return NewMCPServer(server.identity)
+		}
+		return adapter.Server
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
 	var protected http.Handler = guarded(handler, options)
 	if selector != nil {

@@ -125,7 +125,11 @@ func TestApplicationServerSelectsIndependentRootsPerAuthenticatedHTTPClient(t *t
 		errs <- assembly.ServeListenerWithAuthAndRootSelector(ctx, listener, options, identity, selector)
 	}()
 	endpoint := "http://" + listener.Addr().String() + "/mcp"
-	discover := func(root string) string {
+	type rootSurface struct {
+		discovery    string
+		instructions string
+	}
+	discover := func(root string) rootSurface {
 		client := mcp.NewClient(&mcp.Implementation{Name: "root-client-" + root, Version: "0.0.0"}, nil)
 		session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: endpoint, HTTPClient: &http.Client{Transport: rootHeaderTransport{root: root, token: "valid"}}, DisableStandaloneSSE: true}, nil)
 		if err != nil {
@@ -140,14 +144,24 @@ func TestApplicationServerSelectsIndependentRootsPerAuthenticatedHTTPClient(t *t
 		if !ok {
 			t.Fatalf("discover content = %#v", result.Content)
 		}
-		return text.Text
+		initialized := session.InitializeResult()
+		if initialized == nil {
+			t.Fatal("MCP client did not retain initialization instructions")
+		}
+		return rootSurface{discovery: text.Text, instructions: initialized.Instructions}
 	}
 	alpha, beta := discover("alpha"), discover("beta")
-	if !strings.Contains(alpha, "alpha") || strings.Contains(alpha, "beta") {
-		t.Fatalf("alpha discover = %s", alpha)
+	if !strings.Contains(alpha.discovery, "alpha") || strings.Contains(alpha.discovery, "beta") {
+		t.Fatalf("alpha discover = %s", alpha.discovery)
 	}
-	if !strings.Contains(beta, "beta") || strings.Contains(beta, "alpha") {
-		t.Fatalf("beta discover = %s", beta)
+	if !strings.Contains(beta.discovery, "beta") || strings.Contains(beta.discovery, "alpha") {
+		t.Fatalf("beta discover = %s", beta.discovery)
+	}
+	if !strings.Contains(alpha.instructions, "alpha") || strings.Contains(alpha.instructions, "beta") {
+		t.Fatalf("alpha instructions = %s", alpha.instructions)
+	}
+	if !strings.Contains(beta.instructions, "beta") || strings.Contains(beta.instructions, "alpha") {
+		t.Fatalf("beta instructions = %s", beta.instructions)
 	}
 	cancel()
 	select {

@@ -189,6 +189,10 @@ stdio 是默认 transport。只有在明确配置 Host 与网络时才使用 `--
 Contexture 生命周期日志。`server.ConfigureLogging` 会把同一结构化 logger 安装到 stderr，
 所以 MCP stdio 始终独占 stdout。
 
+除非设置 `ApplicationServerOptions.Instructions`，Contexture 会在 MCP 初始化响应中返回紧凑的
+广度优先能力清单及固定导航合同。HTTP root selection 时，该清单按每个请求的 selected root
+surface 生成，绝不会宣称被省略的 root。
+
 Claude Code、Cursor 和 Codex 配置请使用 `server.Launch`。它从 server command 渲染 Host
 configuration，而不是复制 application 已声明的 context。
 

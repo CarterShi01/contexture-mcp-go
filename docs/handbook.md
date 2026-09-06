@@ -212,6 +212,11 @@ controls Contexture lifecycle records. `server.ConfigureLogging` installs the
 same structured logger on stderr, so MCP stdio retains exclusive ownership of
 stdout.
 
+Unless `ApplicationServerOptions.Instructions` is set, Contexture returns a
+compact, breadth-first roster with the fixed navigation contract in MCP
+initialization. For HTTP root selection, that roster is generated for the
+selected root surface on each request; it never advertises an omitted root.
+
 For Claude Code, Cursor, or Codex configuration, use `server.Launch`. It
 renders Host configuration from the server command instead of duplicating the
 application's declared context.

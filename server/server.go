@@ -44,9 +44,18 @@ func NewContextureMCPServer(identity Identity, gateway *contexture.Gateway, publ
 // useful for stdio and single-tenant hosts; request selectors resolve a
 // projection before constructing their transport-specific adapter.
 func NewContextureMCPServerForRoots(identity Identity, gateway *contexture.Gateway, selection contexture.RootSelection, publications ...*surface.Publications) *ContextureMCPServer {
+	return newContextureMCPServerForRoots(identity, gateway, selection, "", publications...)
+}
+
+// newContextureMCPServerForRoots binds one fixed surface and its Host-visible
+// bootstrap instructions. The public compatibility constructor above leaves
+// instructions empty for callers that own that policy themselves.
+func newContextureMCPServerForRoots(identity Identity, gateway *contexture.Gateway, selection contexture.RootSelection, instructions string, publications ...*surface.Publications) *ContextureMCPServer {
 	server := NewMCPServer(identity)
 	if len(publications) > 0 && publications[0] != nil {
-		server = newMCPServer(identity, completionHandler(publications[0], selection))
+		server = newMCPServer(identity, instructions, completionHandler(publications[0], selection))
+	} else if instructions != "" {
+		server = newMCPServer(identity, instructions, nil)
 	}
 	for _, tool := range gateway.Tools() {
 		registerGatewayTool(server, gateway, tool, selection)
@@ -61,11 +70,8 @@ func NewContextureMCPServerForRoots(identity Identity, gateway *contexture.Gatew
 	return &ContextureMCPServer{Server: server, Gateway: gateway, GatewayNames: names}
 }
 
-func newMCPServer(identity Identity, complete func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error)) *mcp.Server {
-	options := (*mcp.ServerOptions)(nil)
-	if complete != nil {
-		options = &mcp.ServerOptions{CompletionHandler: complete}
-	}
+func newMCPServer(identity Identity, instructions string, complete func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error)) *mcp.Server {
+	options := &mcp.ServerOptions{Instructions: instructions, CompletionHandler: complete}
 	return mcp.NewServer(&mcp.Implementation{Name: identity.Name, Version: identity.Version}, options)
 }
 

@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
@@ -89,4 +90,54 @@ func TestNewContextureMCPServerExposesOnlyGatewayTools(t *testing.T) {
 			t.Fatalf("MCP tool list misses %q: %#v", name, listed.Tools)
 		}
 	}
+}
+
+func TestApplicationServerInitializationCarriesGeneratedOrExplicitInstructions(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "instruction-server", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "operations", Description: "Operate services.", Instructions: "Inspect first."}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated, err := server.BuildServer(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if instructions := initializedInstructions(t, generated); !strings.Contains(instructions, "Everything this server offers is behind contexture_open.") || !strings.Contains(instructions, "- operations: Operate services.") {
+		t.Fatalf("generated instructions = %q", instructions)
+	}
+	custom := "Use the owner-provided introduction."
+	explicit, err := server.BuildServerWithOptions(application, server.ApplicationServerOptions{Instructions: &custom})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if instructions := initializedInstructions(t, explicit); instructions != custom {
+		t.Fatalf("explicit instructions = %q", instructions)
+	}
+}
+
+func initializedInstructions(t *testing.T, assembly *server.ApplicationServer) string {
+	t.Helper()
+	adapter, err := assembly.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	client := mcp.NewClient(&mcp.Implementation{Name: "instruction-client", Version: "0.0.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := adapter.Server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+	if initialized := clientSession.InitializeResult(); initialized != nil {
+		return initialized.Instructions
+	}
+	t.Fatal("MCP client did not retain initialization instructions")
+	return ""
 }
