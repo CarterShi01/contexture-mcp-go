@@ -39,7 +39,11 @@ var _ = contexture.ErrNodeNotFound
 var _ = contexture.NewMemoryTelemetry
 var _ = contexture.NewDisclosureWithTelemetry
 var _ = contexture.ReportTelemetry
+var _ = contexture.NewControllerManager
+var _ = contexture.NewControllerManagerWithChannels
+var _ = contexture.RegisterRoot
 var _ contexture.NodeUsage
+var _ contexture.ControllerManager
 var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: contexture.ModelReservedForPerson}
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
@@ -50,7 +54,13 @@ var _ = server.Launch{}
 var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
 
-func main() {}
+func main() {
+    manager := contexture.NewControllerManager()
+    _, _ = manager.RegisterRole(func() *contexture.Role {
+        return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect."}
+    })
+    _, _ = manager.Application("consumer")
+}
 `
 	if err := os.WriteFile(filepath.Join(temporaryRoot, "go.mod"), []byte(goMod), 0o600); err != nil {
 		t.Fatal(err)

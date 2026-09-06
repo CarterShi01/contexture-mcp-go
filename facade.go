@@ -9,6 +9,10 @@ import (
 
 type (
 	Factory                = model.Factory
+	RoleFactory            = model.RoleFactory
+	SkillFactory           = model.SkillFactory
+	ToolFactory            = model.ToolFactory
+	ControllerManager      = model.ControllerManager
 	Node                   = model.Node
 	Kind                   = model.Kind
 	Role                   = model.Role
@@ -76,6 +80,20 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 // DeclareApplication when its error-returning operation is clearer at call sites.
 func Contexture(declaration ApplicationDeclaration) (*Application, error) {
 	return DeclareApplication(declaration)
+}
+
+// NewControllerManager creates the explicit imperative registration owner.
+func NewControllerManager() *ControllerManager { return model.NewControllerManager() }
+
+// NewControllerManagerWithChannels creates a manager for future Applications
+// that share one lifecycle-scoped Channels implementation.
+func NewControllerManagerWithChannels(channels Channels) *ControllerManager {
+	return model.NewControllerManagerWithChannels(channels)
+}
+
+// RegisterRoot dispatches a generic root Factory by its concrete node kind.
+func RegisterRoot(manager *ControllerManager, factory Factory) (Node, error) {
+	return manager.RegisterRoot(factory)
 }
 
 // Compile builds one fresh canonical forest from a lazy Application.

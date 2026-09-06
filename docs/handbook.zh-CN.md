@@ -108,6 +108,28 @@ boolean。默认值 `contexture.ModelMayOpen` 同时允许 model navigation 与�
 该 facade 有意不导入 MCP SDK、`server` 或 `web`。只有在 declaration 准备好被编译到某个 Host
 surface 时，才导入 `server` 或 `web`。
 
+### Imperative registration
+
+`ApplicationDeclaration` 是正常的 Go composition root：它会把 `Factory` 保持为惰性，直到
+`Compile` 才调用。对于希望在声明 Application 前就于 registration 阶段构造并校验固定 forest 的程序，
+`NewControllerManager` 是独立且有意提供的 imperative 选择。应使用带类型的 `RegisterRole`、
+`RegisterSkill` 和 `RegisterTool`；它们的 typed factory argument 会在调用位置明确 standalone root 的
+kind。`RegisterRoot` 仅适用于确实要在 runtime 才知道 kind 的调用者。
+Go registration 接受 factory，而不是 Python 的 class-or-instance union：如有需要，可用 typed factory
+包装已有 declaration。这样会明确 construction boundary，并让 manager 通过 snapshot 取得所有权，而不是
+暴露可变的已注册 node。
+
+manager 拥有防御性的 registration snapshot。root name 共用一个 namespace；暴露 root 时顺序为 Role、
+standalone Skill、standalone Tool（每个 kind 内保留 registration order）。重复 identity、cycle、错误的
+member group 以及无效 node fact 都会在 registration 时以 typed error sentinel 拒绝。
+`manager.Application(name)` 和 `manager.Compile(name)` 会再次 snapshot 已注册的 forest；之后的调用者修改或
+registration 都无法改变已有 Application 或 Index。
+
+`NewControllerManagerWithChannels` 会把生命周期安全的 `Channels` interface 附给 manager 生成的
+Application。`RebindChannels` 只影响之后生成的 Application/Index snapshot，绝不影响已经 compile 或正在
+serving 的 server。这有意区别于 Python 会把任意 handle stamp 到每个 node 的做法：Go 将 dependency 保留在
+compiled Index，绝不将它作为 model-node field 暴露。
+
 ### Telemetry
 
 `ApplicationDeclaration.Telemetry` 可选地提供一个 usage collector；

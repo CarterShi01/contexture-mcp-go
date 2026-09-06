@@ -122,6 +122,36 @@ The facade intentionally does not import the MCP SDK, `server`, or `web`.
 Import `server` or `web` only when the declaration is ready to be compiled for
 one of those Host surfaces.
 
+### Imperative registration
+
+`ApplicationDeclaration` is the normal Go composition root: it keeps its
+`Factory` values lazy until `Compile`. `NewControllerManager` is the separate,
+intentional imperative alternative for a program that wants registration to
+construct and validate a fixed forest before it declares an Application. Use
+the typed `RegisterRole`, `RegisterSkill`, and `RegisterTool` methods; their
+typed factory arguments make a standalone root's kind visible at the call site.
+`RegisterRoot` is available only for a caller that truly learns the kind at
+runtime.
+Go registration accepts factories rather than Python's class-or-instance union:
+wrap an existing declaration in a typed factory if needed. This makes the
+construction boundary explicit and lets the manager take ownership through its
+snapshot rather than exposing a mutable registered node.
+
+The manager owns a defensive registration snapshot. Root names share one
+namespace, roots are exposed as Roles then standalone Skills then standalone
+Tools (preserving registration order within each kind), and duplicate identity,
+cycles, wrong member groups, and invalid node facts fail at registration with
+typed error sentinels. `manager.Application(name)` and `manager.Compile(name)`
+snapshot the registered forest again; later caller mutation or registration
+cannot change an existing Application or Index.
+
+`NewControllerManagerWithChannels` attaches the lifecycle-safe `Channels`
+interface to Applications the manager produces. `RebindChannels` affects only
+future Application/Index snapshots, never a server that is already compiled or
+serving. This is deliberately different from Python's arbitrary handle stamped
+onto each node: Go keeps dependencies on the compiled Index and never exposes
+them as model-node fields.
+
 ### Telemetry
 
 `ApplicationDeclaration.Telemetry` optionally supplies the one usage collector
