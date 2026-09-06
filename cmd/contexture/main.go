@@ -36,13 +36,32 @@ func run(arguments []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stderr, "contexture: `contexture new` needs a project name.")
 		return 2
 	}
-	name, remainder, destination := arguments[1], arguments[2:], ""
+	name, remainder, destination, template, templateSet := arguments[1], arguments[2:], "", "project", false
 	for len(remainder) > 0 {
-		if remainder[0] != "--into" || destination != "" || len(remainder) < 2 {
-			_, _ = fmt.Fprintln(stderr, "contexture: use `contexture new NAME [--into DIR]`.")
+		if len(remainder) < 2 || (remainder[0] != "--into" && remainder[0] != "--template") {
+			_, _ = fmt.Fprintln(stderr, "contexture: use `contexture new NAME [--into DIR] [--template NAME]`.")
 			return 2
 		}
-		destination, remainder = remainder[1], remainder[2:]
+		switch remainder[0] {
+		case "--into":
+			if destination != "" {
+				_, _ = fmt.Fprintln(stderr, "contexture: use --into at most once.")
+				return 2
+			}
+			destination = remainder[1]
+		case "--template":
+			if templateSet {
+				_, _ = fmt.Fprintln(stderr, "contexture: use --template at most once.")
+				return 2
+			}
+			template = remainder[1]
+			templateSet = true
+		}
+		remainder = remainder[2:]
+	}
+	if template != "project" {
+		_, _ = fmt.Fprintf(stderr, "contexture: unknown template %q. Available: project.\n", template)
+		return 2
 	}
 	root, err := NewProject(name, destination)
 	if err != nil {
@@ -53,7 +72,7 @@ func run(arguments []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	_, _ = fmt.Fprintln(stdout, "Wrote "+root)
-	_, _ = fmt.Fprintln(stdout, "Next: go mod tidy && go run ./cmd/assistant")
+	_, _ = fmt.Fprintln(stdout, "Next: go mod tidy && go run ./cmd/assistant check")
 	return 0
 }
 

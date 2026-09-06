@@ -138,6 +138,27 @@ no-argument, read-only content Tool, so use it only when that local read is
 intended. With no project configuration or explicit target, `inspect` replays
 the bundled demo and reports that fallback on stderr.
 
+## Create and run a project
+
+The native command creates the single supported `project` template. Its
+generated application owns its local workflows, so run them from the new
+project rather than from this repository:
+
+```bash
+contexture new operations --template project
+cd operations
+go mod tidy
+go run ./cmd/assistant check
+go run ./cmd/assistant list
+go run ./cmd/assistant inspect --all --summary
+go run ./cmd/assistant call operations/ping --input '{"target":"local"}'
+```
+
+`contexture new` refuses an existing destination and unknown templates. The
+generated `check` validates without opening application dependencies; `call`
+uses the same runtime Binding as a served application and requires
+`--allow-write` for a writing Tool.
+
 ## Host configuration
 
 Keep host configuration as a pointer to the server command, rather than a copy
