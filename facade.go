@@ -52,6 +52,13 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 	return model.DeclareApplication(declaration)
 }
 
+// Contexture declares one lazy application through the public concept name
+// used by the reference binding. Go callers may continue to use
+// DeclareApplication when its error-returning operation is clearer at call sites.
+func Contexture(declaration ApplicationDeclaration) (*Application, error) {
+	return DeclareApplication(declaration)
+}
+
 // Compile builds one fresh canonical forest from a lazy Application.
 func Compile(application *Application) (*Index, error) {
 	return model.Compile(application)

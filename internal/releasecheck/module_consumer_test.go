@@ -31,6 +31,7 @@ import (
 )
 
 var _ = contexture.NewPrincipal
+var _ = contexture.Contexture
 var _ = inspection.Replay
 var _ = server.NewMCPServer
 var _ = server.Auth{}
