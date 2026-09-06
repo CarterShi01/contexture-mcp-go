@@ -64,6 +64,7 @@ type Tool struct {
 	Description string
 	ReadOnly    bool
 	Uses        []string
+	binding     Binding
 }
 
 func (*Tool) nodeKind() Kind               { return ToolKind }

@@ -9,7 +9,7 @@
     "1": { "status": "implemented", "evidence": ["application_test.go"] },
     "2": { "status": "in-progress", "evidence": ["compiler_test.go"] },
     "3": { "status": "in-progress", "evidence": ["compiler_test.go"] },
-    "4": { "status": "not-started", "evidence": [] },
+    "4": { "status": "in-progress", "evidence": ["binding_test.go"] },
     "5": { "status": "not-started", "evidence": [] },
     "6": { "status": "not-started", "evidence": [] },
     "7": { "status": "not-started", "evidence": [] },
