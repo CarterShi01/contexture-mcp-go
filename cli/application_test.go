@@ -41,3 +41,18 @@ func TestRunApplicationRunsLocalProjectWorkflows(t *testing.T) {
 		t.Fatalf("approved write = %d, %q, %q", status, stdout, stderr)
 	}
 }
+
+func TestServeArgumentsShareTheSafeTransportPolicy(t *testing.T) {
+	for _, arguments := range [][]string{
+		{"serve", "--host", "127.0.0.1"},
+		{"serve", "--transport", "stdio", "--port", "8000"},
+		{"serve", "--transport", "streamable-http", "--host", "0.0.0.0"},
+		{"serve", "--transport", "not-a-transport"},
+		{"serve", "--port", "not-a-number"},
+	} {
+		status, _, stderr := runDemo(t, arguments...)
+		if status != 2 || !strings.HasPrefix(stderr, "contexture: ") {
+			t.Fatalf("serve %q = %d, %q", arguments, status, stderr)
+		}
+	}
+}

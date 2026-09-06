@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
@@ -178,17 +179,81 @@ func runCall(ctx context.Context, application *server.RuntimeApplication, argume
 }
 
 func runServe(ctx context.Context, application *contexture.Application, arguments []string, stdout, stderr io.Writer) int {
-	if len(arguments) != 0 {
-		return fail(stderr, 2, "serve transport options are not installed yet.")
+	options, err := parseServeOptions(arguments)
+	if err != nil {
+		return fail(stderr, 2, err.Error())
 	}
 	assembly, err := server.BuildServer(application)
 	if err != nil {
 		return fail(stderr, 1, err.Error())
 	}
-	if err := assembly.Start(ctx, nil); err != nil {
+	if options.Transport == server.StreamableHTTPTransport {
+		_, _ = fmt.Fprintln(stdout, "Serving "+application.Name()+" at "+options.URL())
+	}
+	if err := assembly.Start(ctx, options); err != nil {
 		return fail(stderr, 1, err.Error())
 	}
 	return 0
+}
+
+func parseServeOptions(arguments []string) (*server.ContextureOptions, error) {
+	options := server.ContextureOptions{Transport: server.StdioTransport}
+	seen := map[string]bool{}
+	for len(arguments) > 0 {
+		argument := arguments[0]
+		arguments = arguments[1:]
+		switch argument {
+		case "--allow-anonymous":
+			if seen[argument] {
+				return nil, fmt.Errorf("use --allow-anonymous at most once")
+			}
+			seen[argument] = true
+			options.AllowAnonymous = true
+		case "--transport", "--host", "--port", "--path", "--allow-host", "--allow-origin":
+			if len(arguments) == 0 || strings.HasPrefix(arguments[0], "--") {
+				return nil, fmt.Errorf("%s needs a value", argument)
+			}
+			value := arguments[0]
+			arguments = arguments[1:]
+			switch argument {
+			case "--transport":
+				if seen[argument] {
+					return nil, fmt.Errorf("use --transport at most once")
+				}
+				seen[argument] = true
+				options.Transport = server.Transport(value)
+			case "--host":
+				if seen[argument] {
+					return nil, fmt.Errorf("use --host at most once")
+				}
+				seen[argument] = true
+				options.Host = value
+			case "--port":
+				if seen[argument] {
+					return nil, fmt.Errorf("use --port at most once")
+				}
+				seen[argument] = true
+				port, err := strconv.Atoi(value)
+				if err != nil {
+					return nil, fmt.Errorf("--port must be an integer: %w", err)
+				}
+				options.Port = port
+			case "--path":
+				if seen[argument] {
+					return nil, fmt.Errorf("use --path at most once")
+				}
+				seen[argument] = true
+				options.Path = value
+			case "--allow-host":
+				options.AllowedHosts = append(options.AllowedHosts, value)
+			case "--allow-origin":
+				options.AllowedOrigins = append(options.AllowedOrigins, value)
+			}
+		default:
+			return nil, fmt.Errorf("use serve [--transport stdio|streamable-http] [--host HOST] [--port PORT] [--path PATH] [--allow-host HOST] [--allow-origin ORIGIN] [--allow-anonymous]")
+		}
+	}
+	return server.NewContextureOptions(options)
 }
 
 func fail(stderr io.Writer, status int, message string) int {

@@ -44,12 +44,13 @@ func (server *ApplicationServer) Build() (*ContextureMCPServer, error) {
 // Start blocks while serving stdio or streamable HTTP with Channels open for the lifetime.
 func (server *ApplicationServer) Start(ctx context.Context, options *ContextureOptions) error {
 	if options == nil {
-		var err error
-		options, err = NewContextureOptions(ContextureOptions{})
-		if err != nil {
-			return err
-		}
+		options = &ContextureOptions{}
 	}
+	validated, err := NewContextureOptions(*options)
+	if err != nil {
+		return err
+	}
+	options = validated
 	if options.Transport == StdioTransport {
 		return server.application.Runtime.Serve(ctx, func(ctx context.Context) error {
 			adapter, err := server.Build()
@@ -71,7 +72,15 @@ func (server *ApplicationServer) ServeListener(ctx context.Context, listener net
 	if server == nil || server.application == nil || listener == nil {
 		return fmt.Errorf("Contexture HTTP server requires an application and listener")
 	}
-	if options == nil || options.Transport != StreamableHTTPTransport {
+	if options == nil {
+		return &ServeError{Message: "ServeListener requires transport='streamable-http'."}
+	}
+	validated, err := NewContextureOptions(*options)
+	if err != nil {
+		return err
+	}
+	options = validated
+	if options.Transport != StreamableHTTPTransport {
 		return &ServeError{Message: "ServeListener requires transport='streamable-http'."}
 	}
 	adapter, err := server.Build()

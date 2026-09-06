@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/CarterShi01/contexture-mcp-go/cli"
+	"github.com/CarterShi01/contexture-mcp-go/demo"
 )
 
 const cliVersion = "0.12.0rc1"
@@ -54,8 +58,12 @@ func run(arguments []string, stdout, stderr io.Writer) int {
 func runProjectCommand(arguments []string, stdout, stderr io.Writer) int {
 	command := arguments[0]
 	if command == "demo" {
-		_, _ = fmt.Fprintln(stderr, "contexture: demo is not installed in this build yet.")
-		return 2
+		application, err := demo.Application()
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "contexture: cannot build bundled demo: %v\n", err)
+			return 1
+		}
+		return cli.RunApplication(context.Background(), application, append([]string{"serve"}, arguments[1:]...), stdout, stderr)
 	}
 	if command != "list" && command != "check" && command != "call" && command != "inspect" && command != "serve" {
 		_, _ = fmt.Fprintln(stderr, "contexture: expected new, list, check, call, inspect, serve, or demo.")
