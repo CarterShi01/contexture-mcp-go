@@ -62,11 +62,27 @@ restarts, so the symptom is visible long before the cause is.
 
 ## Order of investigation
 
-1. **Status first.** A high ` + "`restart_count`" + ` with ` + "`ready: false`" + ` confirms the loop rather than a slow start.
+1. **Status first.** A high ` + "`restart_count`" + ` with ` + "`ready: false`" + ` confirms the
+   loop rather than a slow start.
 2. **Logs before events.** The container's own output names the failure.
-3. **Correlate the exit code.** Exit code 1 is an application-level failure.
+   Events describe what the kubelet observed, which is one level removed.
+3. **Correlate the exit code.** Exit code 1 is an application-level failure:
+   the process ran and then rejected its own state. Exit code 137 would mean
+   it was killed, usually for memory, which is a different runbook.
 
-Restarting the Pod does not repair a configuration error; identify the cause first.
+## Common causes, in the order they are usually found
+
+| Evidence in logs | Cause | Remediation |
+| --- | --- | --- |
+| ` + "`ConfigurationError`" + `, missing variable | Config or Secret not projected into the Pod | Add the key to the ConfigMap or Secret, then roll out |
+| Connection refused to a dependency | Dependency unavailable, or wrong address | Fix the address, or wait for the dependency |
+| Panic or uncaught exception on startup | Application defect | Roll back to the last good image |
+| OOMKilled, exit 137 | Memory limit too low | Raise the limit |
+
+## Do not
+
+Restarting the Pod does not repair a configuration error; it produces restart
+15. Identify the cause before recommending any change.
 `
 
 var RollbackPolicy = `# Policy: rolling back a failed release
@@ -74,6 +90,15 @@ var RollbackPolicy = `# Policy: rolling back a failed release
 A rollback is a remediation, not a diagnosis. It restores the previous revision
 and destroys the evidence of why the current one failed.
 
-Before rolling back, establish the cause from workload output, capture logs and
-events, and check whether the cause is in the image at all.
+Before rolling back:
+
+- Establish the cause from the workload's own output. A rollback that follows a
+  guess teaches nothing and will be needed again on the next release.
+- Capture logs and events first. The failing Pods are replaced immediately.
+- Check whether the cause is in the image at all. A missing environment
+  variable, a bad ConfigMap, or an absent Secret follows the previous revision
+  back and reappears.
+
+After rolling back, the incident is not closed. The release that failed is
+still the release that will be re-attempted.
 `
