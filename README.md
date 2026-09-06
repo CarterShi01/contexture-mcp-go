@@ -164,6 +164,8 @@ checks validate implemented behavior, not a full-product release claim.
 
 ## Repository map
 
+The architecture document is also available in [Simplified Chinese](docs/architecture.zh-CN.md).
+
 ```text
 facade.go        public declaration-facing SDK-neutral facade
 core/foundation/ errors and pinned specification identity

@@ -158,6 +158,8 @@ Go 实现生成真实观察结果，再与这些资产比较。上述命令验�
 
 ## 仓库结构
 
+架构文档也提供[英文原文](docs/architecture.md)。
+
 ```text
 facade.go        面向声明的公开、SDK-neutral facade
 core/foundation/ 错误与锁定的规范身份
