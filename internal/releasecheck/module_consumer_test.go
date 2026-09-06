@@ -25,11 +25,13 @@ func TestExternalModuleConsumerCompilesPublicEntrypoints(t *testing.T) {
 
 import (
     contexture "github.com/CarterShi01/contexture-mcp-go"
+    "github.com/CarterShi01/contexture-mcp-go/inspection"
     "github.com/CarterShi01/contexture-mcp-go/server"
     "github.com/CarterShi01/contexture-mcp-go/web"
 )
 
 var _ = contexture.NewPrincipal
+var _ = inspection.Replay
 var _ = server.NewMCPServer
 var _ = web.NewRestRouter
 
