@@ -9,11 +9,12 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	contexture "github.com/CarterShi01/contexture-mcp-go"
 	"github.com/CarterShi01/contexture-mcp-go/cli"
 	"github.com/CarterShi01/contexture-mcp-go/demo"
 )
 
-const cliVersion = "0.12.0rc1"
+const cliVersion = contexture.Version
 
 var errNoProject = errors.New("no Go Contexture project found in this directory or above it")
 

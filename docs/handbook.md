@@ -88,6 +88,22 @@ func main() {
 the application name. Use a factory for every Role, Skill, and Tool:
 compilation creates a fresh immutable graph snapshot from those factories.
 
+The root `contexture` package is the SDK-neutral declaration facade. Its
+native authoring inventory is `ApplicationDeclaration`, `Factory`, `Role`,
+`Skill`, `Tool`, `Channels`, `Principal`, `Prompt`, and `Resource`.
+`Prompt` and `Resource` are data declarations (aliases of the retained
+`PromptDeclaration` and `ResourceDeclaration` spellings), not Python-style
+subclass bases. Populate `Prompts` and `Resources` on `ApplicationDeclaration`
+with those values. Go reports declaration and invocation categories through
+error sentinels such as `ErrInvalidDeclaration`, `ErrDuplicate`, and
+`ErrInvalidInput`, checked with `errors.Is`, rather than Python exception
+classes. `contexture.Version` is the binding package version; it is distinct
+from `contexture.SpecificationVersion`.
+
+The facade intentionally does not import the MCP SDK, `server`, or `web`.
+Import `server` or `web` only when the declaration is ready to be compiled for
+one of those Host surfaces.
+
 ## 3. Choose the right node
 
 | Use | When it belongs there |

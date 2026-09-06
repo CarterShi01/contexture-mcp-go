@@ -15,8 +15,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const packageVersion = "0.12.0rc1"
-
 // ApplicationServer owns one compiled declaration and its official MCP transport assembly.
 type ApplicationServer struct {
 	application  *RuntimeApplication
@@ -48,7 +46,7 @@ func BuildServerWithOptions(application *contexture.Application, options Applica
 	if err != nil {
 		return nil, err
 	}
-	return &ApplicationServer{application: compiled, identity: Identity{Name: application.Name(), Version: packageVersion}, instructions: options.Instructions}, nil
+	return &ApplicationServer{application: compiled, identity: Identity{Name: application.Name(), Version: contexture.Version}, instructions: options.Instructions}, nil
 }
 
 // Build constructs a fresh official-SDK server for one Contexture transport service.

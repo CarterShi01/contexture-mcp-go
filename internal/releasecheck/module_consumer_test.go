@@ -32,6 +32,11 @@ import (
 
 var _ = contexture.NewPrincipal
 var _ = contexture.Contexture
+var _ = contexture.DeclareApplication
+var _ = contexture.Version
+var _ = contexture.ErrInvalidDeclaration
+var _ contexture.Prompt = contexture.Prompt{Opens: "operations"}
+var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
 var _ = server.NewMCPServer
 var _ = server.Auth{}

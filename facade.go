@@ -16,24 +16,30 @@ type (
 	Tool                   = model.Tool
 	Application            = model.Application
 	ApplicationDeclaration = model.ApplicationDeclaration
-	PromptDeclaration      = model.PromptDeclaration
-	ResourceDeclaration    = model.ResourceDeclaration
-	Binding                = model.Binding
-	CleanupRegistrar       = model.CleanupRegistrar
-	Channels               = model.Channels
-	Index                  = model.Index
-	RootSelection          = model.RootSelection
-	Disclosure             = model.Disclosure
-	GatewayName            = model.GatewayName
-	GatewayTool            = model.GatewayTool
-	Gateway                = model.Gateway
-	Telemetry              = model.Telemetry
-	CallEvent              = model.CallEvent
-	MemoryTelemetry        = model.MemoryTelemetry
-	Runtime                = model.Runtime
-	SelectedGraph          = model.SelectedGraph
-	Principal              = foundation.Principal
-	PrincipalOptions       = foundation.PrincipalOptions
+	// Prompt is the native data declaration for one person-controlled MCP prompt.
+	// PromptDeclaration remains an equivalent explicit spelling for compatibility.
+	Prompt            = model.PromptDeclaration
+	PromptDeclaration = model.PromptDeclaration
+	// Resource is the native data declaration for one host-readable MCP resource.
+	// ResourceDeclaration remains an equivalent explicit spelling for compatibility.
+	Resource            = model.ResourceDeclaration
+	ResourceDeclaration = model.ResourceDeclaration
+	Binding             = model.Binding
+	CleanupRegistrar    = model.CleanupRegistrar
+	Channels            = model.Channels
+	Index               = model.Index
+	RootSelection       = model.RootSelection
+	Disclosure          = model.Disclosure
+	GatewayName         = model.GatewayName
+	GatewayTool         = model.GatewayTool
+	Gateway             = model.Gateway
+	Telemetry           = model.Telemetry
+	CallEvent           = model.CallEvent
+	MemoryTelemetry     = model.MemoryTelemetry
+	Runtime             = model.Runtime
+	SelectedGraph       = model.SelectedGraph
+	Principal           = foundation.Principal
+	PrincipalOptions    = foundation.PrincipalOptions
 )
 
 const (

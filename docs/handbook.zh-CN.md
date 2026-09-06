@@ -83,6 +83,18 @@ func main() {
 惰性 factory 并规范化 application 名称。每个 Role、Skill、Tool 都应通过 factory 声明；编译会
 从这些 factory 创建新的不可变 graph snapshot。
 
+根 `contexture` package 是 SDK-neutral 的 declaration facade。其原生 authoring inventory 包括
+`ApplicationDeclaration`、`Factory`、`Role`、`Skill`、`Tool`、`Channels`、`Principal`、`Prompt`
+和 `Resource`。`Prompt` 与 `Resource` 是数据 declaration（分别是保留的 `PromptDeclaration` 和
+`ResourceDeclaration` 写法的 alias），不是 Python 风格的 subclass base。应使用这些值填充
+`ApplicationDeclaration` 的 `Prompts` 与 `Resources`。Go 通过 `ErrInvalidDeclaration`、
+`ErrDuplicate`、`ErrInvalidInput` 等 error sentinel 报告 declaration 与 invocation 类别，并用
+`errors.Is` 判断，而不是使用 Python exception class。`contexture.Version` 是 binding package version，
+与 `contexture.SpecificationVersion` 不同。
+
+该 facade 有意不导入 MCP SDK、`server` 或 `web`。只有在 declaration 准备好被编译到某个 Host
+surface 时，才导入 `server` 或 `web`。
+
 ## 3. 选择正确的节点
 
 | 使用 | 适用情形 |

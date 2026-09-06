@@ -3,6 +3,10 @@ package contexture
 import "github.com/CarterShi01/contexture-mcp-go/core/foundation"
 
 const (
+	// Version is the Go binding package version. It is independent from the
+	// specification version because one binding release can target one contract.
+	Version = "0.12.0rc1"
+
 	// SpecificationVersion is the Contexture contract targeted by this binding.
 	SpecificationVersion = foundation.SpecificationVersion
 
