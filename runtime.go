@@ -66,6 +66,19 @@ type Runtime struct {
 	telemetry Telemetry
 }
 
+// Tool resolves an executable Tool in this Runtime's immutable Index.
+func (runtime *Runtime) Tool(ref string) (*Tool, error) {
+	node, err := runtime.index.Find(ref)
+	if err != nil {
+		return nil, err
+	}
+	tool, ok := node.(*Tool)
+	if !ok {
+		return nil, fmt.Errorf("%s names a %s, not a tool. Open it with contexture_open.", ref, node.nodeKind())
+	}
+	return tool, nil
+}
+
 // NewRuntime constructs a transport-neutral runtime over one bound Index.
 func NewRuntime(index *Index, selection, ceiling RootSelection, telemetry Telemetry) (*Runtime, error) {
 	if index == nil {
