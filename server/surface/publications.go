@@ -64,19 +64,30 @@ func NewPublications(application *contexture.Application, disclosure *contexture
 // normal model-visible node. The target card remains visible through its
 // parent, but only a person-controlled Prompt or goto may open a reserved ref.
 func (publications *Publications) OpenForModel(ref string, selection contexture.RootSelection) (map[string]any, error) {
+	if err := publications.CheckModelOpen(ref, selection); err != nil {
+		return nil, err
+	}
+	return publications.disclosure.Open(ref, selection)
+}
+
+// CheckModelOpen applies publication-only authorization before a server asks
+// its Gateway to open a ref. Keeping this separate lets the server send every
+// ordinary lookup through Gateway.Open, where typed lookup facts become the
+// fixed agent-facing recovery sentence exactly once.
+func (publications *Publications) CheckModelOpen(ref string, selection contexture.RootSelection) error {
 	// Check the request ceiling before any publication-specific reservation so a
 	// hidden root cannot reveal that it happens to be person-controlled.
 	effective, err := publications.effective(selection)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err := effective.RequireRef(ref); err != nil {
-		return nil, err
+		return err
 	}
 	if _, reserved := publications.reserved[ref]; reserved {
-		return nil, fmt.Errorf("%s", contexture.TakenByPersonMessage(ref))
+		return &contexture.RefusedError{Message: contexture.TakenByPersonMessage(ref)}
 	}
-	return publications.disclosure.Open(ref, selection)
+	return nil
 }
 
 // PromptCards returns selected prompt cards plus Contexture's fixed goto prompt.

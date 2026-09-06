@@ -45,7 +45,9 @@ func TestOfficialSDKExposesOnlyFixedGatewayAndPreservesInvocationDoors(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	adapter := server.NewContextureMCPServer(server.Identity{Name: "gateway-test", Version: "0.0.0"}, gateway)
+	// Install Publications too: the open route must still delegate ordinary
+	// missing refs to Gateway.Open's recovery layer.
+	adapter := server.NewContextureMCPServer(server.Identity{Name: "gateway-test", Version: "0.0.0"}, gateway, compiled.Publications)
 	ctx := context.Background()
 	client := mcp.NewClient(&mcp.Implementation{Name: "gateway-test-client", Version: "0.0.0"}, nil)
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()

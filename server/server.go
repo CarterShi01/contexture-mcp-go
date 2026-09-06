@@ -142,7 +142,9 @@ func callGateway(ctx context.Context, gateway *contexture.Gateway, name contextu
 		return gateway.Discover(selection)
 	case contexture.OpenGatewayName:
 		if publications != nil {
-			return publications.OpenForModel(input.Ref, selection)
+			if err := publications.CheckModelOpen(input.Ref, selection); err != nil {
+				return nil, err
+			}
 		}
 		return gateway.Open(input.Ref, selection)
 	case contexture.InvokeReadOnlyGatewayName:
