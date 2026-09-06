@@ -76,6 +76,13 @@ The normative contract remains in the
 Go APIs should follow Go conventions while producing the same observable
 behavior and protocol payloads.
 
+Implementation sessions begin with the reference repository's
+[`spec/porting/TERRA_GOAL.md`](https://github.com/CarterShi01/contexture-mcp/blob/master/spec/porting/TERRA_GOAL.md)
+and use its conformance matrix as the task ledger. `go run
+./internal/conformancecheck` verifies this repository's revision pin, all 16
+rule states, and the required fixture and golden inventories; it does not claim
+those assets were executed.
+
 ## Repository map
 
 ```text

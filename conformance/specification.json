@@ -5,5 +5,42 @@
   "specificationVersion": "0.12",
   "status": "scaffold",
   "implementedRules": [1],
+  "rules": {
+    "1": { "status": "implemented", "evidence": ["application_test.go"] },
+    "2": { "status": "not-started", "evidence": [] },
+    "3": { "status": "not-started", "evidence": [] },
+    "4": { "status": "not-started", "evidence": [] },
+    "5": { "status": "not-started", "evidence": [] },
+    "6": { "status": "not-started", "evidence": [] },
+    "7": { "status": "not-started", "evidence": [] },
+    "8": { "status": "not-started", "evidence": [] },
+    "9": { "status": "not-started", "evidence": [] },
+    "10": { "status": "not-started", "evidence": [] },
+    "11": { "status": "not-started", "evidence": [] },
+    "12": { "status": "not-started", "evidence": [] },
+    "13": { "status": "not-started", "evidence": [] },
+    "14": { "status": "not-started", "evidence": [] },
+    "15": { "status": "not-started", "evidence": [] },
+    "16": { "status": "not-started", "evidence": [] }
+  },
+  "fixtures": [
+    "disclosure-only-application.json",
+    "prompt-roots-application.json",
+    "reference-application.json",
+    "rest-routes.json",
+    "root-selections.json"
+  ],
+  "golden": [
+    "commands.json",
+    "completions.json",
+    "discover.json",
+    "instructions.txt",
+    "open.json",
+    "prompts.json",
+    "reads.json",
+    "refusals.json",
+    "resources.json",
+    "tools.json"
+  ],
   "notes": "Only lazy application declaration is implemented. No module release may claim full conformance yet."
 }

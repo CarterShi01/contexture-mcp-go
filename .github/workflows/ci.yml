@@ -27,6 +27,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
       - run: go mod download
+      - run: go run ./internal/conformancecheck
       - run: go test -race ./...
 
   quality:
