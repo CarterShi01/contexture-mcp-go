@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -59,5 +60,38 @@ func TestNewProjectWritesStarterAndRefusesOverwrite(t *testing.T) {
 	}
 	if _, err := NewProject("My Context", filepath.Dir(root)); err == nil {
 		t.Fatal("existing project was overwritten")
+	}
+}
+
+func TestGeneratedProjectRunsItsNativeCheckWorkflow(t *testing.T) {
+	root, err := NewProject("Generated Context", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := filepath.Clean(filepath.Join(workingDirectory, "..", ".."))
+	module, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), append(module, []byte("\nreplace github.com/CarterShi01/contexture-mcp-go => "+repository+"\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tidy := exec.CommandContext(t.Context(), "go", "mod", "tidy")
+	tidy.Dir = root
+	if output, err := tidy.CombinedOutput(); err != nil {
+		t.Fatalf("generated go mod tidy failed: %v\n%s", err, output)
+	}
+	command := exec.CommandContext(t.Context(), "go", "run", "./cmd/assistant", "check")
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generated check failed: %v\n%s", err, output)
+	}
+	if !strings.Contains(string(output), "OK generated-context: 1 role(s), 1 skill(s), 1 tool(s)") {
+		t.Fatalf("generated check output = %q", output)
 	}
 }
