@@ -111,6 +111,23 @@ func main() {
 `server` 包拥有官方 MCP Go SDK，`web` 包拥有显式 `net/http` REST 适配器。请求级事实通过
 `context.Context` 传递，应用依赖通过 `Channels` 管理并按逆序清理。
 
+## Host 配置
+
+Host 配置应当指向启动服务器的命令，而不是复制应用已经声明的 context。`server.Launch`
+可以生成 Claude Code、Cursor 和 Codex 所需的准确格式：
+
+```go
+launch := server.Launch{
+	Name: "operations", Command: "go",
+	Args: []string{"run", "./cmd/assistant", "serve"},
+}
+fmt.Print(server.ClaudeCodeConfig(launch)) // .mcp.json 或 .cursor/mcp.json
+fmt.Print(server.CodexConfig(launch))      // ~/.codex/config.toml 的 stanza
+```
+
+`server.CLICommands(launch)` 会返回经过安全 shell 引用的 `claude mcp add` 与
+`codex mcp add` 命令。使用自定义 stdio 入口的应用也可复用同一 API。
+
 ## 运行项目
 
 Go CLI 运行项目 `cmd/assistant/main.go` 中静态声明的 application；它不会依据字符串

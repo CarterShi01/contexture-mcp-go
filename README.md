@@ -115,6 +115,25 @@ package is SDK-neutral; `server` owns the official MCP Go SDK and `web` owns
 explicit `net/http` REST adapters. Request-local facts use `context.Context`, and
 application dependencies use `Channels` with reverse-order cleanup.
 
+## Host configuration
+
+Keep host configuration as a pointer to the server command, rather than a copy
+of an application's declared context. `server.Launch` produces the exact
+formats for Claude Code, Cursor, and Codex:
+
+```go
+launch := server.Launch{
+	Name: "operations", Command: "go",
+	Args: []string{"run", "./cmd/assistant", "serve"},
+}
+fmt.Print(server.ClaudeCodeConfig(launch)) // .mcp.json or .cursor/mcp.json
+fmt.Print(server.CodexConfig(launch))      // stanza for ~/.codex/config.toml
+```
+
+`server.CLICommands(launch)` returns safely quoted `claude mcp add` and `codex
+mcp add` commands. The same API works for applications with a custom stdio
+entry point.
+
 ## Run a project
 
 The Go CLI runs the static application declared by a project's
