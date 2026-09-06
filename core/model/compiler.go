@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -189,9 +190,68 @@ func (index *Index) PromptRoots() []Node { return index.cloneNodes(index.promptR
 func (index *Index) Find(ref string) (Node, error) {
 	node, ok := index.byRef[ref]
 	if !ok {
-		return nil, fmt.Errorf("unknown Contexture reference %q", ref)
+		return nil, index.lookupFailure(ref)
 	}
 	return cloneNode(node, index, ref), nil
+}
+
+func (index *Index) lookupFailure(ref string) *NodeNotFoundError {
+	segments := []string{}
+	for _, segment := range strings.Split(ref, "/") {
+		if segment != "" {
+			segments = append(segments, segment)
+		}
+	}
+	if len(segments) == 0 {
+		return &NodeNotFoundError{Reason: EmptyRef, Ref: ref}
+	}
+	rootRef := segments[0]
+	current, exists := index.byRef[rootRef]
+	if !exists {
+		known := make([]string, 0, len(index.roots))
+		for _, root := range index.roots {
+			known = append(known, root.nodeName())
+		}
+		sort.Strings(known)
+		return &NodeNotFoundError{Reason: NoSuchRoot, Ref: ref, Segment: rootRef, Scope: rootRef, Known: known}
+	}
+	for depth := 1; depth < len(segments); depth++ {
+		role, ok := current.(*Role)
+		if !ok {
+			return &NodeNotFoundError{Reason: NotAContainer, Ref: ref, Segment: segments[depth], Scope: current.nodeName(), Kind: string(current.nodeKind())}
+		}
+		known := []string{}
+		var next Node
+		for _, candidateRef := range index.order {
+			candidate := index.byRef[candidateRef]
+			if index.parent[candidate] != role {
+				continue
+			}
+			known = append(known, candidate.nodeName())
+			if candidate.nodeName() == segments[depth] {
+				next = candidate
+			}
+		}
+		if next == nil {
+			sort.Strings(known)
+			return &NodeNotFoundError{Reason: NoSuchMember, Ref: ref, Segment: segments[depth], Scope: role.Name, Kind: string(role.nodeKind()), Known: known}
+		}
+		current = next
+	}
+	return &NodeNotFoundError{Reason: NoSuchMember, Ref: ref, Segment: segments[len(segments)-1]}
+}
+
+// Tool resolves one canonical ref that must name a Tool.
+func (index *Index) Tool(ref string) (*Tool, error) {
+	node, err := index.Find(ref)
+	if err != nil {
+		return nil, err
+	}
+	tool, ok := node.(*Tool)
+	if !ok {
+		return nil, &NodeNotFoundError{Reason: WrongKind, Ref: ref, Kind: string(node.nodeKind()), Wanted: string(ToolKind)}
+	}
+	return tool, nil
 }
 
 // RefOf returns a canonical address for a node compiled into this Index.

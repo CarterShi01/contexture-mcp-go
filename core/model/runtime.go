@@ -67,15 +67,7 @@ type Runtime struct {
 
 // Tool resolves an executable Tool in this Runtime's immutable Index.
 func (runtime *Runtime) Tool(ref string) (*Tool, error) {
-	node, ok := runtime.index.byRef[ref]
-	if !ok {
-		return nil, fmt.Errorf("unknown Contexture reference %q", ref)
-	}
-	tool, ok := node.(*Tool)
-	if !ok {
-		return nil, fmt.Errorf("%s names a %s, not a tool. Open it with contexture_open.", ref, node.nodeKind())
-	}
-	return cloneNode(tool, runtime.index, ref).(*Tool), nil
+	return runtime.index.Tool(ref)
 }
 
 // NewRuntime constructs a transport-neutral runtime over one bound Index.
@@ -119,13 +111,13 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	if err := selection.RequireRef(ref); err != nil {
 		return nil, err
 	}
-	node, ok := runtime.index.byRef[ref]
-	if !ok {
-		return nil, fmt.Errorf("unknown Contexture reference %q", ref)
-	}
-	tool, ok := node.(*Tool)
-	if !ok {
-		return nil, fmt.Errorf("%s names a %s, not a tool. Open it with contexture_open.", ref, node.nodeKind())
+	tool, err := runtime.index.Tool(ref)
+	if err != nil {
+		var failure *NodeNotFoundError
+		if errors.As(err, &failure) && failure.Reason == WrongKind {
+			return nil, runtimeWrongKindError{failure: failure}
+		}
+		return nil, err
 	}
 	if tool.ReadOnly != readOnly {
 		correct := "contexture_invoke"
@@ -168,6 +160,16 @@ type wrongDoorError string
 
 func (err wrongDoorError) Error() string { return string(err) }
 func (err wrongDoorError) Unwrap() error { return ErrWrongDoor }
+
+// runtimeWrongKindError retains the established agent-facing invocation text
+// while unwrapping to the typed lookup facts exposed by Index.Tool.
+type runtimeWrongKindError struct{ failure *NodeNotFoundError }
+
+func (err runtimeWrongKindError) Error() string {
+	return fmt.Sprintf("%s names a %s, not a tool. Open it with contexture_open.", err.failure.Ref, err.failure.Kind)
+}
+
+func (err runtimeWrongKindError) Unwrap() error { return err.failure }
 
 // WithPrincipal derives a request context carrying framework identity.
 func WithPrincipal(ctx context.Context, principal *foundation.Principal) context.Context {

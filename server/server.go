@@ -57,8 +57,12 @@ func newContextureMCPServerForRoots(identity Identity, gateway *contexture.Gatew
 	} else if instructions != "" {
 		server = newMCPServer(identity, instructions, nil)
 	}
+	var publication *surface.Publications
+	if len(publications) > 0 {
+		publication = publications[0]
+	}
 	for _, tool := range gateway.Tools() {
-		registerGatewayTool(server, gateway, tool, selection)
+		registerGatewayTool(server, gateway, tool, selection, publication)
 	}
 	if len(publications) > 0 && publications[0] != nil {
 		registerPublications(server, publications[0], selection)
@@ -97,10 +101,10 @@ func completionHandler(publications *surface.Publications, selection contexture.
 	}
 }
 
-func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool contexture.GatewayTool, selection contexture.RootSelection) {
+func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool contexture.GatewayTool, selection contexture.RootSelection, publications *surface.Publications) {
 	definition := &mcp.Tool{Name: string(tool.Name), Description: tool.Description, InputSchema: gatewaySchema(tool.Name), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: tool.ReadOnly}}
 	server.AddTool(definition, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		value, err := callGateway(ctx, gateway, tool.Name, request.Params.Arguments, selection)
+		value, err := callGateway(ctx, gateway, tool.Name, request.Params.Arguments, selection, publications)
 		if err != nil {
 			return toolFailure(err), nil
 		}
@@ -119,7 +123,7 @@ func gatewaySchema(name contexture.GatewayName) map[string]any {
 	return map[string]any{"type": "object", "properties": properties, "required": []string{"ref"}}
 }
 
-func callGateway(ctx context.Context, gateway *contexture.Gateway, name contexture.GatewayName, raw json.RawMessage, selection contexture.RootSelection) (any, error) {
+func callGateway(ctx context.Context, gateway *contexture.Gateway, name contexture.GatewayName, raw json.RawMessage, selection contexture.RootSelection, publications *surface.Publications) (any, error) {
 	if principal := PrincipalOf(ctx); principal != nil {
 		ctx = contexture.WithPrincipal(ctx, principal)
 	}
@@ -137,6 +141,9 @@ func callGateway(ctx context.Context, gateway *contexture.Gateway, name contextu
 	case contexture.DiscoverGatewayName:
 		return gateway.Discover(selection)
 	case contexture.OpenGatewayName:
+		if publications != nil {
+			return publications.OpenForModel(input.Ref, selection)
+		}
 		return gateway.Open(input.Ref, selection)
 	case contexture.InvokeReadOnlyGatewayName:
 		return gateway.InvokeReadOnly(ctx, input.Ref, input.Arguments, selection)

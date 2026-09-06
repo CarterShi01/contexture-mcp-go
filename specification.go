@@ -29,4 +29,6 @@ var (
 	ErrWrongDoor = foundation.ErrWrongDoor
 	// ErrInvalidSelection identifies an invalid root-level capability projection.
 	ErrInvalidSelection = foundation.ErrInvalidSelection
+	// ErrNodeNotFound identifies failed canonical node lookup.
+	ErrNodeNotFound = foundation.ErrNodeNotFound
 )

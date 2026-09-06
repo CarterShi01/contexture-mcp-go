@@ -10,4 +10,16 @@ var (
 	ErrUnresolvedReference = foundation.ErrUnresolvedReference
 	ErrWrongDoor           = foundation.ErrWrongDoor
 	ErrInvalidSelection    = foundation.ErrInvalidSelection
+	ErrNodeNotFound        = foundation.ErrNodeNotFound
+)
+
+type LookupFailure = foundation.LookupFailure
+type NodeNotFoundError = foundation.NodeNotFoundError
+
+const (
+	EmptyRef      = foundation.EmptyRef
+	NoSuchRoot    = foundation.NoSuchRoot
+	NotAContainer = foundation.NotAContainer
+	NoSuchMember  = foundation.NoSuchMember
+	WrongKind     = foundation.WrongKind
 )

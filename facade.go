@@ -20,6 +20,7 @@ type (
 	// PromptDeclaration remains an equivalent explicit spelling for compatibility.
 	Prompt            = model.PromptDeclaration
 	PromptDeclaration = model.PromptDeclaration
+	ModelOpenPolicy   = model.ModelOpenPolicy
 	// Resource is the native data declaration for one host-readable MCP resource.
 	// ResourceDeclaration remains an equivalent explicit spelling for compatibility.
 	Resource            = model.ResourceDeclaration
@@ -40,12 +41,23 @@ type (
 	SelectedGraph       = model.SelectedGraph
 	Principal           = foundation.Principal
 	PrincipalOptions    = foundation.PrincipalOptions
+	LookupFailure       = foundation.LookupFailure
+	NodeNotFoundError   = foundation.NodeNotFoundError
 )
 
 const (
 	RoleKind  = model.RoleKind
 	SkillKind = model.SkillKind
 	ToolKind  = model.ToolKind
+
+	ModelMayOpen           = model.ModelMayOpen
+	ModelReservedForPerson = model.ModelReservedForPerson
+
+	EmptyRef      = foundation.EmptyRef
+	NoSuchRoot    = foundation.NoSuchRoot
+	NotAContainer = foundation.NotAContainer
+	NoSuchMember  = foundation.NoSuchMember
+	WrongKind     = foundation.WrongKind
 
 	DiscoverGatewayName       = model.DiscoverGatewayName
 	OpenGatewayName           = model.OpenGatewayName

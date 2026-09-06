@@ -100,6 +100,24 @@ error sentinels such as `ErrInvalidDeclaration`, `ErrDuplicate`, and
 classes. `contexture.Version` is the binding package version; it is distinct
 from `contexture.SpecificationVersion`.
 
+`Prompt.ModelOpen` uses a native zero-safe policy rather than a boolean whose
+zero value would accidentally reserve every Prompt target. Its default,
+`contexture.ModelMayOpen`, permits both model navigation and the named person
+Prompt. Set `ModelOpen: contexture.ModelReservedForPerson` to keep the target
+card visible in its parent while refusing only the model's direct open; the
+named Prompt and `goto` still open it for a person. Prompt and Resource facts
+that can be checked without compiling the graph (blank `Opens`, supplied blank
+`Name`, descriptions, URI, or an invalid policy) are rejected by
+`DeclareApplication`; target existence and Resource Tool shape are checked
+when publications compile.
+
+`Index.Find` and `Index.Tool` return a typed `*contexture.NodeNotFoundError`
+for failed canonical lookup. Use `errors.Is(err, contexture.ErrNodeNotFound)`
+and `errors.As` to read its `Reason`, `Ref`, segment, scope, kind, wanted kind,
+and known alternatives. This is the Go equivalent of Python's
+`NodeNotFoundError`; `LookupFailure` constants such as `NoSuchMember` and
+`WrongKind` make the facts machine-checkable without attaching Host prose.
+
 The facade intentionally does not import the MCP SDK, `server`, or `web`.
 Import `server` or `web` only when the declaration is ready to be compiled for
 one of those Host surfaces.

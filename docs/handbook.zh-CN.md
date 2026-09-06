@@ -92,6 +92,19 @@ func main() {
 `errors.Is` 判断，而不是使用 Python exception class。`contexture.Version` 是 binding package version，
 与 `contexture.SpecificationVersion` 不同。
 
+`Prompt.ModelOpen` 使用一个对 Go zero value 安全的 policy，而不是会意外保留全部 Prompt target 的
+boolean。默认值 `contexture.ModelMayOpen` 同时允许 model navigation 与具名 person Prompt。设置
+`ModelOpen: contexture.ModelReservedForPerson` 后，target card 仍会在其 parent 中可见，但只拒绝 model
+的直接 open；具名 Prompt 与 `goto` 仍可为 person 打开它。无需编译 graph 即可判断的 Prompt 与 Resource
+事实（空白 `Opens`、已提供但空白的 `Name`、description、URI 或无效 policy）会由
+`DeclareApplication` 拒绝；target 是否存在以及 Resource Tool 的 shape 则在 publication 编译时检查。
+
+`Index.Find` 与 `Index.Tool` 在 canonical lookup 失败时返回有类型的
+`*contexture.NodeNotFoundError`。使用 `errors.Is(err, contexture.ErrNodeNotFound)` 和 `errors.As`
+读取其 `Reason`、`Ref`、segment、scope、kind、wanted kind 与已知替代项。它是 Python
+`NodeNotFoundError` 的 Go 等价物；`NoSuchMember`、`WrongKind` 等 `LookupFailure` constant 使这些
+事实可由程序检查，而不附带 Host 专属 prose。
+
 该 facade 有意不导入 MCP SDK、`server` 或 `web`。只有在 declaration 准备好被编译到某个 Host
 surface 时，才导入 `server` 或 `web`。
 

@@ -20,6 +20,14 @@ type ApplicationDeclaration struct {
 // PromptDeclaration is the SDK-free person-controlled MCP Prompt declaration.
 type PromptDeclaration = mcpinterface.PromptDeclaration
 
+// ModelOpenPolicy controls whether a prompt target also admits model navigation.
+type ModelOpenPolicy = mcpinterface.ModelOpenPolicy
+
+const (
+	ModelMayOpen           = mcpinterface.ModelMayOpen
+	ModelReservedForPerson = mcpinterface.ModelReservedForPerson
+)
+
 // ResourceDeclaration is the SDK-free host-controlled MCP Resource declaration.
 type ResourceDeclaration = mcpinterface.ResourceDeclaration
 
@@ -44,6 +52,25 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 	for _, factory := range append(append([]Factory(nil), declaration.Roots...), declaration.PromptRoots...) {
 		if factory == nil {
 			return nil, errors.Join(ErrInvalidDeclaration, errors.New("application roots must be lazy factories"))
+		}
+	}
+	for _, prompt := range declaration.Prompts {
+		if strings.TrimSpace(prompt.Opens) == "" || strings.TrimSpace(prompt.Description) == "" {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Prompt requires a non-empty opens ref and description"))
+		}
+		if prompt.Name != "" && strings.TrimSpace(prompt.Name) == "" {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Prompt name must be non-empty when supplied"))
+		}
+		if prompt.ModelOpen != mcpinterface.ModelMayOpen && prompt.ModelOpen != mcpinterface.ModelReservedForPerson {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Prompt model open policy is not supported"))
+		}
+	}
+	for _, resource := range declaration.Resources {
+		if strings.TrimSpace(resource.Opens) == "" || strings.TrimSpace(resource.URI) == "" || strings.TrimSpace(resource.Description) == "" {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Resource requires a non-empty opens ref, URI, and description"))
+		}
+		if resource.Name != "" && strings.TrimSpace(resource.Name) == "" {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Resource name must be non-empty when supplied"))
 		}
 	}
 	return &Application{name: strings.TrimSpace(declaration.Name), roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...), channels: declaration.Channels, prompts: append([]PromptDeclaration(nil), declaration.Prompts...), resources: append([]ResourceDeclaration(nil), declaration.Resources...)}, nil

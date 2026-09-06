@@ -40,6 +40,7 @@ type Publications struct {
 	runtime    *contexture.Runtime
 	prompts    []contexture.PromptDeclaration
 	resources  []contexture.ResourceDeclaration
+	reserved   map[string]struct{}
 }
 
 // NewPublications validates application publications over one compiled surface.
@@ -47,11 +48,26 @@ func NewPublications(application *contexture.Application, disclosure *contexture
 	if application == nil || disclosure == nil {
 		return nil, errors.New("Contexture application and Disclosure must not be nil")
 	}
-	publications := &Publications{disclosure: disclosure, runtime: runtime, prompts: application.Prompts(), resources: application.Resources()}
+	publications := &Publications{disclosure: disclosure, runtime: runtime, prompts: application.Prompts(), resources: application.Resources(), reserved: map[string]struct{}{}}
 	if err := publications.validate(); err != nil {
 		return nil, err
 	}
+	for _, prompt := range publications.prompts {
+		if !prompt.AllowsModelOpen() {
+			publications.reserved[prompt.Opens] = struct{}{}
+		}
+	}
 	return publications, nil
+}
+
+// OpenForModel applies Prompt model-navigation reservations before opening a
+// normal model-visible node. The target card remains visible through its
+// parent, but only a person-controlled Prompt or goto may open a reserved ref.
+func (publications *Publications) OpenForModel(ref string, selection contexture.RootSelection) (map[string]any, error) {
+	if _, reserved := publications.reserved[ref]; reserved {
+		return nil, fmt.Errorf("%s is opened by a person, not by an agent; tell the user which Contexture Prompt reaches it.", ref)
+	}
+	return publications.disclosure.Open(ref, selection)
 }
 
 // PromptCards returns selected prompt cards plus Contexture's fixed goto prompt.
