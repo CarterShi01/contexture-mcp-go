@@ -1,6 +1,7 @@
 package contexture_test
 
 import (
+	"context"
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
@@ -8,11 +9,15 @@ import (
 
 func disclosureFixture(t *testing.T) *contexture.Disclosure {
 	t.Helper()
+	status, err := contexture.NewTool("status", "Status.", true, func(context.Context, noInput) (string, error) { return "ok", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
 	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "view", Roots: []contexture.Factory{func() contexture.Node {
 		return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect.", Skills: []contexture.Factory{func() contexture.Node {
 			return &contexture.Skill{Name: "diagnose", Description: "Diagnose.", Instructions: "Read.", Uses: []string{"operations/status"}}
 		}}, Tools: []contexture.Factory{func() contexture.Node {
-			return &contexture.Tool{Name: "status", Description: "Status.", ReadOnly: true}
+			return status
 		}}}
 	}}, PromptRoots: []contexture.Factory{func() contexture.Node {
 		return &contexture.Skill{Name: "command", Description: "Person.", Instructions: "Wait."}
