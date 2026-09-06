@@ -26,6 +26,7 @@ type Index struct {
 	refByNode   map[Node]string
 	parent      map[Node]*Role
 	dependents  map[string][]string
+	order       []string
 }
 
 // Compile builds one fresh canonical forest from a lazy Application.
@@ -93,6 +94,7 @@ func (state *compiler) build(factory Factory, parent *Role, path []string) (Node
 		return nil, fmt.Errorf("%w: address %q", ErrDuplicate, ref)
 	}
 	state.index.byRef[ref] = node
+	state.index.order = append(state.index.order, ref)
 	state.index.refByNode[node] = ref
 	state.index.parent[node] = parent
 	role, isRole := node.(*Role)
@@ -193,3 +195,21 @@ func (index *Index) DependentsOf(ref string) ([]string, error) {
 	}
 	return append([]string(nil), index.dependents[ref]...), nil
 }
+
+// ChildrenOf returns immediate containment members in declaration order.
+func (index *Index) ChildrenOf(node Node) ([]Node, error) {
+	if _, ok := index.refByNode[node]; !ok {
+		return nil, errors.New("node is not registered in this Index")
+	}
+	children := make([]Node, 0)
+	for _, ref := range index.order {
+		candidate := index.byRef[ref]
+		if index.parent[candidate] == node {
+			children = append(children, candidate)
+		}
+	}
+	return children, nil
+}
+
+// Walk returns every canonical address in declaration order.
+func (index *Index) Walk() []string { return append([]string(nil), index.order...) }
