@@ -120,6 +120,9 @@ surface 时，才导入 `server` 或 `web`。
 context 内非 nil。exporter 的 error 或 panic 会被忽略，因此 telemetry 不会改变业务结果。
 `MemoryTelemetry.Events()` 返回非破坏性的 snapshot，并有意保留全部 event；需要有界保留或远程导出时，
 应提供自定义 `Telemetry` 实现。
+`ReportTelemetry(telemetry, ref, failed)` 是供拥有额外 observation 的 Host boundary 使用的、公开的 Go
+原生 Python `telemetry.report` 等价物；它同样隔离 exporter 的 error 与 panic。框架 navigation 和
+invocation 会自动记录，无需调用者手动使用该函数。
 
 ## 3. 选择正确的节点
 

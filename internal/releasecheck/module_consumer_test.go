@@ -38,6 +38,7 @@ var _ = contexture.ErrInvalidDeclaration
 var _ = contexture.ErrNodeNotFound
 var _ = contexture.NewMemoryTelemetry
 var _ = contexture.NewDisclosureWithTelemetry
+var _ = contexture.ReportTelemetry
 var _ contexture.NodeUsage
 var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: contexture.ModelReservedForPerson}
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}

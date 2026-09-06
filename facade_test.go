@@ -58,6 +58,7 @@ func TestDeclarationFacadeInventory(t *testing.T) {
 		"Version":                    contexture.Version,
 		"NewMemoryTelemetry":         contexture.NewMemoryTelemetry,
 		"NewDisclosureWithTelemetry": contexture.NewDisclosureWithTelemetry,
+		"ReportTelemetry":            contexture.ReportTelemetry,
 	}
 	for name, value := range values {
 		if value == nil {

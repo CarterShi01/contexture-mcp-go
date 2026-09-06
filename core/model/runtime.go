@@ -211,6 +211,14 @@ func reportTelemetry(telemetry Telemetry, event CallEvent) {
 	_ = telemetry.Record(event)
 }
 
+// ReportTelemetry publishes one node-use observation without letting a
+// telemetry exporter alter the caller's outcome. It is the Go-native
+// equivalent of Python's telemetry.report: failed selects the error counter,
+// while the collector supplies the observation timestamp when needed.
+func ReportTelemetry(telemetry Telemetry, ref string, failed bool) {
+	reportTelemetry(telemetry, CallEvent{Ref: ref, Failed: failed})
+}
+
 // Serve holds the Application's Channels open around one serving lifetime.
 func (runtime *Runtime) Serve(ctx context.Context, serve func(context.Context) error) error {
 	if serve == nil {

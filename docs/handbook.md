@@ -137,6 +137,10 @@ Tool handler's request context. Exporter errors and panics are ignored so
 telemetry cannot change a business result. `MemoryTelemetry.Events()` returns
 non-destructive snapshots and deliberately retains all events; use a custom
 `Telemetry` implementation when bounded retention or remote export is needed.
+`ReportTelemetry(telemetry, ref, failed)` is the public Go-native equivalent
+of Python's `telemetry.report` for a Host boundary that owns an additional
+observation; it has the same exporter-error and panic isolation. Framework
+navigation and invocation do not need callers to invoke it manually.
 
 ## 3. Choose the right node
 

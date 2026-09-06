@@ -128,6 +128,13 @@ func NewMemoryTelemetry() *MemoryTelemetry {
 	return model.NewMemoryTelemetry()
 }
 
+// ReportTelemetry records one node use without allowing a telemetry exporter
+// to change the caller's result. It is useful at a Host integration boundary;
+// Runtime and Disclosure report their own framework observations automatically.
+func ReportTelemetry(telemetry Telemetry, ref string, failed bool) {
+	model.ReportTelemetry(telemetry, ref, failed)
+}
+
 // NewPrincipal snapshots Host-supplied identity facts for one request.
 func NewPrincipal(options PrincipalOptions) *Principal {
 	return foundation.NewPrincipal(options)
