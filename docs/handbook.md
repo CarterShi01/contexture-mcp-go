@@ -207,6 +207,11 @@ Host and network configuration. Non-loopback startup requires corresponding
 Host, origin, and anonymous-access decisions; handle server option errors
 rather than weakening them.
 
+For programmatic startup, `server.ContextureOptions{LogLevel: server.WarnLogLevel}`
+controls Contexture lifecycle records. `server.ConfigureLogging` installs the
+same structured logger on stderr, so MCP stdio retains exclusive ownership of
+stdout.
+
 For Claude Code, Cursor, or Codex configuration, use `server.Launch`. It
 renders Host configuration from the server command instead of duplicating the
 application's declared context.

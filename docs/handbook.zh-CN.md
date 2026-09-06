@@ -185,6 +185,10 @@ stdio 是默认 transport。只有在明确配置 Host 与网络时才使用 `--
 非 loopback 启动需要对应的 Host、origin 和 anonymous-access 决策；应处理 server option error，
 而不是放宽这些限制。
 
+程序化启动时，`server.ContextureOptions{LogLevel: server.WarnLogLevel}` 控制
+Contexture 生命周期日志。`server.ConfigureLogging` 会把同一结构化 logger 安装到 stderr，
+所以 MCP stdio 始终独占 stdout。
+
 Claude Code、Cursor 和 Codex 配置请使用 `server.Launch`。它从 server command 渲染 Host
 configuration，而不是复制 application 已声明的 context。
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -80,6 +81,9 @@ func (server *ApplicationServer) StartWithAuthAndRootSelector(ctx context.Contex
 		return err
 	}
 	options = validated
+	if err := ConfigureLogging(options.LogLevel); err != nil {
+		return err
+	}
 	if options.Transport == StdioTransport {
 		if identity != nil || selector != nil {
 			return &ServeError{Message: "stdio cannot use HTTP identity or root selection."}
@@ -124,9 +128,13 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 		return err
 	}
 	options = validated
+	if err := ConfigureLogging(options.LogLevel); err != nil {
+		return err
+	}
 	if options.Transport != StreamableHTTPTransport {
 		return &ServeError{Message: "ServeListener requires transport='streamable-http'."}
 	}
+	slog.Info("Serving MCP", "url", fmt.Sprintf("http://%s", listener.Addr()))
 	gateway, err := server.application.Gateway()
 	if err != nil {
 		return err

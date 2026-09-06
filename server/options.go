@@ -30,6 +30,7 @@ type ContextureOptions struct {
 	AllowedHosts   []string
 	AllowedOrigins []string
 	AllowAnonymous bool
+	LogLevel       LogLevel
 
 	hostSet bool
 	portSet bool
@@ -46,6 +47,9 @@ func NewContextureOptions(options ContextureOptions) (*ContextureOptions, error)
 	if options.Transport == "" {
 		options.Transport = StdioTransport
 	}
+	if options.LogLevel == "" {
+		options.LogLevel = InfoLogLevel
+	}
 	if options.Host == "" {
 		options.Host = DefaultHost
 	}
@@ -56,6 +60,9 @@ func NewContextureOptions(options ContextureOptions) (*ContextureOptions, error)
 		options.Path = DefaultPath
 	}
 	if options.Transport == StdioTransport {
+		if _, ok := slogLevel(options.LogLevel); !ok {
+			return nil, &ServeError{Message: fmt.Sprintf("unknown Contexture log level %q", options.LogLevel)}
+		}
 		stated := []string{}
 		if options.hostSet {
 			stated = append(stated, "host")
@@ -82,6 +89,9 @@ func NewContextureOptions(options ContextureOptions) (*ContextureOptions, error)
 	}
 	if options.Transport != StreamableHTTPTransport {
 		return nil, &ServeError{Message: fmt.Sprintf("unknown Contexture transport %q", options.Transport)}
+	}
+	if _, ok := slogLevel(options.LogLevel); !ok {
+		return nil, &ServeError{Message: fmt.Sprintf("unknown Contexture log level %q", options.LogLevel)}
 	}
 	if options.Port < 0 || options.Port > 65535 {
 		return nil, &ServeError{Message: "port must be an integer from 0 through 65535."}

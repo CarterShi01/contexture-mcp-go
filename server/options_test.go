@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,26 @@ import (
 	"github.com/CarterShi01/contexture-mcp-go/server"
 )
 
+func TestConfigureLoggingWritesContextureRecordsToStderr(t *testing.T) {
+	t.Cleanup(func() {
+		if err := server.ConfigureLogging(server.InfoLogLevel); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := server.ConfigureLogging(server.WarnLogLevel); err != nil {
+		t.Fatal(err)
+	}
+	if slog.Default().Enabled(context.Background(), slog.LevelInfo) {
+		t.Fatal("info record remained enabled at warn level")
+	}
+	if !slog.Default().Enabled(context.Background(), slog.LevelWarn) {
+		t.Fatal("warn record was disabled")
+	}
+	if err := server.ConfigureLogging(server.LogLevel("verbose")); !errors.As(err, new(*server.ServeError)) {
+		t.Fatalf("invalid logging level error = %v", err)
+	}
+}
+
 func TestContextureOptionsPreserveSafeDefaultsAndRejectPublicStartup(t *testing.T) {
 	local, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport})
 	if err != nil {
@@ -18,6 +39,12 @@ func TestContextureOptionsPreserveSafeDefaultsAndRejectPublicStartup(t *testing.
 	}
 	if local.URL() != "http://127.0.0.1:8000/mcp" {
 		t.Fatalf("URL() = %q", local.URL())
+	}
+	if local.LogLevel != server.InfoLogLevel {
+		t.Fatalf("LogLevel = %q", local.LogLevel)
+	}
+	if _, err := server.NewContextureOptions(server.ContextureOptions{LogLevel: server.LogLevel("verbose")}); !errors.As(err, new(*server.ServeError)) {
+		t.Fatalf("invalid log level error = %v", err)
 	}
 	if _, err := server.NewContextureOptions(server.ContextureOptions{Host: "127.0.0.1"}); !errors.As(err, new(*server.ServeError)) {
 		t.Fatalf("stdio HTTP option error = %v", err)
