@@ -130,6 +130,12 @@ Application。`RebindChannels` 只影响之后生成的 Application/Index snapsh
 serving 的 server。这有意区别于 Python 会把任意 handle stamp 到每个 node 的做法：Go 将 dependency 保留在
 compiled Index，绝不将它作为 model-node field 暴露。
 
+`WithChannels` 是 Runtime 与 Host serving loop 使用的 transport-neutral lifecycle boundary。成功 scope 的顺序是
+`Open → serve → Close → 已注册 cleanup 的逆序`；Open failure 不会调用 `Close`，但仍会回收失败前已经注册的
+每一个 cleanup。`CleanupRegistrar.Defer` 只在 `Channels.Open` 运行时有效；若保留 registrar 并在之后注册，
+会 panic。若 Open 或 serve panic，Contexture 会完成适用的 unwind，并且即使 Close 或 cleanup 也 panic，仍会
+re-panic 原始 value。普通返回的 error 则保持原有 joined-error 行为。
+
 ### Compiled Index 查询
 
 `Index` 是不可变的 compilation snapshot。`Count`、`Has`、`Bound` 和 `Channels` 报告其 capture

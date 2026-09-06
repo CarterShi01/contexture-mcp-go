@@ -3,10 +3,13 @@ package model
 import (
 	"context"
 	"errors"
+	"sync"
 )
 
 // CleanupRegistrar records cleanups for resources acquired by Channels.Open.
 // A Channel must register a cleanup immediately after acquiring its resource.
+// Registrations after Open returns panic: retaining the registrar would make
+// cleanup order and ownership unknowable.
 type CleanupRegistrar interface {
 	Defer(func(context.Context) error)
 }
@@ -18,10 +21,17 @@ type Channels interface {
 	Close(context.Context) error
 }
 
-// WithChannels opens dependencies around serve and unwinds acquired resources in
-// reverse order. Close runs only after a successful Open, while dependencies are
-// still live. A cleanup error supplements, never replaces, the primary error.
-func WithChannels[T any](ctx context.Context, channels Channels, serve func(context.Context) (T, error)) (T, error) {
+// WithChannels opens dependencies around serve and unwinds acquired resources
+// in reverse order. Close runs only after a successful Open, while dependencies
+// are still live. A cleanup error supplements, never replaces, the primary
+// returned error.
+//
+// Panic paths retain the original panic: an Open panic runs registered cleanup
+// without Close; a serve panic runs Close then cleanup. Panics raised while
+// tearing down never replace the original panic, and remaining cleanup still
+// runs. Without an original panic, a teardown panic is re-panicked after all
+// cleanup has been attempted.
+func WithChannels[T any](ctx context.Context, channels Channels, serve func(context.Context) (T, error)) (result T, primary error) {
 	var zero T
 	if serve == nil {
 		return zero, errors.New("Contexture serving function must not be nil")
@@ -30,43 +40,92 @@ func WithChannels[T any](ctx context.Context, channels Channels, serve func(cont
 		return serve(ctx)
 	}
 
-	cleanups := []func(context.Context) error{}
-	registrar := cleanupRegistrar{cleanups: &cleanups}
+	registrar := &cleanupRegistrar{active: true}
 	opened := false
-	result, primary := channelsResult(ctx, channels, registrar, serve, &opened)
-	if opened {
-		if err := channels.Close(ctx); err != nil {
-			primary = combineErrors(primary, err)
+	defer func() {
+		originalPanic := recover()
+		cleanups := registrar.finish()
+		var teardownPanic any
+		if opened {
+			closeErr, closePanic := callLifecycle(func() error { return channels.Close(ctx) })
+			if closePanic != nil {
+				teardownPanic = closePanic
+			} else if closeErr != nil {
+				primary = combineErrors(primary, closeErr)
+			}
 		}
-	}
-	for position := len(cleanups) - 1; position >= 0; position-- {
-		if err := cleanups[position](ctx); err != nil {
-			primary = combineErrors(primary, err)
+		for position := len(cleanups) - 1; position >= 0; position-- {
+			cleanupErr, cleanupPanic := callLifecycle(func() error { return cleanups[position](ctx) })
+			if cleanupPanic != nil {
+				if teardownPanic == nil {
+					teardownPanic = cleanupPanic
+				}
+				continue
+			}
+			if cleanupErr != nil {
+				primary = combineErrors(primary, cleanupErr)
+			}
 		}
-	}
-	if primary != nil {
-		return zero, primary
-	}
-	return result, nil
-}
+		if originalPanic != nil {
+			panic(originalPanic)
+		}
+		if teardownPanic != nil {
+			panic(teardownPanic)
+		}
+		if primary != nil {
+			result = zero
+		}
+	}()
 
-func channelsResult[T any](ctx context.Context, channels Channels, registrar CleanupRegistrar, serve func(context.Context) (T, error), opened *bool) (T, error) {
-	var zero T
-	if err := channels.Open(ctx, registrar); err != nil {
+	err := channels.Open(ctx, registrar)
+	// The registrar is valid only during Open. This is deliberately before
+	// serve, so a retained registrar cannot add cleanup after acquisition.
+	registrar.deactivate()
+	if err != nil {
 		return zero, err
 	}
-	*opened = true
+	opened = true
 	return serve(ctx)
 }
 
-type cleanupRegistrar struct {
-	cleanups *[]func(context.Context) error
+// callLifecycle executes one teardown step without allowing its panic to skip
+// subsequent steps. Its caller decides which panic is authoritative.
+func callLifecycle(call func() error) (err error, panicValue any) {
+	defer func() { panicValue = recover() }()
+	return call(), nil
 }
 
-func (registrar cleanupRegistrar) Defer(cleanup func(context.Context) error) {
-	if cleanup != nil {
-		*registrar.cleanups = append(*registrar.cleanups, cleanup)
+type cleanupRegistrar struct {
+	mu       sync.Mutex
+	active   bool
+	cleanups []func(context.Context) error
+}
+
+func (registrar *cleanupRegistrar) Defer(cleanup func(context.Context) error) {
+	if cleanup == nil {
+		return
 	}
+	registrar.mu.Lock()
+	defer registrar.mu.Unlock()
+	if !registrar.active {
+		panic("Contexture cleanup registration is outside the Channels.Open lifecycle")
+	}
+	registrar.cleanups = append(registrar.cleanups, cleanup)
+}
+
+func (registrar *cleanupRegistrar) finish() []func(context.Context) error {
+	registrar.mu.Lock()
+	defer registrar.mu.Unlock()
+	registrar.active = false
+	cleanups := append([]func(context.Context) error(nil), registrar.cleanups...)
+	registrar.cleanups = nil
+	return cleanups
+}
+
+func (registrar *cleanupRegistrar) deactivate() {
+	registrar.mu.Lock()
+	defer registrar.mu.Unlock()
+	registrar.active = false
 }
 
 func combineErrors(primary, cleanup error) error {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
@@ -106,5 +108,131 @@ func TestRuntimeServesWithApplicationChannels(t *testing.T) {
 	want := []string{"open", "serve", "close", "cleanup:second", "cleanup:first"}
 	if !reflect.DeepEqual(channels.events, want) {
 		t.Fatalf("events = %#v, want %#v", channels.events, want)
+	}
+}
+
+type panicChannels struct {
+	events       []string
+	openPanic    any
+	closePanic   any
+	cleanupPanic any
+}
+
+func (channels *panicChannels) Open(_ context.Context, registrar contexture.CleanupRegistrar) error {
+	channels.events = append(channels.events, "open")
+	registrar.Defer(func(context.Context) error {
+		channels.events = append(channels.events, "cleanup:first")
+		return nil
+	})
+	registrar.Defer(func(context.Context) error {
+		channels.events = append(channels.events, "cleanup:second")
+		if channels.cleanupPanic != nil {
+			panic(channels.cleanupPanic)
+		}
+		return nil
+	})
+	if channels.openPanic != nil {
+		panic(channels.openPanic)
+	}
+	return nil
+}
+
+func (channels *panicChannels) Close(context.Context) error {
+	channels.events = append(channels.events, "close")
+	if channels.closePanic != nil {
+		panic(channels.closePanic)
+	}
+	return nil
+}
+
+func recovered(t *testing.T, call func()) any {
+	t.Helper()
+	var value any
+	func() {
+		defer func() { value = recover() }()
+		call()
+	}()
+	if value == nil {
+		t.Fatal("call did not panic")
+	}
+	return value
+}
+
+func TestWithChannelsOpenPanicUnwindsWithoutCloseAndPreservesOriginal(t *testing.T) {
+	original, teardown := errors.New("open panic"), errors.New("cleanup panic")
+	channels := &panicChannels{openPanic: original, cleanupPanic: teardown}
+	got := recovered(t, func() {
+		_, _ = contexture.WithChannels(context.Background(), channels, func(context.Context) (string, error) {
+			t.Fatal("serve ran after Open panic")
+			return "", nil
+		})
+	})
+	if got != original {
+		t.Fatalf("panic = %#v, want original %#v", got, original)
+	}
+	if want := []string{"open", "cleanup:second", "cleanup:first"}; !reflect.DeepEqual(channels.events, want) {
+		t.Fatalf("events = %#v, want %#v", channels.events, want)
+	}
+}
+
+func TestWithChannelsServePanicClosesThenUnwindsAndPreservesOriginal(t *testing.T) {
+	original, closePanic, cleanupPanic := errors.New("serve panic"), errors.New("close panic"), errors.New("cleanup panic")
+	channels := &panicChannels{closePanic: closePanic, cleanupPanic: cleanupPanic}
+	got := recovered(t, func() {
+		_, _ = contexture.WithChannels(context.Background(), channels, func(context.Context) (string, error) {
+			channels.events = append(channels.events, "serve")
+			panic(original)
+		})
+	})
+	if got != original {
+		t.Fatalf("panic = %#v, want original %#v", got, original)
+	}
+	if want := []string{"open", "serve", "close", "cleanup:second", "cleanup:first"}; !reflect.DeepEqual(channels.events, want) {
+		t.Fatalf("events = %#v, want %#v", channels.events, want)
+	}
+}
+
+type retainedRegistrarChannels struct{ registrar contexture.CleanupRegistrar }
+
+func (channels *retainedRegistrarChannels) Open(_ context.Context, registrar contexture.CleanupRegistrar) error {
+	channels.registrar = registrar
+	return nil
+}
+func (*retainedRegistrarChannels) Close(context.Context) error { return nil }
+
+func TestWithChannelsRejectsCleanupRegistrationOutsideOpen(t *testing.T) {
+	channels := &retainedRegistrarChannels{}
+	if _, err := contexture.WithChannels(context.Background(), channels, func(context.Context) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Fatal(err)
+	}
+	got := recovered(t, func() { channels.registrar.Defer(func(context.Context) error { return nil }) })
+	if message, ok := got.(string); !ok || message != "Contexture cleanup registration is outside the Channels.Open lifecycle" {
+		t.Fatalf("late cleanup panic = %#v", got)
+	}
+}
+
+type concurrentRegistrarChannels struct{ cleaned atomic.Int32 }
+
+func (channels *concurrentRegistrarChannels) Open(_ context.Context, registrar contexture.CleanupRegistrar) error {
+	var group sync.WaitGroup
+	for range 32 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			registrar.Defer(func(context.Context) error { channels.cleaned.Add(1); return nil })
+		}()
+	}
+	group.Wait()
+	return nil
+}
+func (*concurrentRegistrarChannels) Close(context.Context) error { return nil }
+
+func TestWithChannelsConcurrentOpenRegistrationsAreRaceSafe(t *testing.T) {
+	channels := &concurrentRegistrarChannels{}
+	if _, err := contexture.WithChannels(context.Background(), channels, func(context.Context) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Fatal(err)
+	}
+	if channels.cleaned.Load() != 32 {
+		t.Fatalf("cleanup count = %d", channels.cleaned.Load())
 	}
 }

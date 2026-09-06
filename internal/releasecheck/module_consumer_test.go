@@ -44,6 +44,7 @@ var _ = contexture.NewControllerManager
 var _ = contexture.NewControllerManagerWithChannels
 var _ = contexture.RegisterRoot
 var _ = contexture.NewSelectedGraph
+var _ = contexture.WithChannels[struct{}]
 var _ contexture.NodeUsage
 var _ contexture.ControllerManager
 var _ contexture.RootSelectionError

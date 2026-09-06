@@ -152,6 +152,15 @@ serving. This is deliberately different from Python's arbitrary handle stamped
 onto each node: Go keeps dependencies on the compiled Index and never exposes
 them as model-node fields.
 
+`WithChannels` is the transport-neutral lifecycle boundary used by Runtime and
+Host serving loops. A successful scope is `Open → serve → Close → registered
+cleanup in reverse order`; an Open failure skips `Close` but still unwinds every
+cleanup registered before the failure. `CleanupRegistrar.Defer` is valid only
+while `Channels.Open` is running and panics if retained for later registration.
+If Open or serve panics, Contexture completes the applicable unwind and
+re-panics that original value even when Close or cleanup also panics. Ordinary
+returned errors keep their existing joined-error behavior.
+
 ### Compiled Index queries
 
 `Index` is an immutable compilation snapshot. `Count`, `Has`, `Bound`, and
