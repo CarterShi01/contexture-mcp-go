@@ -146,6 +146,10 @@ ancestor signpost，最后展示正常 node payload。`ModelMayOpen: false` 会�
 模型导航之外；它不会对拥有 Host 的人隐藏该 capability。不要把 Prompt 当成 business Tool，也不要在
 description 中重复其 procedure。
 
+原生 MCP completion endpoint 只服务 `goto` 的 `ref` 参数，并且只返回当前 selected root surface 内的
+ref。它最多返回 100 个值；若还有更多匹配，最后一个可见值会说明剩余数量，而 response 仍保留真实的
+`total` 与 `hasMore`。针对其他 Prompt 或参数的 completion request 不会返回任何 Contexture ref。
+
 ## 7. 通过 MCP Host 提供服务
 
 服务时不改变 declaration。server adapter 提供四个固定的 Contexture gateway Tool；业务 Tool

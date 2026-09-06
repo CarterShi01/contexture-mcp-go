@@ -45,6 +45,9 @@ func NewContextureMCPServer(identity Identity, gateway *contexture.Gateway, publ
 // projection before constructing their transport-specific adapter.
 func NewContextureMCPServerForRoots(identity Identity, gateway *contexture.Gateway, selection contexture.RootSelection, publications ...*surface.Publications) *ContextureMCPServer {
 	server := NewMCPServer(identity)
+	if len(publications) > 0 && publications[0] != nil {
+		server = newMCPServer(identity, completionHandler(publications[0], selection))
+	}
 	for _, tool := range gateway.Tools() {
 		registerGatewayTool(server, gateway, tool, selection)
 	}
@@ -56,6 +59,36 @@ func NewContextureMCPServerForRoots(identity Identity, gateway *contexture.Gatew
 		names = append(names, tool.Name)
 	}
 	return &ContextureMCPServer{Server: server, Gateway: gateway, GatewayNames: names}
+}
+
+func newMCPServer(identity Identity, complete func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error)) *mcp.Server {
+	options := (*mcp.ServerOptions)(nil)
+	if complete != nil {
+		options = &mcp.ServerOptions{CompletionHandler: complete}
+	}
+	return mcp.NewServer(&mcp.Implementation{Name: identity.Name, Version: identity.Version}, options)
+}
+
+// completionHandler exposes only goto's ref argument. It returns the selected
+// graph's true total, not a total inferred from already-truncated values.
+func completionHandler(publications *surface.Publications, selection contexture.RootSelection) func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+	return func(_ context.Context, request *mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+		empty := func() *mcp.CompleteResult {
+			return &mcp.CompleteResult{Completion: mcp.CompletionResultDetails{Values: []string{}}}
+		}
+		if request == nil || request.Params.Ref == nil || request.Params.Ref.Type != "ref/prompt" || request.Params.Ref.Name != messages.GotoPrompt || request.Params.Argument.Name != messages.GotoArgument {
+			return empty(), nil
+		}
+		values, total, err := publications.Complete(request.Params.Argument.Value, selection, messages.CompletionLimit)
+		if err != nil {
+			return nil, err
+		}
+		hasMore := total > len(values)
+		if hasMore && len(values) > 0 {
+			values[len(values)-1] = messages.TruncatedCompletion(len(values), total)
+		}
+		return &mcp.CompleteResult{Completion: mcp.CompletionResultDetails{Values: values, Total: total, HasMore: hasMore}}, nil
+	}
 }
 
 func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool contexture.GatewayTool, selection contexture.RootSelection) {

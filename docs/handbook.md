@@ -160,6 +160,12 @@ declared capability from model navigation; it does not hide it from the person
 who owns the Host. Do not present a Prompt as a business Tool or duplicate its
 procedure in its description.
 
+The native MCP completion endpoint serves only `goto`'s `ref` argument and
+only refs inside the current selected root surface. It returns at most 100
+values; if more match, the final visible value says how many remain while the
+response keeps the true `total` and `hasMore` facts. A completion request for
+another Prompt or argument returns no Contexture refs.
+
 ## 7. Serve through an MCP Host
 
 The declaration does not change when it is served. The server adapter exposes
