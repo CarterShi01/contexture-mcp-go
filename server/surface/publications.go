@@ -377,16 +377,21 @@ func marshalOrderedMap(values map[string]any, preferred []string, transform func
 }
 
 func (publications *Publications) signposts(ref string, selection contexture.RootSelection) (string, error) {
-	parts := strings.Split(ref, "/")
-	levels := []messages.SignpostLevel{}
-	for depth := 1; depth < len(parts); depth++ {
-		ancestor := strings.Join(parts[:depth], "/")
-		payload, err := publications.disclosure.OpenForPerson(ancestor, selection)
-		if err != nil {
-			return "", err
-		}
-		roles, _ := payload["roles"].([]map[string]any)
-		levels = append(levels, messages.SignpostLevel{Ref: ancestor, SubRoleCount: len(roles)})
+	// Command has already opened ref through the exact selected surface. Index
+	// owns this structural, non-disclosing ancestor calculation; reopening each
+	// ancestor would duplicate navigation and telemetry observations.
+	if effective, err := publications.effective(selection); err != nil {
+		return "", err
+	} else if err := effective.RequireRef(ref); err != nil {
+		return "", err
+	}
+	facts, err := publications.disclosure.Index().Signpost(ref)
+	if err != nil {
+		return "", err
+	}
+	levels := make([]messages.SignpostLevel, 0, len(facts))
+	for _, fact := range facts {
+		levels = append(levels, messages.SignpostLevel{Ref: fact.Ref, SubRoleCount: fact.SubRoleCount})
 	}
 	return messages.Signpost(levels), nil
 }

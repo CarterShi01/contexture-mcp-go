@@ -49,6 +49,8 @@ var _ contexture.ControllerManager
 var _ contexture.RootSelectionError
 var _ contexture.RootOutsideSelectionError
 var _ contexture.NodeRef
+var _ contexture.SignpostLevel
+var _ contexture.ReferenceCrossing
 var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: contexture.ModelReservedForPerson}
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
@@ -67,6 +69,11 @@ func main() {
     application, _ := manager.Application("consumer")
     index, _ := contexture.Compile(application)
     _, _ = contexture.NewSelectedGraph(index, contexture.AllRoots())
+    _ = index.Count()
+    _ = index.Has("operations")
+    _ = index.NodesWithRefs()
+    _ = index.RolesByLevel()
+    _, _ = index.MatchingRefs("operations", 10)
 }
 `
 	if err := os.WriteFile(filepath.Join(temporaryRoot, "go.mod"), []byte(goMod), 0o600); err != nil {

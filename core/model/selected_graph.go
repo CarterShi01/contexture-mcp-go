@@ -169,13 +169,17 @@ func (graph *SelectedGraph) DependentsOf(ref string) ([]string, error) {
 // MatchingRefs ranks selected refs with the same rank, length, and lexical
 // ordering as Index completion. total is the count before the requested limit.
 func (graph *SelectedGraph) MatchingRefs(value string, limit int) ([]string, int) {
+	return matchingRefs(graph.Walk(), value, limit)
+}
+
+func matchingRefs(refs []string, value string, limit int) ([]string, int) {
 	wanted := strings.ToLower(strings.TrimSpace(value))
 	type candidate struct {
 		rank, length int
 		ref          string
 	}
 	scored := []candidate{}
-	for _, ref := range graph.Walk() {
+	for _, ref := range refs {
 		lowered := strings.ToLower(ref)
 		rank := -1
 		switch {

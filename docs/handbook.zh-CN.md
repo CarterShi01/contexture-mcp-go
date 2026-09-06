@@ -130,6 +130,21 @@ Application。`RebindChannels` 只影响之后生成的 Application/Index snapsh
 serving 的 server。这有意区别于 Python 会把任意 handle stamp 到每个 node 的做法：Go 将 dependency 保留在
 compiled Index，绝不将它作为 model-node field 暴露。
 
+### Compiled Index 查询
+
+`Index` 是不可变的 compilation snapshot。`Count`、`Has`、`Bound` 和 `Channels` 报告其 capture
+的 facts；`OfKind`、`NodesWithRefs`、`Skills`、`RolesWithRefs` 与 `RolesByLevel` 按已声明的
+canonical order 返回防御性 node snapshot（最后一项是 breadth-first）。`Walk` 保持只返回 ref 的
+兼容遍历；`NodesWithRefs` 是 Go 原生的 address/node pair 形式。`BindingOf` 与 `SchemaOf` 只可用于
+bound Index；disclosure-only Index 会返回带 `ErrInvalidDeclaration` 类型的 error，不会暴露 execution
+data，schema 也是防御性 copy。
+
+`MatchingRefs` 依次按完整 prefix、最后 segment prefix、任一 segment prefix 和 substring 匹配，再按
+rank、ref length 与 lexical order 排序；返回的 total 是截断前数量。Go 有意将负 limit 视为零结果（而非
+Python 的 negative slice 语义），避免受限 completion response 被意外扩大。`Signpost` 只暴露 ancestor
+ref 与 sub-role count；`Crossings` 列出跨越 root 的声明 `Uses` edge。二者都是结构性 Index facts，均不
+披露 node member card。
+
 ### Request root projections
 
 `RootSelection` 要么是 `AllRoots()`，要么是用 `OnlyRoots` 创建的完整 root 精确 allowlist。它会拒绝

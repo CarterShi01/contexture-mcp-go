@@ -48,6 +48,8 @@ type (
 	Runtime                   = model.Runtime
 	SelectedGraph             = model.SelectedGraph
 	NodeRef                   = model.NodeRef
+	SignpostLevel             = model.SignpostLevel
+	ReferenceCrossing         = model.ReferenceCrossing
 	Principal                 = foundation.Principal
 	PrincipalOptions          = foundation.PrincipalOptions
 	LookupFailure             = foundation.LookupFailure

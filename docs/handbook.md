@@ -152,6 +152,25 @@ serving. This is deliberately different from Python's arbitrary handle stamped
 onto each node: Go keeps dependencies on the compiled Index and never exposes
 them as model-node fields.
 
+### Compiled Index queries
+
+`Index` is an immutable compilation snapshot. `Count`, `Has`, `Bound`, and
+`Channels` report its captured facts; `OfKind`, `NodesWithRefs`, `Skills`,
+`RolesWithRefs`, and `RolesByLevel` return defensive node snapshots in their
+documented canonical order (the final method is breadth-first). `Walk` remains
+the compatibility ref-only traversal, while `NodesWithRefs` is the Go-native
+address/node pair form. `BindingOf` and `SchemaOf` are available only on a
+bound Index; a disclosure-only Index returns an `ErrInvalidDeclaration`-typed
+error instead of exposing execution data, and schemas are defensive copies.
+
+`MatchingRefs` ranks prefix, final-segment prefix, segment prefix, then
+substring matches by rank, ref length, and lexical order. Its returned total is
+pre-limit. Go deliberately treats a negative limit as zero results (rather
+than Python's negative-slice behavior), avoiding accidental expansion of a
+bounded completion response. `Signpost` exposes only ancestor refs and their
+sub-role counts; `Crossings` lists declared `Uses` edges that cross roots. Both
+are structural Index facts and do not disclose a node's member cards.
+
 ### Request root projections
 
 `RootSelection` is either `AllRoots()` or an exact complete-root allowlist

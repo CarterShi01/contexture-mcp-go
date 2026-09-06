@@ -21,6 +21,7 @@ type Index struct {
 	parent      map[Node]*Role
 	dependents  map[string][]string
 	order       []string
+	byKind      map[Kind][]Node
 }
 
 // Compile builds one fresh canonical forest from a lazy Application.
@@ -32,7 +33,7 @@ func compile(application *Application, bindTools bool) (*Index, error) {
 	if application == nil {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("application must not be nil"))
 	}
-	state := compiler{index: &Index{name: application.name, channels: application.channels, bound: bindTools, byRef: map[string]Node{}, refByNode: map[Node]string{}, parent: map[Node]*Role{}, dependents: map[string][]string{}}, active: map[uintptr]bool{}, seen: map[Node]bool{}}
+	state := compiler{index: &Index{name: application.name, channels: application.channels, bound: bindTools, byRef: map[string]Node{}, refByNode: map[Node]string{}, parent: map[Node]*Role{}, dependents: map[string][]string{}, byKind: map[Kind][]Node{}}, active: map[uintptr]bool{}, seen: map[Node]bool{}}
 	for _, factory := range application.roots {
 		node, err := state.build(factory, nil, nil)
 		if err != nil {
@@ -122,6 +123,7 @@ func (state *compiler) build(factory Factory, parent *Role, path []string) (Node
 	state.index.order = append(state.index.order, ref)
 	state.index.refByNode[node] = ref
 	state.index.parent[node] = parent
+	state.index.byKind[node.nodeKind()] = append(state.index.byKind[node.nodeKind()], node)
 	role, isRole := node.(*Role)
 	if !isRole {
 		return node, nil
@@ -177,6 +179,35 @@ func validateNode(node Node) error {
 // Name returns the application name.
 func (index *Index) Name() string { return index.name }
 
+// Count reports the number of addressable nodes in this immutable snapshot.
+func (index *Index) Count() int {
+	if index == nil {
+		return 0
+	}
+	return len(index.byRef)
+}
+
+// Has reports whether ref is an exact canonical address in this snapshot.
+func (index *Index) Has(ref string) bool {
+	if index == nil {
+		return false
+	}
+	_, ok := index.byRef[ref]
+	return ok
+}
+
+// Bound reports whether this snapshot has executable Tool Bindings.
+func (index *Index) Bound() bool { return index != nil && index.bound }
+
+// Channels returns the lifecycle owner captured at compilation time. It is a
+// snapshot fact; rebinding a manager later cannot change it.
+func (index *Index) Channels() Channels {
+	if index == nil {
+		return nil
+	}
+	return index.channels
+}
+
 // Roots returns a defensive root copy in declaration order.
 func (index *Index) Roots() []Node { return index.cloneNodes(index.roots) }
 
@@ -185,6 +216,14 @@ func (index *Index) ModelRoots() []Node { return index.cloneNodes(index.modelRoo
 
 // PromptRoots returns person-controlled roots in declaration order.
 func (index *Index) PromptRoots() []Node { return index.cloneNodes(index.promptRoots) }
+
+// OfKind returns every node of kind in containment declaration order.
+func (index *Index) OfKind(kind Kind) []Node {
+	if index == nil {
+		return nil
+	}
+	return index.cloneNodes(index.byKind[kind])
+}
 
 // Find resolves one canonical address.
 func (index *Index) Find(ref string) (Node, error) {
@@ -254,6 +293,32 @@ func (index *Index) Tool(ref string) (*Tool, error) {
 	return tool, nil
 }
 
+// BindingOf returns the one compiled Binding for a Tool ref. It rejects an
+// unbound disclosure-only snapshot before exposing any execution capability.
+func (index *Index) BindingOf(ref string) (Binding, error) {
+	if index == nil || !index.bound {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("a disclosure-only Index has no executable Bindings"))
+	}
+	tool, err := index.Tool(ref)
+	if err != nil {
+		return nil, err
+	}
+	return tool.Binding()
+}
+
+// SchemaOf returns a defensive schema snapshot for one compiled Tool node.
+func (index *Index) SchemaOf(node Node) (map[string]any, error) {
+	ref, err := index.RefOf(node)
+	if err != nil {
+		return nil, err
+	}
+	binding, err := index.BindingOf(ref)
+	if err != nil {
+		return nil, err
+	}
+	return binding.Schema(), nil
+}
+
 // RefOf returns a canonical address for a node compiled into this Index.
 func (index *Index) RefOf(node Node) (string, error) {
 	ref, ok := index.refByNode[node]
@@ -319,6 +384,137 @@ func (index *Index) ChildrenOf(node Node) ([]Node, error) {
 
 // Walk returns every canonical address in declaration order.
 func (index *Index) Walk() []string { return append([]string(nil), index.order...) }
+
+// NodesWithRefs returns every canonical address/node pair in containment
+// declaration order. Node values are defensive snapshots owned by this Index.
+func (index *Index) NodesWithRefs() []NodeRef {
+	if index == nil {
+		return nil
+	}
+	result := make([]NodeRef, 0, len(index.order))
+	for _, ref := range index.order {
+		result = append(result, NodeRef{Ref: ref, Node: cloneNode(index.byRef[ref], index, ref)})
+	}
+	return result
+}
+
+// Skills returns every procedure with its canonical opening ref.
+func (index *Index) Skills() []NodeRef { return index.nodesOfKind(SkillKind) }
+
+// RolesWithRefs returns every Role in containment depth-first order.
+func (index *Index) RolesWithRefs() []NodeRef { return index.nodesOfKind(RoleKind) }
+
+func (index *Index) nodesOfKind(kind Kind) []NodeRef {
+	if index == nil {
+		return nil
+	}
+	result := []NodeRef{}
+	for _, ref := range index.order {
+		node := index.byRef[ref]
+		if node.nodeKind() == kind {
+			result = append(result, NodeRef{Ref: ref, Node: cloneNode(node, index, ref)})
+		}
+	}
+	return result
+}
+
+// RolesByLevel returns the Role axis breadth-first. It follows containment
+// only, never Uses, so reference cycles cannot affect startup enumeration.
+func (index *Index) RolesByLevel() []NodeRef {
+	if index == nil {
+		return nil
+	}
+	queue := make([]string, 0)
+	for _, root := range index.roots {
+		if root.nodeKind() == RoleKind {
+			queue = append(queue, index.refByNode[root])
+		}
+	}
+	result := []NodeRef{}
+	for len(queue) > 0 {
+		ref := queue[0]
+		queue = queue[1:]
+		role := index.byRef[ref].(*Role)
+		result = append(result, NodeRef{Ref: ref, Node: cloneNode(role, index, ref)})
+		for _, child := range index.order {
+			node := index.byRef[child]
+			if index.parent[node] == role && node.nodeKind() == RoleKind {
+				queue = append(queue, child)
+			}
+		}
+	}
+	return result
+}
+
+// MatchingRefs ranks all addressable refs against interactive input. A negative
+// limit deliberately returns no matches (rather than Python slice semantics)
+// so a Host cannot accidentally expand a bounded completion response.
+func (index *Index) MatchingRefs(value string, limit int) ([]string, int) {
+	if index == nil {
+		return nil, 0
+	}
+	return matchingRefs(index.order, value, limit)
+}
+
+// SignpostLevel is one undisclosed ancestor and its direct sub-role count.
+type SignpostLevel struct {
+	Ref          string
+	SubRoleCount int
+}
+
+// Signpost returns ancestors of ref from root toward its parent without
+// disclosing their member names.
+func (index *Index) Signpost(ref string) ([]SignpostLevel, error) {
+	if _, err := index.Find(ref); err != nil {
+		return nil, err
+	}
+	parts := strings.Split(ref, "/")
+	result := make([]SignpostLevel, 0, len(parts)-1)
+	for depth := 1; depth < len(parts); depth++ {
+		ancestor := strings.Join(parts[:depth], "/")
+		node, err := index.Find(ancestor)
+		if err != nil {
+			return nil, err
+		}
+		children, err := index.ChildrenOf(node)
+		if err != nil {
+			return nil, err
+		}
+		count := 0
+		for _, child := range children {
+			if child.nodeKind() == RoleKind {
+				count++
+			}
+		}
+		result = append(result, SignpostLevel{Ref: ancestor, SubRoleCount: count})
+	}
+	return result, nil
+}
+
+// ReferenceCrossing records one declared Uses edge into a different root.
+type ReferenceCrossing struct {
+	SourceRef  string
+	TargetRef  string
+	TargetRoot string
+}
+
+// Crossings returns cross-root Uses edges in containment declaration order.
+func (index *Index) Crossings() []ReferenceCrossing {
+	if index == nil {
+		return nil
+	}
+	result := []ReferenceCrossing{}
+	for _, source := range index.order {
+		root := source[:strings.Index(source+"/", "/")]
+		for _, target := range index.byRef[source].nodeUses() {
+			targetRoot := target[:strings.Index(target+"/", "/")]
+			if targetRoot != root {
+				result = append(result, ReferenceCrossing{SourceRef: source, TargetRef: target, TargetRoot: targetRoot})
+			}
+		}
+	}
+	return result
+}
 
 func (index *Index) cloneNodes(nodes []Node) []Node {
 	result := make([]Node, 0, len(nodes))
