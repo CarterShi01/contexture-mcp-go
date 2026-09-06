@@ -286,7 +286,7 @@ func TestDisclosureOnlyOmitsSchemasAndExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err := contexture.Compile(application)
+	index, err := contexture.CompileDisclosure(application)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,6 +300,13 @@ func TestDisclosureOnlyOmitsSchemasAndExecution(t *testing.T) {
 	}
 	if _, exists := payload["input_schema"]; exists {
 		t.Fatal("disclosure-only Tool leaked input schema")
+	}
+	disclosedTool, err := index.Find("tool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := disclosedTool.(*contexture.Tool).Binding(); err == nil {
+		t.Fatal("disclosure-only Index retained a Tool Binding")
 	}
 	readOnlyGateway, err := contexture.NewGateway(disclosure, nil)
 	if err != nil {

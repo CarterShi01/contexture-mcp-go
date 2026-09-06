@@ -63,6 +63,21 @@ func Compile(application *Application) (*Index, error) {
 	return state.index, nil
 }
 
+// CompileDisclosure builds an independent navigation Index without execution
+// Bindings. It never invokes a Tool handler or opens application Channels.
+func CompileDisclosure(application *Application) (*Index, error) {
+	index, err := Compile(application)
+	if err != nil {
+		return nil, err
+	}
+	for _, ref := range index.order {
+		if tool, ok := index.byRef[ref].(*Tool); ok {
+			tool.binding = nil
+		}
+	}
+	return index, nil
+}
+
 type compiler struct {
 	index  *Index
 	active map[uintptr]bool
