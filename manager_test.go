@@ -178,11 +178,15 @@ func TestControllerManagerRebindsOnlyFutureApplicationLifetimes(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	before, err := manager.Compile("before")
+	capturedApplication, err := manager.Application("captured-before-rebind")
 	if err != nil {
 		t.Fatal(err)
 	}
 	manager.RebindChannels(secondChannels)
+	before, err := contexture.Compile(capturedApplication)
+	if err != nil {
+		t.Fatal(err)
+	}
 	after, err := manager.Compile("after")
 	if err != nil {
 		t.Fatal(err)
@@ -201,6 +205,99 @@ func TestControllerManagerRebindsOnlyFutureApplicationLifetimes(t *testing.T) {
 		if test.want.opens != 1 || test.want.closes != 1 {
 			t.Fatalf("compiled lifecycle used the wrong Channels: %#v", test.want)
 		}
+	}
+}
+
+func TestControllerManagerRejectsInvalidNodeFactsAtTypedRegistration(t *testing.T) {
+	tests := []struct {
+		name     string
+		register func(*contexture.ControllerManager) error
+	}{
+		{"role blank name", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterRole(func() *contexture.Role {
+				return &contexture.Role{Name: " ", Description: "Role.", Instructions: "Inspect."}
+			})
+			return err
+		}},
+		{"role slash name", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterRole(func() *contexture.Role {
+				return &contexture.Role{Name: "bad/name", Description: "Role.", Instructions: "Inspect."}
+			})
+			return err
+		}},
+		{"role blank description", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterRole(func() *contexture.Role {
+				return &contexture.Role{Name: "role", Description: " ", Instructions: "Inspect."}
+			})
+			return err
+		}},
+		{"role blank instructions", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterRole(func() *contexture.Role {
+				return &contexture.Role{Name: "role", Description: "Role.", Instructions: " "}
+			})
+			return err
+		}},
+		{"role duplicate uses", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterRole(func() *contexture.Role {
+				return &contexture.Role{Name: "role", Description: "Role.", Instructions: "Inspect.", Uses: []string{"other", "other"}}
+			})
+			return err
+		}},
+		{"skill blank name", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterSkill(func() *contexture.Skill {
+				return &contexture.Skill{Name: " ", Description: "Skill.", Instructions: "Inspect."}
+			})
+			return err
+		}},
+		{"skill slash name", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterSkill(func() *contexture.Skill {
+				return &contexture.Skill{Name: "bad/name", Description: "Skill.", Instructions: "Inspect."}
+			})
+			return err
+		}},
+		{"skill blank description", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterSkill(func() *contexture.Skill {
+				return &contexture.Skill{Name: "skill", Description: " ", Instructions: "Inspect."}
+			})
+			return err
+		}},
+		{"skill blank instructions", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterSkill(func() *contexture.Skill {
+				return &contexture.Skill{Name: "skill", Description: "Skill.", Instructions: " "}
+			})
+			return err
+		}},
+		{"skill duplicate uses", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterSkill(func() *contexture.Skill {
+				return &contexture.Skill{Name: "skill", Description: "Skill.", Instructions: "Inspect.", Uses: []string{"other", "other"}}
+			})
+			return err
+		}},
+		{"tool blank name", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterTool(func() *contexture.Tool { return &contexture.Tool{Name: " ", Description: "Tool."} })
+			return err
+		}},
+		{"tool slash name", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterTool(func() *contexture.Tool { return &contexture.Tool{Name: "bad/name", Description: "Tool."} })
+			return err
+		}},
+		{"tool blank description", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterTool(func() *contexture.Tool { return &contexture.Tool{Name: "tool", Description: " "} })
+			return err
+		}},
+		{"tool duplicate uses", func(manager *contexture.ControllerManager) error {
+			_, err := manager.RegisterTool(func() *contexture.Tool {
+				return &contexture.Tool{Name: "tool", Description: "Tool.", Uses: []string{"other", "other"}}
+			})
+			return err
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.register(contexture.NewControllerManager()); !errors.Is(err, contexture.ErrInvalidDeclaration) {
+				t.Fatalf("typed registration error = %v, want ErrInvalidDeclaration", err)
+			}
+		})
 	}
 }
 
