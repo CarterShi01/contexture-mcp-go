@@ -14,9 +14,9 @@ Implementations:
 > **Status: active 0.12 product port; not yet a release-ready replacement for
 > Python.** The kernel has focused execution evidence, and this repository now
 > has native project commands, inspection, a generated application, a real MCP
-> launcher, and the maintained demo. Remaining parity work includes hosted
-> identity/root selection, complete documentation and scenario mapping, and a
-> clean-checkout release audit. Do not treat this branch as full product parity.
+> launcher, authenticated request-local root selection, and the maintained demo.
+> Remaining parity work includes complete documentation and scenario mapping, and
+> a clean-checkout release audit. Do not treat this branch as full product parity.
 
 ## Node model
 

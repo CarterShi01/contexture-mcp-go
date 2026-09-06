@@ -20,6 +20,8 @@ type ApplicationServer struct {
 	identity    Identity
 }
 
+type rootSelectionContextKey struct{}
+
 // BuildServer compiles one lazy declaration for serving.
 func BuildServer(application *contexture.Application) (*ApplicationServer, error) {
 	compiled, err := CompileApplication(application)
@@ -53,6 +55,13 @@ func (server *ApplicationServer) BuildForRoots(selection contexture.RootSelectio
 
 // Start blocks while serving stdio or streamable HTTP with Channels open for the lifetime.
 func (server *ApplicationServer) Start(ctx context.Context, options *ContextureOptions) error {
+	return server.StartWithAuthAndRootSelector(ctx, options, nil, nil)
+}
+
+// StartWithAuthAndRootSelector starts one transport with optional HTTP bearer
+// identity and request-local root attenuation. Those HTTP-only policies are
+// rejected for stdio rather than silently ignored.
+func (server *ApplicationServer) StartWithAuthAndRootSelector(ctx context.Context, options *ContextureOptions, identity *Auth, selector RootSelector) error {
 	if options == nil {
 		options = &ContextureOptions{}
 	}
@@ -62,6 +71,9 @@ func (server *ApplicationServer) Start(ctx context.Context, options *ContextureO
 	}
 	options = validated
 	if options.Transport == StdioTransport {
+		if identity != nil || selector != nil {
+			return &ServeError{Message: "stdio cannot use HTTP identity or root selection."}
+		}
 		return server.application.Runtime.Serve(ctx, func(ctx context.Context) error {
 			adapter, err := server.Build()
 			if err != nil {
@@ -74,16 +86,23 @@ func (server *ApplicationServer) Start(ctx context.Context, options *ContextureO
 	if err != nil {
 		return err
 	}
-	return server.ServeListener(ctx, listener, options)
+	return server.ServeListenerWithAuthAndRootSelector(ctx, listener, options, identity, selector)
 }
 
 // ServeListener serves streamable HTTP through an existing listener; it is useful for embedding and tests.
 func (server *ApplicationServer) ServeListener(ctx context.Context, listener net.Listener, options *ContextureOptions) error {
-	return server.ServeListenerWithAuth(ctx, listener, options, nil)
+	return server.ServeListenerWithAuthAndRootSelector(ctx, listener, options, nil, nil)
 }
 
 // ServeListenerWithAuth serves one HTTP listener and validates bearer tokens before MCP dispatch.
 func (server *ApplicationServer) ServeListenerWithAuth(ctx context.Context, listener net.Listener, options *ContextureOptions, identity *Auth) error {
+	return server.ServeListenerWithAuthAndRootSelector(ctx, listener, options, identity, nil)
+}
+
+// ServeListenerWithAuthAndRootSelector serves one HTTP listener with optional
+// bearer identity and request-local root attenuation. Authentication runs before
+// selection, so a selector ceiling receives only a verified Principal.
+func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx context.Context, listener net.Listener, options *ContextureOptions, identity *Auth, selector RootSelector) error {
 	if server == nil || server.application == nil || listener == nil {
 		return fmt.Errorf("Contexture HTTP server requires an application and listener")
 	}
@@ -98,12 +117,21 @@ func (server *ApplicationServer) ServeListenerWithAuth(ctx context.Context, list
 	if options.Transport != StreamableHTTPTransport {
 		return &ServeError{Message: "ServeListener requires transport='streamable-http'."}
 	}
-	adapter, err := server.Build()
+	gateway, err := server.application.Gateway()
 	if err != nil {
 		return err
 	}
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return adapter.Server }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
+	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
+		selection := contexture.AllRoots()
+		if selected, ok := request.Context().Value(rootSelectionContextKey{}).(contexture.RootSelection); ok {
+			selection = selected
+		}
+		return NewContextureMCPServerForRoots(server.identity, gateway, selection, server.application.Publications).Server
+	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
 	var protected http.Handler = guarded(handler, options)
+	if selector != nil {
+		protected = selectedRoots(protected, server.application.Index, selector)
+	}
 	if identity != nil {
 		middleware, err := identity.Middleware()
 		if err != nil {
@@ -123,6 +151,27 @@ func (server *ApplicationServer) ServeListenerWithAuth(ctx context.Context, list
 		}
 		return err
 	})
+}
+
+// selectedRoots resolves request facts once before MCP dispatch and retains the
+// immutable projection in the request context consumed by the MCP factory.
+func selectedRoots(next http.Handler, index *contexture.Index, selector RootSelector) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		selection, err := selector.Select(index, requestHeaders(request.Header), PrincipalOf(request.Context()))
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		next.ServeHTTP(writer, request.WithContext(context.WithValue(request.Context(), rootSelectionContextKey{}, selection)))
+	})
+}
+
+func requestHeaders(headers http.Header) map[string]string {
+	result := make(map[string]string, len(headers))
+	for name, values := range headers {
+		result[name] = strings.Join(values, ", ")
+	}
+	return result
 }
 
 func guarded(next http.Handler, options *ContextureOptions) http.Handler {

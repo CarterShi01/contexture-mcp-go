@@ -22,8 +22,8 @@ SDK-neutral 层负责声明校验、规范 ref、不可变 Index、root-selected
 
 1. core 节点模型、注册、校验、不可变 Index 与 disclosure；
 2. 强类型 Tool binding、`context.Context`、固定 MCP gateway、Prompt、Resource 和 REST；
-3. Channels、principal、telemetry、HTTP bearer identity、固定 root surface；
+3. Channels、principal、telemetry、HTTP bearer identity、经过认证的请求级 root selection；
 4. 原生 CLI、项目生成/发现、inspection、demo 和 stdio/streamable-HTTP launcher；
 5. 外部 Go module 消费者与竞态测试。
 
-这仍不是 parity 或 release 声明：请求级 HTTP root selection、完整文档/场景 inventory 和干净检出环境的 release audit 仍待完成。
+这仍不是 parity 或 release 声明：完整文档/场景 inventory 和干净检出环境的 release audit 仍待完成。

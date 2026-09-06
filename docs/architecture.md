@@ -30,7 +30,8 @@ MCP tools; Contexture exposes a fixed navigation and invocation gateway.
 2. Disclosure API and exact golden discover/open/refusal payloads.
 3. Typed Tool binding, `context.Context` call state, and fixed MCP gateway.
 4. Prompt, Resource, completion, and selected-root behavior.
-5. Channels lifecycle, principal context, telemetry, HTTP, and explicit REST routes.
+5. Channels lifecycle, principal context, telemetry, HTTP bearer identity,
+   authenticated request-local root selection, and explicit REST routes.
 6. Native CLI project generation and discovery, local check/list/inspect/call
    workflows, safe transport options, and a real MCP stdio/streamable-HTTP
    launcher.
@@ -39,7 +40,6 @@ MCP tools; Contexture exposes a fixed navigation and invocation gateway.
 
 The first five areas have focused kernel-conformance evidence; the last two
 have native product-workflow tests. This is still not a parity or release
-claim. Hosted identity and request-selected roots, the full documentation and
-scenario inventory, and the clean-checkout release audit remain open. They
-must be finished with direct evidence rather than treated as a language-native
-substitution.
+claim. The full documentation and scenario inventory, and the clean-checkout
+release audit remain open. They must be finished with direct evidence rather
+than treated as a language-native substitution.
