@@ -90,15 +90,18 @@ func (trace Trace) Failures() []Step {
 // ConnectStep measures bootstrap instructions exactly as a Host receives them.
 func ConnectStep(disclosure *contexture.Disclosure, text string) Step {
 	cost := CostOf(text)
-	listed, cut := rosterLines(text)
+	rootRefs := map[string]bool{}
 	roots := 0
 	if disclosure != nil {
 		for _, node := range disclosure.Index().ModelRoots() {
 			if node != nil {
 				roots++
+				ref, _ := disclosure.Index().RefOf(node)
+				rootRefs[ref] = true
 			}
 		}
 	}
+	listed, cut := rosterLines(text, rootRefs)
 	checks := []Check{
 		{OK: cost.Bytes <= instructions.InstructionsLimit, Note: fmt.Sprintf("%d of %d bytes — Claude Code truncates what is over, mid-sentence", cost.Bytes, instructions.InstructionsLimit)},
 		{OK: strings.Contains(string([]rune(text)[:min(utf8.RuneCountInString(text), instructions.SelfContainedPrefix)]), "contexture_open"), Note: fmt.Sprintf("contexture_open named in the first %d characters — that is how far Codex reads while deciding whether to use this server", instructions.SelfContainedPrefix)},
@@ -264,13 +267,16 @@ func conditionalNote(ok bool, accepted, rejected string) string {
 	}
 	return rejected
 }
-func rosterLines(text string) (int, bool) {
+func rosterLines(text string, roots map[string]bool) (int, bool) {
 	listed, cut := 0, false
 	for _, line := range strings.Split(text, "\n") {
 		if strings.HasPrefix(line, "- ...and ") {
 			cut = true
 		} else if strings.HasPrefix(line, "- ") {
-			listed++
+			ref := strings.TrimSpace(strings.SplitN(strings.TrimPrefix(line, "- "), ":", 2)[0])
+			if roots[ref] {
+				listed++
+			}
 		}
 	}
 	return listed, cut

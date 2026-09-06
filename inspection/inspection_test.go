@@ -67,3 +67,26 @@ func TestInspectionCostAndBreadthFirstReferences(t *testing.T) {
 		t.Fatalf("wrong refs: %#v", refs)
 	}
 }
+
+func TestConnectStepCountsOnlyRootRosterEntries(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "nested", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "root", Description: "Root.", Instructions: "Start here.", Children: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{Name: "child", Description: "Child.", Instructions: "Continue here."}
+		}}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := contexture.NewDisclosure(index, contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := inspection.ConnectStep(view, "contexture_open\n\nCapabilities:\n- root: Root.\n- root/child: Child.")
+	if !step.Checks[2].OK {
+		t.Fatalf("nested roster should list one root: %#v", step.Checks)
+	}
+}
