@@ -70,9 +70,16 @@ func (publications *Publications) PromptCards(selection contexture.RootSelection
 }
 
 // ResourceCards returns resources in declaration order.
-func (publications *Publications) ResourceCards() []ResourceCard {
+func (publications *Publications) ResourceCards(selection contexture.RootSelection) []ResourceCard {
+	effective, err := publications.effective(selection)
+	if err != nil {
+		return nil
+	}
 	result := make([]ResourceCard, 0, len(publications.resources))
 	for _, entry := range publications.resources {
+		if !effective.ContainsRef(entry.Opens) {
+			continue
+		}
 		result = append(result, ResourceCard{Name: publicationName(entry.Name, entry.Opens), URI: entry.URI, Description: entry.Description, MIMEType: entry.MIMEType})
 	}
 	return result

@@ -36,12 +36,19 @@ type ContextureMCPServer struct {
 // NewContextureMCPServer registers only the fixed Contexture gateway.
 // Business Tools are payload cards, never MCP top-level tools.
 func NewContextureMCPServer(identity Identity, gateway *contexture.Gateway, publications ...*surface.Publications) *ContextureMCPServer {
+	return NewContextureMCPServerForRoots(identity, gateway, contexture.AllRoots(), publications...)
+}
+
+// NewContextureMCPServerForRoots registers one fixed root projection. It is
+// useful for stdio and single-tenant hosts; request selectors resolve a
+// projection before constructing their transport-specific adapter.
+func NewContextureMCPServerForRoots(identity Identity, gateway *contexture.Gateway, selection contexture.RootSelection, publications ...*surface.Publications) *ContextureMCPServer {
 	server := NewMCPServer(identity)
 	for _, tool := range gateway.Tools() {
-		registerGatewayTool(server, gateway, tool)
+		registerGatewayTool(server, gateway, tool, selection)
 	}
 	if len(publications) > 0 && publications[0] != nil {
-		registerPublications(server, publications[0])
+		registerPublications(server, publications[0], selection)
 	}
 	names := make([]contexture.GatewayName, 0, len(gateway.Tools()))
 	for _, tool := range gateway.Tools() {
@@ -50,10 +57,10 @@ func NewContextureMCPServer(identity Identity, gateway *contexture.Gateway, publ
 	return &ContextureMCPServer{Server: server, Gateway: gateway, GatewayNames: names}
 }
 
-func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool contexture.GatewayTool) {
+func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool contexture.GatewayTool, selection contexture.RootSelection) {
 	definition := &mcp.Tool{Name: string(tool.Name), Description: tool.Description, InputSchema: gatewaySchema(tool.Name), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: tool.ReadOnly}}
 	server.AddTool(definition, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		value, err := callGateway(ctx, gateway, tool.Name, request.Params.Arguments)
+		value, err := callGateway(ctx, gateway, tool.Name, request.Params.Arguments, selection)
 		if err != nil {
 			return toolFailure(err), nil
 		}
@@ -72,7 +79,7 @@ func gatewaySchema(name contexture.GatewayName) map[string]any {
 	return map[string]any{"type": "object", "properties": properties, "required": []string{"ref"}}
 }
 
-func callGateway(ctx context.Context, gateway *contexture.Gateway, name contexture.GatewayName, raw json.RawMessage) (any, error) {
+func callGateway(ctx context.Context, gateway *contexture.Gateway, name contexture.GatewayName, raw json.RawMessage, selection contexture.RootSelection) (any, error) {
 	if len(raw) == 0 {
 		raw = json.RawMessage("{}")
 	}
@@ -85,13 +92,13 @@ func callGateway(ctx context.Context, gateway *contexture.Gateway, name contextu
 	}
 	switch name {
 	case contexture.DiscoverGatewayName:
-		return gateway.Discover(contexture.AllRoots())
+		return gateway.Discover(selection)
 	case contexture.OpenGatewayName:
-		return gateway.Open(input.Ref, contexture.AllRoots())
+		return gateway.Open(input.Ref, selection)
 	case contexture.InvokeReadOnlyGatewayName:
-		return gateway.InvokeReadOnly(ctx, input.Ref, input.Arguments, contexture.AllRoots())
+		return gateway.InvokeReadOnly(ctx, input.Ref, input.Arguments, selection)
 	case contexture.InvokeGatewayName:
-		return gateway.Invoke(ctx, input.Ref, input.Arguments, contexture.AllRoots())
+		return gateway.Invoke(ctx, input.Ref, input.Arguments, selection)
 	}
 	return nil, nil
 }
@@ -108,8 +115,8 @@ func toolFailure(err error) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}, IsError: true}
 }
 
-func registerPublications(server *mcp.Server, publications *surface.Publications) {
-	prompts, err := publications.PromptCards(contexture.AllRoots())
+func registerPublications(server *mcp.Server, publications *surface.Publications, selection contexture.RootSelection) {
+	prompts, err := publications.PromptCards(selection)
 	if err == nil {
 		for _, card := range prompts {
 			card := card
@@ -121,9 +128,9 @@ func registerPublications(server *mcp.Server, publications *surface.Publications
 				var text string
 				var callErr error
 				if card.Name == "goto" {
-					text, callErr = publications.Goto(request.Params.Arguments["ref"], contexture.AllRoots())
+					text, callErr = publications.Goto(request.Params.Arguments["ref"], selection)
 				} else {
-					text, callErr = publications.Command(card.Name, contexture.AllRoots())
+					text, callErr = publications.Command(card.Name, selection)
 				}
 				if callErr != nil {
 					return nil, callErr
@@ -132,10 +139,10 @@ func registerPublications(server *mcp.Server, publications *surface.Publications
 			})
 		}
 	}
-	for _, card := range publications.ResourceCards() {
+	for _, card := range publications.ResourceCards(selection) {
 		card := card
 		server.AddResource(&mcp.Resource{Name: card.Name, URI: card.URI, Description: card.Description, MIMEType: card.MIMEType}, func(ctx context.Context, _ *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-			value, callErr := publications.Read(ctx, card.URI, contexture.AllRoots())
+			value, callErr := publications.Read(ctx, card.URI, selection)
 			if callErr != nil {
 				return nil, callErr
 			}

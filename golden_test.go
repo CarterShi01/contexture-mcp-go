@@ -231,7 +231,7 @@ func TestGoDemoMatchesPublicationGoldens(t *testing.T) {
 	if !reflect.DeepEqual(actualPrompts, expectedPromptCards) {
 		t.Fatalf("prompts differ\n got %#v\nwant %#v", actualPrompts, expectedPromptCards)
 	}
-	resources := publications.ResourceCards()
+	resources := publications.ResourceCards(contexture.AllRoots())
 	actualResources := make([]any, 0, len(resources))
 	for _, resource := range resources {
 		actualResources = append(actualResources, map[string]any{"name": resource.Name, "uri": resource.URI, "description": resource.Description, "mime_type": resource.MIMEType})

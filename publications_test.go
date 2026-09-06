@@ -61,9 +61,16 @@ func TestPublicationsProjectPromptResourceCompletionAndInstructions(t *testing.T
 	if err != nil || len(prompts) != 2 || prompts[0].Name != "show-command" || prompts[1].Name != "goto" {
 		t.Fatalf("PromptCards = %#v, %v", prompts, err)
 	}
-	resources := publications.ResourceCards()
+	resources := publications.ResourceCards(contexture.AllRoots())
 	if len(resources) != 1 || resources[0].URI != "contexture://runbooks/operations" {
 		t.Fatalf("ResourceCards = %#v", resources)
+	}
+	selection, err := contexture.OnlyRoots("command")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hidden := publications.ResourceCards(selection); len(hidden) != 0 {
+		t.Fatalf("ResourceCards leaked outside selected roots: %#v", hidden)
 	}
 	command, err := publications.Command("show-command", contexture.AllRoots())
 	if err != nil || len(command) == 0 {

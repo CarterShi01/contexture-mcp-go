@@ -31,14 +31,24 @@ func BuildServer(application *contexture.Application) (*ApplicationServer, error
 
 // Build constructs a fresh official-SDK server for one Contexture transport service.
 func (server *ApplicationServer) Build() (*ContextureMCPServer, error) {
+	return server.BuildForRoots(contexture.AllRoots())
+}
+
+// BuildForRoots constructs an adapter whose gateway and publications share one
+// validated immutable root projection.
+func (server *ApplicationServer) BuildForRoots(selection contexture.RootSelection) (*ContextureMCPServer, error) {
 	if server == nil || server.application == nil {
 		return nil, fmt.Errorf("Contexture application server must not be nil")
+	}
+	selection, err := selection.Resolve(server.application.Index)
+	if err != nil {
+		return nil, err
 	}
 	gateway, err := server.application.Gateway()
 	if err != nil {
 		return nil, err
 	}
-	return NewContextureMCPServer(server.identity, gateway, server.application.Publications), nil
+	return NewContextureMCPServerForRoots(server.identity, gateway, selection, server.application.Publications), nil
 }
 
 // Start blocks while serving stdio or streamable HTTP with Channels open for the lifetime.
