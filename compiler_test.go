@@ -81,3 +81,58 @@ func TestCompileRejectsInvalidForest(t *testing.T) {
 		t.Fatalf("Compile error = %v, want unresolved", err)
 	}
 }
+
+func TestCompileRejectsCyclesNamesAndCrossKindDuplicates(t *testing.T) {
+	tests := []struct {
+		name    string
+		factory contexture.Factory
+		want    error
+	}{
+		{
+			name: "cycle",
+			factory: func() contexture.Node {
+				var recursive contexture.Factory
+				recursive = func() contexture.Node {
+					return &contexture.Role{Name: "loop", Description: "Loop.", Instructions: "Loop.", Children: []contexture.Factory{recursive}}
+				}
+				return recursive()
+			},
+			want: contexture.ErrContainmentCycle,
+		},
+		{
+			name: "cross kind duplicate",
+			factory: func() contexture.Node {
+				return &contexture.Role{Name: "root", Description: "Root.", Instructions: "Root.", Skills: []contexture.Factory{
+					func() contexture.Node {
+						return &contexture.Skill{Name: "same", Description: "Skill.", Instructions: "Do."}
+					},
+				}, Tools: []contexture.Factory{
+					func() contexture.Node { return &contexture.Tool{Name: "same", Description: "Tool."} },
+				}}
+			},
+			want: contexture.ErrDuplicate,
+		},
+		{
+			name: "separator ambiguity",
+			factory: func() contexture.Node {
+				return &contexture.Skill{Name: "not/a-name", Description: "Skill.", Instructions: "Do."}
+			},
+			want: contexture.ErrInvalidDeclaration,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "negative", Roots: []contexture.Factory{test.factory}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = contexture.Compile(application)
+			if !errors.Is(err, test.want) {
+				t.Fatalf("Compile error = %v, want %v", err, test.want)
+			}
+		})
+	}
+	if _, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "empty"}); !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("empty application = %v", err)
+	}
+}

@@ -51,7 +51,8 @@ func Compile(application *Application) (*Index, error) {
 		state.index.promptRoots = append(state.index.promptRoots, node)
 		state.index.roots = append(state.index.roots, node)
 	}
-	for ref, node := range state.index.byRef {
+	for _, ref := range state.index.order {
+		node := state.index.byRef[ref]
 		for _, target := range node.nodeUses() {
 			if _, ok := state.index.byRef[target]; !ok {
 				return nil, fmt.Errorf("%w: %q uses %q", ErrUnresolvedReference, ref, target)
@@ -77,9 +78,9 @@ func (state *compiler) build(factory Factory, parent *Role, path []string) (Node
 		return nil, ErrContainmentCycle
 	}
 	state.active[key] = true
+	defer delete(state.active, key)
 	node := factory()
-	delete(state.active, key)
-	if node == nil {
+	if node == nil || (reflect.ValueOf(node).Kind() == reflect.Ptr && reflect.ValueOf(node).IsNil()) {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("node factory returned nil"))
 	}
 	if state.seen[node] {
