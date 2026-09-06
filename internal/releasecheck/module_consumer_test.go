@@ -35,6 +35,8 @@ var _ = inspection.Replay
 var _ = server.NewMCPServer
 var _ = server.Auth{}
 var _ = server.HeaderRootSelector{}
+var _ = server.Launch{}
+var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
 
 func main() {}
