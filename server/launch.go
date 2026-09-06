@@ -79,6 +79,11 @@ func (server *ApplicationServer) Start(ctx context.Context, options *ContextureO
 
 // ServeListener serves streamable HTTP through an existing listener; it is useful for embedding and tests.
 func (server *ApplicationServer) ServeListener(ctx context.Context, listener net.Listener, options *ContextureOptions) error {
+	return server.ServeListenerWithAuth(ctx, listener, options, nil)
+}
+
+// ServeListenerWithAuth serves one HTTP listener and validates bearer tokens before MCP dispatch.
+func (server *ApplicationServer) ServeListenerWithAuth(ctx context.Context, listener net.Listener, options *ContextureOptions, identity *Auth) error {
 	if server == nil || server.application == nil || listener == nil {
 		return fmt.Errorf("Contexture HTTP server requires an application and listener")
 	}
@@ -98,7 +103,15 @@ func (server *ApplicationServer) ServeListener(ctx context.Context, listener net
 		return err
 	}
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return adapter.Server }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
-	httpServer := &http.Server{Handler: guarded(handler, options)}
+	var protected http.Handler = guarded(handler, options)
+	if identity != nil {
+		middleware, err := identity.Middleware()
+		if err != nil {
+			return err
+		}
+		protected = middleware(protected)
+	}
+	httpServer := &http.Server{Handler: protected}
 	go func() {
 		<-ctx.Done()
 		_ = httpServer.Close()
