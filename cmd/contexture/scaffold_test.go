@@ -95,3 +95,46 @@ func TestGeneratedProjectRunsItsNativeCheckWorkflow(t *testing.T) {
 		t.Fatalf("generated check output = %q", output)
 	}
 }
+
+func TestGlobalCommandRunsGeneratedProjectFromNestedDirectory(t *testing.T) {
+	root, err := NewProject("Forwarded Context", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := filepath.Clean(filepath.Join(workingDirectory, "..", ".."))
+	module, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), append(module, []byte("\nreplace github.com/CarterShi01/contexture-mcp-go => "+repository+"\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tidy := exec.CommandContext(t.Context(), "go", "mod", "tidy")
+	tidy.Dir = root
+	if output, err := tidy.CombinedOutput(); err != nil {
+		t.Fatalf("generated go mod tidy failed: %v\n%s", err, output)
+	}
+	binary := filepath.Join(t.TempDir(), "contexture")
+	build := exec.CommandContext(t.Context(), "go", "build", "-o", binary, ".")
+	build.Dir = workingDirectory
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("building contexture command failed: %v\n%s", err, output)
+	}
+	nested := filepath.Join(root, "internal", "notes")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.CommandContext(t.Context(), binary, "check")
+	command.Dir = nested
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("forwarded check failed: %v\n%s", err, output)
+	}
+	if !strings.Contains(string(output), "OK forwarded-context: 1 role(s), 1 skill(s), 1 tool(s)") {
+		t.Fatalf("forwarded check output = %q", output)
+	}
+}
