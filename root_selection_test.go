@@ -155,6 +155,9 @@ func TestSelectedGraphProjectsEveryGraphOperationWithoutCrossRootLeakage(t *test
 	if matches, total := allGraph.MatchingRefs("ins", 1); total != 1 || !reflect.DeepEqual(matches, []string{"alpha/inspect"}) {
 		t.Fatalf("MatchingRefs = %#v, %d", matches, total)
 	}
+	if matches, total := graph.MatchingRefs("", 10); total != 3 || !reflect.DeepEqual(matches, []string{"alpha", "alpha/child", "alpha/inspect"}) {
+		t.Fatalf("selected MatchingRefs leaked or counted beta: %#v, %d", matches, total)
+	}
 }
 
 func TestRuntimeCurrentGraphAndSelectionAreConcurrentRequestLocalProjections(t *testing.T) {

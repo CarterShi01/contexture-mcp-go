@@ -173,12 +173,14 @@ bound Index; a disclosure-only Index returns an `ErrInvalidDeclaration`-typed
 error instead of exposing execution data, and schemas are defensive copies.
 
 `MatchingRefs` ranks prefix, final-segment prefix, segment prefix, then
-substring matches by rank, ref length, and lexical order. Its returned total is
+substring matches by rank, Unicode rune length, and lexical order. Its returned total is
 pre-limit. Go deliberately treats a negative limit as zero results (rather
 than Python's negative-slice behavior), avoiding accidental expansion of a
 bounded completion response. `Signpost` exposes only ancestor refs and their
 sub-role counts; `Crossings` lists declared `Uses` edges that cross roots. Both
 are structural Index facts and do not disclose a node's member cards.
+`Find` and `Signpost` normalize repeated or leading/trailing `/` separators to
+the same canonical address before a successful lookup.
 
 ### Request root projections
 

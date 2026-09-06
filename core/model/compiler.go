@@ -227,11 +227,25 @@ func (index *Index) OfKind(kind Kind) []Node {
 
 // Find resolves one canonical address.
 func (index *Index) Find(ref string) (Node, error) {
-	node, ok := index.byRef[ref]
+	canonical := canonicalRef(ref)
+	node, ok := index.byRef[canonical]
 	if !ok {
 		return nil, index.lookupFailure(ref)
 	}
-	return cloneNode(node, index, ref), nil
+	return cloneNode(node, index, canonical), nil
+}
+
+// canonicalRef matches the reference parser used by lookup diagnostics: empty
+// slash segments are separators, not address components. Every successful
+// Index lookup therefore returns one canonical address spelling.
+func canonicalRef(ref string) string {
+	segments := make([]string, 0)
+	for _, segment := range strings.Split(ref, "/") {
+		if segment != "" {
+			segments = append(segments, segment)
+		}
+	}
+	return strings.Join(segments, "/")
 }
 
 func (index *Index) lookupFailure(ref string) *NodeNotFoundError {
@@ -468,7 +482,7 @@ func (index *Index) Signpost(ref string) ([]SignpostLevel, error) {
 	if _, err := index.Find(ref); err != nil {
 		return nil, err
 	}
-	parts := strings.Split(ref, "/")
+	parts := strings.Split(canonicalRef(ref), "/")
 	result := make([]SignpostLevel, 0, len(parts)-1)
 	for depth := 1; depth < len(parts); depth++ {
 		ancestor := strings.Join(parts[:depth], "/")

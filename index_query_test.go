@@ -126,6 +126,44 @@ func TestIndexQueryFacadeBindingMatchingSignpostAndCrossings(t *testing.T) {
 	}
 }
 
+func TestIndexMatchingRefsRanksByRunesNotUTF8Bytes(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "unicode-matching", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "root", Description: "Root.", Instructions: "Route.", Children: []contexture.Factory{
+			func() contexture.Node {
+				return &contexture.Role{Name: "a中", Description: "Chinese.", Instructions: "Route."}
+			},
+			func() contexture.Node {
+				return &contexture.Role{Name: "abcd", Description: "ASCII.", Instructions: "Route."}
+			},
+		}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if matches, total := index.MatchingRefs("a", 1); total != 2 || !reflect.DeepEqual(matches, []string{"root/a中"}) {
+		t.Fatalf("rune-length matching = %#v, %d", matches, total)
+	}
+}
+
+func TestIndexFindAndSignpostCanonicalizeEmptySlashSegments(t *testing.T) {
+	index := queryIndex(t, nil)
+	node, err := index.Find("/alpha//child/")
+	if err != nil || node.NodeName() != "child" {
+		t.Fatalf("normalized Find = %#v, %v", node, err)
+	}
+	if ref, err := index.RefOf(node); err != nil || ref != "alpha/child" {
+		t.Fatalf("normalized RefOf = %q, %v", ref, err)
+	}
+	levels, err := index.Signpost("/alpha//child//grand/")
+	if err != nil || !reflect.DeepEqual(levels, []contexture.SignpostLevel{{Ref: "alpha", SubRoleCount: 1}, {Ref: "alpha/child", SubRoleCount: 1}}) {
+		t.Fatalf("normalized Signpost = %#v, %v", levels, err)
+	}
+}
+
 func TestDisclosureOnlyIndexQueryFacadeRefusesBindings(t *testing.T) {
 	tool, err := contexture.NewTool("status", "Status.", true, func(context.Context, struct{}) (string, error) { return "ok", nil })
 	if err != nil {

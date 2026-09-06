@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // NodeRef is one canonical node encountered during a selected graph walk.
@@ -193,7 +194,7 @@ func matchingRefs(refs []string, value string, limit int) ([]string, int) {
 			rank = 3
 		}
 		if rank >= 0 {
-			scored = append(scored, candidate{rank: rank, length: len(ref), ref: ref})
+			scored = append(scored, candidate{rank: rank, length: utf8.RuneCountInString(ref), ref: ref})
 		}
 	}
 	sort.Slice(scored, func(left, right int) bool {
