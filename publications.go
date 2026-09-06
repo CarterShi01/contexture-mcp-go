@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -98,17 +99,59 @@ func (publications *Publications) Complete(input string, selection RootSelection
 	if limit <= 0 {
 		limit = 100
 	}
-	values := []string{}
+	type scoredRef struct {
+		rank, length int
+		ref          string
+	}
+	scored := []scoredRef{}
+	wanted := strings.ToLower(strings.TrimSpace(input))
 	for _, ref := range publications.disclosure.index.Walk() {
-		if effective.ContainsRef(ref) && strings.HasPrefix(ref, input) {
-			values = append(values, ref)
+		if !effective.ContainsRef(ref) {
+			continue
+		}
+		lowered := strings.ToLower(ref)
+		rank := -1
+		switch {
+		case wanted == "" || strings.HasPrefix(lowered, wanted):
+			rank = 0
+		case strings.HasPrefix(lowered[strings.LastIndex(lowered, "/")+1:], wanted):
+			rank = 1
+		case anyRefPartStartsWith(lowered, wanted):
+			rank = 2
+		case strings.Contains(lowered, wanted):
+			rank = 3
+		}
+		if rank >= 0 {
+			scored = append(scored, scoredRef{rank: rank, length: len(ref), ref: ref})
 		}
 	}
-	total := len(values)
-	if len(values) > limit {
-		values = values[:limit]
+	sort.Slice(scored, func(left, right int) bool {
+		if scored[left].rank != scored[right].rank {
+			return scored[left].rank < scored[right].rank
+		}
+		if scored[left].length != scored[right].length {
+			return scored[left].length < scored[right].length
+		}
+		return scored[left].ref < scored[right].ref
+	})
+	total := len(scored)
+	if len(scored) > limit {
+		scored = scored[:limit]
+	}
+	values := make([]string, 0, len(scored))
+	for _, candidate := range scored {
+		values = append(values, candidate.ref)
 	}
 	return values, total, nil
+}
+
+func anyRefPartStartsWith(ref, wanted string) bool {
+	for _, part := range strings.Split(ref, "/") {
+		if strings.HasPrefix(part, wanted) {
+			return true
+		}
+	}
+	return false
 }
 
 // Read invokes the exact published Resource Tool through the same Binding.
@@ -178,7 +221,7 @@ func (publications *Publications) openForPerson(ref string, selection RootSelect
 	if err != nil {
 		return "", err
 	}
-	rendered, err := json.MarshalIndent(payload, "", "  ")
+	rendered, err := json.MarshalIndent(orderedContexture(payload), "", "  ")
 	if err != nil {
 		return "", err
 	}
@@ -188,6 +231,138 @@ func (publications *Publications) openForPerson(ref string, selection RootSelect
 	}
 	parts = append(parts, string(rendered), "Continue with contexture_open, contexture_invoke_read_only or contexture_invoke, using refs taken from what is above. Nothing listed here was reached by navigating, so nothing beside it has been shown to you.")
 	return strings.Join(parts, "\n\n"), nil
+}
+
+type orderedContexture map[string]any
+
+func (value orderedContexture) MarshalJSON() ([]byte, error) {
+	keys := []string{"kind", "name", "description", "ref"}
+	switch value["kind"] {
+	case "role":
+		keys = append(keys, "instructions", "roles", "skills", "tools")
+	case "skill":
+		keys = append(keys, "instructions", "uses")
+	case "tool":
+		keys = append(keys, "read_only", "input_schema")
+	}
+	return marshalOrderedMap(map[string]any(value), keys, func(key string, item any) any {
+		if key == "input_schema" {
+			if schema, ok := item.(map[string]any); ok {
+				return orderedSchema(schema)
+			}
+		}
+		return orderedContextureValue(item)
+	})
+}
+
+type orderedSchema map[string]any
+
+func (value orderedSchema) MarshalJSON() ([]byte, error) {
+	return marshalOrderedMap(map[string]any(value), []string{"properties", "required", "type", "default", "anyOf", "items", "additionalProperties"}, func(key string, item any) any {
+		if key == "properties" {
+			if properties, ok := item.(map[string]any); ok {
+				orderedNames := []string{}
+				if required, ok := value["required"].([]any); ok {
+					for _, name := range required {
+						if text, ok := name.(string); ok {
+							orderedNames = append(orderedNames, text)
+						}
+					}
+				}
+				return orderedProperties{values: properties, names: orderedNames}
+			}
+		}
+		switch typed := item.(type) {
+		case map[string]any:
+			return orderedSchema(typed)
+		case []any:
+			result := make([]any, len(typed))
+			for position, child := range typed {
+				if mapped, ok := child.(map[string]any); ok {
+					result[position] = orderedSchema(mapped)
+				} else {
+					result[position] = child
+				}
+			}
+			return result
+		default:
+			return item
+		}
+	})
+}
+
+type orderedProperties struct {
+	values map[string]any
+	names  []string
+}
+
+func (value orderedProperties) MarshalJSON() ([]byte, error) {
+	return marshalOrderedMap(value.values, value.names, func(_ string, item any) any {
+		if schema, ok := item.(map[string]any); ok {
+			return orderedSchema(schema)
+		}
+		return item
+	})
+}
+
+func orderedContextureValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return orderedContexture(typed)
+	case []map[string]any:
+		result := make([]any, len(typed))
+		for position, child := range typed {
+			result[position] = orderedContexture(child)
+		}
+		return result
+	case []any:
+		result := make([]any, len(typed))
+		for position, child := range typed {
+			result[position] = orderedContextureValue(child)
+		}
+		return result
+	default:
+		return value
+	}
+}
+
+func marshalOrderedMap(values map[string]any, preferred []string, transform func(string, any) any) ([]byte, error) {
+	ordered := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, key := range preferred {
+		if _, exists := values[key]; exists {
+			ordered = append(ordered, key)
+			seen[key] = true
+		}
+	}
+	remaining := []string{}
+	for key := range values {
+		if !seen[key] {
+			remaining = append(remaining, key)
+		}
+	}
+	sort.Strings(remaining)
+	ordered = append(ordered, remaining...)
+	buffer := strings.Builder{}
+	buffer.WriteByte('{')
+	for position, key := range ordered {
+		if position > 0 {
+			buffer.WriteByte(',')
+		}
+		encodedKey, err := json.Marshal(key)
+		if err != nil {
+			return nil, err
+		}
+		encodedValue, err := json.Marshal(transform(key, values[key]))
+		if err != nil {
+			return nil, err
+		}
+		buffer.Write(encodedKey)
+		buffer.WriteByte(':')
+		buffer.Write(encodedValue)
+	}
+	buffer.WriteByte('}')
+	return []byte(buffer.String()), nil
 }
 
 func (publications *Publications) signposts(ref string, selection RootSelection) (string, error) {

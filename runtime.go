@@ -132,7 +132,7 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 			correct = "contexture_invoke_read_only"
 			stated = "read-only"
 		}
-		return nil, fmt.Errorf("%w: %s is %s, so it must be run through %s.", ErrWrongDoor, ref, stated, correct)
+		return nil, wrongDoorError(fmt.Sprintf("%s is %s, so it must be run through %s.", ref, stated, correct))
 	}
 	binding, err := tool.Binding()
 	if err != nil {
@@ -148,6 +148,11 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	}
 	return value, callErr
 }
+
+type wrongDoorError string
+
+func (err wrongDoorError) Error() string { return string(err) }
+func (err wrongDoorError) Unwrap() error { return ErrWrongDoor }
 
 // WithPrincipal derives a request context carrying framework identity.
 func WithPrincipal(ctx context.Context, principal any) context.Context {

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestRootPackageDoesNotImportMCPSDK(t *testing.T) {
+func TestRootPackageDoesNotImportHostSDKs(t *testing.T) {
 	t.Parallel()
 
 	files, err := filepath.Glob("*.go")
@@ -26,8 +26,8 @@ func TestRootPackageDoesNotImportMCPSDK(t *testing.T) {
 			if unquoteErr != nil {
 				t.Fatalf("unquote import in %s: %v", file, unquoteErr)
 			}
-			if strings.HasPrefix(path, "github.com/modelcontextprotocol/") {
-				t.Errorf("SDK-neutral package imports MCP SDK in %s: %s", file, path)
+			if strings.HasPrefix(path, "github.com/modelcontextprotocol/") || path == "net/http" {
+				t.Errorf("SDK-neutral package imports Host SDK in %s: %s", file, path)
 			}
 		}
 	}

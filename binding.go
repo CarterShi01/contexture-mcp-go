@@ -45,8 +45,50 @@ func NewTool[I any, O any](name, description string, readOnly bool, handler func
 	if err := json.Unmarshal(raw, &rendered); err != nil {
 		return nil, fmt.Errorf("decode Tool schema: %w", err)
 	}
-	delete(rendered, "$schema")
+	normalizeSchema(rendered, typeOf)
 	return &Tool{Name: name, Description: description, ReadOnly: readOnly, binding: &typedBinding[I, O]{schema: rendered, handler: handler}}, nil
+}
+
+func normalizeSchema(schema map[string]any, input reflect.Type) {
+	normalizeSchemaValue(schema)
+	if schema["type"] == "object" && schema["properties"] == nil {
+		schema["properties"] = map[string]any{}
+	}
+	properties, _ := schema["properties"].(map[string]any)
+	for _, field := range reflect.VisibleFields(input) {
+		if !field.IsExported() || field.Anonymous {
+			continue
+		}
+		name := strings.Split(field.Tag.Get("json"), ",")[0]
+		property, _ := properties[name].(map[string]any)
+		if property == nil {
+			continue
+		}
+		if defaultValue, ok := field.Tag.Lookup("default"); ok {
+			var decoded any
+			if json.Unmarshal([]byte(defaultValue), &decoded) == nil {
+				property["default"] = decoded
+			}
+		}
+	}
+}
+
+func normalizeSchemaValue(value any) {
+	switch typed := value.(type) {
+	case map[string]any:
+		delete(typed, "$schema")
+		delete(typed, "title")
+		if additional, ok := typed["additionalProperties"].(bool); ok && !additional {
+			delete(typed, "additionalProperties")
+		}
+		for _, child := range typed {
+			normalizeSchemaValue(child)
+		}
+	case []any:
+		for _, child := range typed {
+			normalizeSchemaValue(child)
+		}
+	}
 }
 
 // Binding returns the compiled Tool Binding, if this Tool is executable.
