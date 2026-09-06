@@ -221,7 +221,55 @@ For Claude Code, Cursor, or Codex configuration, use `server.Launch`. It
 renders Host configuration from the server command instead of duplicating the
 application's declared context.
 
-## 9. Keep the contract honest
+## 9. Publish an explicit REST surface
+
+`web` is a separate `net/http` adapter for an application that deliberately
+chooses a small REST allowlist. It never derives public paths from the
+Contexture graph. Each route names one fixed Tool ref; `GET` and `HEAD` can
+name only read-only Tools, while `POST`, `PUT`, `PATCH`, and `DELETE` can name
+only writing Tools.
+
+```go
+surface, err := web.NewRestSurface(runtime, []web.RestRoute{
+	{Method: http.MethodGet, Path: "/status", Ref: "operations/status"},
+	{Method: http.MethodPost, Path: "/restart", Ref: "operations/restart", Status: http.StatusAccepted},
+}, web.RestRouterOptions{
+	MaxBodyBytes: 1024 * 1024, // zero selects the same 1 MiB default
+	Authenticator: func(_ context.Context, request web.WebRequest) *contexture.Principal {
+		if request.Headers["authorization"] != "Bearer expected" {
+			return nil
+		}
+		return contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "operator"})
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+server := &http.Server{Addr: "127.0.0.1:8080", Handler: surface}
+if err := surface.Serve(context.Background(), func(_ context.Context, _ http.Handler) error {
+	return server.ListenAndServe()
+}); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	log.Fatal(err)
+}
+```
+
+Read arguments come from the query string: one value becomes a JSON string and
+repeated values become a JSON array. Commands accept an empty body or one JSON
+object and reject other media types, invalid JSON, non-object bodies, and
+bodies above the configured limit. `HEAD` falls back to an explicit `GET`
+route and retains its response status and headers without a body. Successful
+responses are JSON with `Cache-Control: no-store`; failures are structured
+`application/problem+json` responses. The optional authenticator receives a
+snapshot of lower-case headers and repeated query values. A non-nil principal
+is placed in the Tool's `context.Context` (`contexture.CurrentPrincipal`), and
+the same HTTP snapshot is available through `web.CurrentRequest`.
+
+Call `surface.Serve` around the actual serving loop so Contexture Channels are
+opened once and closed after the loop. Calling `ServeHTTP` directly is useful
+for tests but does not establish that application lifetime.
+
+## 10. Keep the contract honest
 
 Run the full repository gate before proposing a change:
 

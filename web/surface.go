@@ -1,33 +1,100 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"strings"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 )
 
+const defaultMaxBodyBytes int64 = 1024 * 1024
+
+// WebRequest is the protocol snapshot an Authenticator or Tool may inspect.
+// It deliberately contains request facts, never a Controller or Tool ref.
+// Headers use lower-case names and Query preserves repeated values.
+type WebRequest struct {
+	Method  string
+	Path    string
+	Headers map[string]string
+	Query   map[string][]string
+}
+
+// Authenticator supplies the immutable principal for one HTTP request. A nil
+// result rejects the request without choosing application authorization policy.
+type Authenticator func(context.Context, WebRequest) *contexture.Principal
+
+// RestRouterOptions configures optional HTTP-boundary behavior.
+type RestRouterOptions struct {
+	Authenticator Authenticator
+	// MaxBodyBytes limits JSON command bodies. Zero uses the 1 MiB default.
+	MaxBodyBytes int64
+}
+
+type webRequestKey struct{}
+
+// CurrentRequest returns the HTTP request facts for a Tool invocation. The
+// returned snapshot is defensively copied, so a Tool cannot mutate another
+// component's view of the request.
+func CurrentRequest(ctx context.Context) (WebRequest, bool) {
+	request, ok := ctx.Value(webRequestKey{}).(WebRequest)
+	if !ok {
+		return WebRequest{}, false
+	}
+	return cloneWebRequest(request), true
+}
+
 // RestRouter is an allowlisted net/http adapter over Runtime Bindings.
 // It never accepts a caller-supplied Tool ref or principal.
 type RestRouter struct {
-	runtime *contexture.Runtime
-	routes  map[string]RestRoute
-	order   []string
+	runtime       *contexture.Runtime
+	routes        map[string]RestRoute
+	order         []string
+	authenticator Authenticator
+	maxBodyBytes  int64
 }
+
+// RestSurface is the native net/http name for an explicit REST publication.
+// It is an alias so existing RestRouter users retain the same behavior.
+type RestSurface = RestRouter
 
 // NewRestRouter validates every explicit route before it can serve requests.
 func NewRestRouter(runtime *contexture.Runtime, routes []RestRoute) (*RestRouter, error) {
+	return NewRestRouterWithOptions(runtime, routes, RestRouterOptions{})
+}
+
+// NewRestSurface builds one explicit net/http REST publication.
+func NewRestSurface(runtime *contexture.Runtime, routes []RestRoute, options RestRouterOptions) (*RestSurface, error) {
+	return NewRestRouterWithOptions(runtime, routes, options)
+}
+
+// NewRestRouterWithOptions validates every route and HTTP boundary option
+// before the router can serve requests.
+func NewRestRouterWithOptions(runtime *contexture.Runtime, routes []RestRoute, options RestRouterOptions) (*RestRouter, error) {
 	if runtime == nil {
 		return nil, errors.New("Contexture Runtime must not be nil")
 	}
-	router := &RestRouter{runtime: runtime, routes: map[string]RestRoute{}}
+	if options.MaxBodyBytes < 0 {
+		return nil, errors.New("Contexture REST max body bytes must be non-negative")
+	}
+	maxBodyBytes := options.MaxBodyBytes
+	if maxBodyBytes == 0 {
+		maxBodyBytes = defaultMaxBodyBytes
+	}
+	router := &RestRouter{
+		runtime: runtime, routes: map[string]RestRoute{},
+		authenticator: options.Authenticator, maxBodyBytes: maxBodyBytes,
+	}
 	for _, route := range routes {
-		route.Method = strings.ToUpper(route.Method)
-		if !strings.HasPrefix(route.Path, "/") || route.Path == "/" {
-			return nil, errors.New("A Contexture REST route path must begin with /.")
+		var err error
+		route, err = normalizeRestRoute(route)
+		if err != nil {
+			return nil, err
 		}
 		tool, err := runtime.Tool(route.Ref)
 		if err != nil {
@@ -59,60 +126,176 @@ func (router *RestRouter) Routes() []RestRoute {
 // ServeHTTP serves only exact allowlisted method/path pairs.
 func (router *RestRouter) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	route, exists := router.routes[routeKey(request.Method, request.URL.Path)]
+	if !exists && request.Method == http.MethodHead {
+		route, exists = router.routes[routeKey(http.MethodGet, request.URL.Path)]
+	}
 	if !exists {
-		if router.hasPath(request.URL.Path) {
-			http.Error(writer, "Contexture REST method is not allowed for this route.", http.StatusMethodNotAllowed)
-			return
-		}
-		http.NotFound(writer, request)
+		problem(writer, http.StatusNotFound, "route-not-found", "No REST route is published here.")
 		return
 	}
-	arguments, err := requestArguments(writer, request)
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusBadRequest)
+	webRequest := newWebRequest(request)
+	if router.authenticator != nil {
+		principal := router.authenticator(request.Context(), cloneWebRequest(webRequest))
+		if principal == nil {
+			problem(writer, http.StatusUnauthorized, "unauthenticated", "Authentication is required.")
+			return
+		}
+		request = request.WithContext(contexture.WithPrincipal(request.Context(), principal))
+	}
+	request = request.WithContext(context.WithValue(request.Context(), webRequestKey{}, webRequest))
+	arguments, requestError := router.requestArguments(writer, request)
+	if requestError != nil {
+		problem(writer, requestError.status, requestError.kind, requestError.detail)
 		return
 	}
 	var value any
+	var err error
 	if route.Method == http.MethodGet || route.Method == http.MethodHead {
 		value, err = router.runtime.InvokeReadOnly(request.Context(), route.Ref, arguments, contexture.AllRoots())
 	} else {
 		value, err = router.runtime.Invoke(request.Context(), route.Ref, arguments, contexture.AllRoots())
 	}
 	if err != nil {
-		http.Error(writer, err.Error(), http.StatusBadRequest)
+		router.invokeProblem(writer, err)
 		return
 	}
-	if route.Method == http.MethodHead {
-		writer.WriteHeader(http.StatusNoContent)
-		return
-	}
-	writer.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(writer).Encode(value); err != nil {
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
-	}
+	jsonResponse(writer, route.Status, value, request.Method == http.MethodHead)
 }
 
-func (router *RestRouter) hasPath(path string) bool {
-	for _, route := range router.routes {
-		if route.Path == path {
-			return true
-		}
+// Serve holds the Runtime's Channels open for the entire HTTP serving scope.
+// Call it around http.Server.Serve (or an equivalent Host loop), not per
+// request, so application dependencies have one coherent lifetime.
+func (router *RestRouter) Serve(ctx context.Context, serve func(context.Context, http.Handler) error) error {
+	if serve == nil {
+		return errors.New("Contexture REST serving function must not be nil")
 	}
-	return false
+	return router.runtime.Serve(ctx, func(ctx context.Context) error { return serve(ctx, router) })
 }
 
-func requestArguments(writer http.ResponseWriter, request *http.Request) (json.RawMessage, error) {
+type requestFailure struct {
+	status int
+	kind   string
+	detail string
+}
+
+func (router *RestRouter) requestArguments(writer http.ResponseWriter, request *http.Request) (json.RawMessage, *requestFailure) {
 	if request.Method == http.MethodGet || request.Method == http.MethodHead {
-		return json.RawMessage("{}"), nil
+		arguments := make(map[string]any, len(request.URL.Query()))
+		for key, values := range request.URL.Query() {
+			if len(values) == 1 {
+				arguments[key] = values[0]
+			} else {
+				arguments[key] = append([]string(nil), values...)
+			}
+		}
+		body, err := json.Marshal(arguments)
+		if err != nil {
+			return nil, &requestFailure{status: http.StatusInternalServerError, kind: "controller-failed", detail: typeName(err)}
+		}
+		return body, nil
 	}
-	body, err := io.ReadAll(http.MaxBytesReader(writer, request.Body, 1<<20))
+	contentType := strings.ToLower(strings.TrimSpace(strings.Split(request.Header.Get("Content-Type"), ";")[0]))
+	if contentType != "" && contentType != "application/json" {
+		return nil, &requestFailure{status: http.StatusUnsupportedMediaType, kind: "unsupported-media-type", detail: "REST commands accept application/json."}
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(writer, request.Body, router.maxBodyBytes))
 	if err != nil {
-		return nil, err
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			return nil, &requestFailure{status: http.StatusRequestEntityTooLarge, kind: "body-too-large", detail: "Request body exceeds the configured limit."}
+		}
+		return nil, &requestFailure{status: http.StatusBadRequest, kind: "invalid-json", detail: "Request body is not valid JSON."}
 	}
 	if len(strings.TrimSpace(string(body))) == 0 {
 		return json.RawMessage("{}"), nil
+	}
+	var value any
+	if err := json.Unmarshal(body, &value); err != nil {
+		return nil, &requestFailure{status: http.StatusBadRequest, kind: "invalid-json", detail: "Request body is not valid JSON."}
+	}
+	if _, ok := value.(map[string]any); !ok {
+		return nil, &requestFailure{status: http.StatusBadRequest, kind: "invalid-body", detail: "Request body must be a JSON object."}
 	}
 	return json.RawMessage(body), nil
 }
 
 func routeKey(method, path string) string { return strings.ToUpper(method) + " " + path }
+
+func newWebRequest(request *http.Request) WebRequest {
+	headers := make(map[string]string, len(request.Header))
+	for key, values := range request.Header {
+		if len(values) > 0 {
+			headers[strings.ToLower(key)] = values[len(values)-1]
+		}
+	}
+	query := make(map[string][]string, len(request.URL.Query()))
+	for key, values := range request.URL.Query() {
+		query[key] = append([]string(nil), values...)
+	}
+	return WebRequest{Method: request.Method, Path: request.URL.Path, Headers: headers, Query: query}
+}
+
+func cloneWebRequest(request WebRequest) WebRequest {
+	result := WebRequest{Method: request.Method, Path: request.Path, Headers: make(map[string]string, len(request.Headers)), Query: make(map[string][]string, len(request.Query))}
+	for key, value := range request.Headers {
+		result.Headers[key] = value
+	}
+	for key, values := range request.Query {
+		result.Query[key] = append([]string(nil), values...)
+	}
+	return result
+}
+
+func (router *RestRouter) invokeProblem(writer http.ResponseWriter, err error) {
+	if errors.Is(err, contexture.ErrInvalidInput) {
+		problem(writer, http.StatusUnprocessableEntity, "invalid-arguments", err.Error())
+		return
+	}
+	if errors.Is(err, contexture.ErrWrongDoor) {
+		problem(writer, http.StatusInternalServerError, "invalid-surface", err.Error())
+		return
+	}
+	if errors.Is(err, fs.ErrPermission) {
+		problem(writer, http.StatusForbidden, "forbidden", nonEmptyDetail(err.Error(), "Forbidden."))
+		return
+	}
+	problem(writer, http.StatusInternalServerError, "controller-failed", typeName(err))
+}
+
+func typeName(err error) string {
+	return fmt.Sprintf("%T", err)
+}
+
+func nonEmptyDetail(detail, fallback string) string {
+	if detail == "" {
+		return fallback
+	}
+	return detail
+}
+
+func jsonResponse(writer http.ResponseWriter, status int, value any, head bool) {
+	body, err := json.Marshal(value)
+	if err != nil {
+		problem(writer, http.StatusInternalServerError, "controller-failed", typeName(err))
+		return
+	}
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
+	writer.WriteHeader(status)
+	if !head {
+		_, _ = writer.Write(body)
+	}
+}
+
+func problem(writer http.ResponseWriter, status int, kind, detail string) {
+	body, _ := json.Marshal(map[string]any{
+		"type": "urn:contexture:problem:" + kind, "status": status,
+		"title": strings.ReplaceAll(kind, "-", " "), "detail": detail,
+	})
+	writer.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
+	writer.WriteHeader(status)
+	_, _ = writer.Write(body)
+}

@@ -196,7 +196,48 @@ surface 生成，绝不会宣称被省略的 root。
 Claude Code、Cursor 和 Codex 配置请使用 `server.Launch`。它从 server command 渲染 Host
 configuration，而不是复制 application 已声明的 context。
 
-## 9. 保持合同真实
+## 9. 发布显式 REST surface
+
+`web` 是一个独立的 `net/http` adapter，适用于 application 有意选择一小组 REST allowlist 的场景。
+它绝不会从 Contexture graph 推导 public path。每条 route 都指向一个固定的 Tool ref：`GET` 与 `HEAD`
+只能指向 read-only Tool，而 `POST`、`PUT`、`PATCH`、`DELETE` 只能指向 writing Tool。
+
+```go
+surface, err := web.NewRestSurface(runtime, []web.RestRoute{
+	{Method: http.MethodGet, Path: "/status", Ref: "operations/status"},
+	{Method: http.MethodPost, Path: "/restart", Ref: "operations/restart", Status: http.StatusAccepted},
+}, web.RestRouterOptions{
+	MaxBodyBytes: 1024 * 1024, // zero 使用相同的 1 MiB 默认值
+	Authenticator: func(_ context.Context, request web.WebRequest) *contexture.Principal {
+		if request.Headers["authorization"] != "Bearer expected" {
+			return nil
+		}
+		return contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "operator"})
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+
+server := &http.Server{Addr: "127.0.0.1:8080", Handler: surface}
+if err := surface.Serve(context.Background(), func(_ context.Context, _ http.Handler) error {
+	return server.ListenAndServe()
+}); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	log.Fatal(err)
+}
+```
+
+只读参数来自 query string：单个值变为 JSON string，重复值变为 JSON array。命令接受空 body 或一个 JSON
+object，并拒绝其他 media type、无效 JSON、非 object body 和超过配置上限的 body。`HEAD` 会回退到显式
+`GET` route，保留其 response status 与 headers 但不返回 body。成功 response 是带
+`Cache-Control: no-store` 的 JSON；失败 response 是结构化的 `application/problem+json`。可选的
+authenticator 会收到 lower-case header 与重复 query value 的 snapshot。非空 principal 会放入 Tool 的
+`context.Context`（`contexture.CurrentPrincipal`），同一 HTTP snapshot 可通过 `web.CurrentRequest` 获取。
+
+应使用 `surface.Serve` 包住实际 serving loop，这样 Contexture Channels 只打开一次，并在 loop 结束后关闭。
+直接调用 `ServeHTTP` 适合测试，但不会建立 application lifetime。
+
+## 10. 保持合同真实
 
 提出改动前运行完整 repository gate：
 
