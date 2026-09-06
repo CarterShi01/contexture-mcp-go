@@ -19,8 +19,7 @@ commit credentials, local environment files, coverage output, or binaries.
 
 - English is the primary language for code, comments, errors, API docs, commits,
   and review discussion. User-facing Simplified Chinese docs are translations.
-- The root package and future `internal` compiler must remain independent of
-  every MCP or HTTP SDK.
+- The root package must remain independent of every MCP or HTTP SDK.
 - Language-native APIs are encouraged; observable behavior must follow the
   pinned Contexture specification and golden fixtures.
 - Update `conformance/specification.json` only after reviewing the upstream

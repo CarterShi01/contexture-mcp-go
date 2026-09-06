@@ -3,7 +3,7 @@
 [简体中文](README.zh-CN.md)
 
 Go implementation of Contexture, a progressive-disclosure framework for
-building MCP applications whose capabilities stay navigable as they grow.
+building MCP applications whose capabilities remain navigable as they grow.
 
 Implementations:
 [Python](https://github.com/CarterShi01/contexture-mcp) ·
@@ -11,93 +11,142 @@ Implementations:
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **Status: scaffold, not released.** The module currently establishes its
-> permanent path, language-native declaration boundary, dependency layering,
-> CI, and conformance lock. It is not yet a usable replacement for the Python
-> implementation and no version tag should be published.
+> **Status: 0.12 kernel-conformant prototype; full Python-product parity is in
+> progress.** The 16 kernel rules have focused execution evidence, but this is
+> not yet a release-ready replacement for the Python distribution. The project
+> CLI, inspection API, bundled demo, templates, and consumer/release gates
+> still need their own implementation and tests.
 
-## Design boundary
+## Node model
 
-Contexture keeps business declarations separate from Host adapters:
+The public SDK-neutral root facade exposes the closed node set. Its source is
+split by responsibility under `core/model/`:
 
-```text
-application declarations
-        ↓
-SDK-neutral root package and internal compiler
-        ↓
-compile → disclose → invoke
-        ↓
-MCP and optional HTTP surfaces
+- `Role` is a responsibility and containment boundary.
+- `Skill` is procedure followed by a model.
+- `Tool` is an executable capability with one typed Binding.
+- `Node` is the sealed interface implemented by their pointer types.
+
+`NewTool` and `NewToolWithSchema` are backed by `core/model/binding.go`. The
+root facade intentionally exposes declarations only; MCP and web adapters are
+separate imports.
+
+## Example
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/server"
+)
+
+type statusInput struct {
+	Service string `json:"service"`
+}
+
+func main() {
+	status, err := contexture.NewTool(
+		"status",
+		"Return one service status.",
+		true,
+		func(_ context.Context, input statusInput) (map[string]any, error) {
+			return map[string]any{"service": input.Service, "healthy": true}, nil
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "operations",
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{
+				Name:         "operations",
+				Description:  "Operate services.",
+				Instructions: "Inspect before changing anything.",
+				Skills: []contexture.Factory{func() contexture.Node {
+					return &contexture.Skill{
+						Name:         "diagnose",
+						Description:  "Diagnose an unhealthy service.",
+						Instructions: "Read status and explain the evidence.",
+						Uses:         []string{"operations/status"},
+					}
+				}},
+				Tools: []contexture.Factory{func() contexture.Node { return status }},
+			}
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	index, err := contexture.Compile(application)
+	if err != nil {
+		log.Fatal(err)
+	}
+	disclosure, err := contexture.NewDisclosure(index, contexture.AllRoots())
+	if err != nil {
+		log.Fatal(err)
+	}
+	runtime, err := contexture.NewRuntime(
+		index, contexture.AllRoots(), contexture.AllRoots(), nil,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	gateway, err := contexture.NewGateway(disclosure, runtime)
+	if err != nil {
+		log.Fatal(err)
+	}
+	adapter := server.NewContextureMCPServer(
+		server.Identity{Name: "operations", Version: "0.1.0"}, gateway,
+	)
+	_ = adapter.Server // Connect it to an official MCP SDK transport chosen by the Host.
+}
 ```
 
-The root package must not import an MCP SDK. The `server` package is the
-adapter seam and currently proves integration with the official MCP Go SDK
-without claiming that Contexture's fixed gateway has been implemented.
+Business Tools remain behind Contexture's four fixed gateway Tools. The root
+package is SDK-neutral; `server` owns the official MCP Go SDK and `web` owns
+explicit `net/http` REST adapters. Request-local facts use `context.Context`, and
+application dependencies use `Channels` with reverse-order cleanup.
 
-## Development
+## Development and kernel conformance
 
-Prerequisites are Go 1.25 or newer and Git.
+Requires Go 1.25 or newer.
 
 ```bash
 git clone https://github.com/CarterShi01/contexture-mcp-go.git
 cd contexture-mcp-go
 go mod download
+go run ./internal/conformancecheck
 go test -race ./...
 go vet ./...
 ```
 
-The current declaration seam is deliberately small:
-
-```go
-application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
-    Name: "operations",
-    Roots: []contexture.RoleFactory{func() contexture.Role {
-        return contexture.Role{
-            Name:         "operations",
-            Description:  "Handle routine operational questions.",
-            Instructions: "Inspect first.",
-        }
-    }},
-})
-```
-
-Declaring the application does not call its root factories. Compilation, Index
-construction, disclosure, and invocation are upcoming milestones.
-
-## Conformance
-
-The binding targets Contexture Specification 0.12 at the immutable revision in
-[`conformance/specification.json`](conformance/specification.json). The status
-file lists implemented rules explicitly; copied prose or an incomplete golden
-run does not count as conformance.
-
-The normative contract remains in the
-[reference repository](https://github.com/CarterShi01/contexture-mcp/tree/master/spec).
-Go APIs should follow Go conventions while producing the same observable
-behavior and protocol payloads.
-
-Implementation sessions begin with the reference repository's
-[`spec/porting/TERRA_GOAL.md`](https://github.com/CarterShi01/contexture-mcp/blob/master/spec/porting/TERRA_GOAL.md)
-and use its conformance matrix as the task ledger. `go run
-./internal/conformancecheck` verifies this repository's revision pin, all 16
-rule states, and the required fixture and golden inventories; it does not claim
-those assets were executed.
+The prototype targets Contexture Specification 0.12 at the immutable revision in
+[`conformance/specification.json`](conformance/specification.json). Pinned
+fixtures and golden outputs are stored under `conformance/`; tests construct and
+run the Go implementation before comparing its observations with them. These
+commands validate the implemented kernel, not a full-product release.
 
 ## Repository map
 
 ```text
-*.go            public SDK-neutral authoring package
-internal/       future compiler and release-only tooling
-server/         MCP and future Host adapters
-conformance/    pinned specification identity and implementation status
-docs/           architecture and implementation plans
+facade.go        public declaration-facing SDK-neutral facade
+core/foundation/ errors and pinned specification identity
+core/mcpinterface/ SDK-neutral Prompt, Resource, and gateway declarations
+core/model/      compiler, disclosure, runtime, lifecycle, and bindings
+server/          MCP SDK adapter and publication surface
+web/             explicit HTTP route and REST adapter
+conformance/    pinned specification identity, fixtures, and golden data
 ```
 
-## Language policy
-
-English is the primary project language. Source comments, identifiers, errors,
-API documentation, release notes, and the authoritative README are English.
-Simplified Chinese user documentation is maintained as a translation.
+English is the primary project language. Simplified Chinese documentation is a
+maintained translation.
 
 ## License
 

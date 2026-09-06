@@ -75,3 +75,36 @@ func TestWithChannelsPreservesPrimaryErrorsAndUnwindsPartialOpen(t *testing.T) {
 		t.Fatalf("combined failure = %v", err)
 	}
 }
+
+func TestRuntimeServesWithApplicationChannels(t *testing.T) {
+	channels := &testChannels{}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name:     "lifecycle",
+		Channels: channels,
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect."}
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = runtime.Serve(context.Background(), func(context.Context) error {
+		channels.events = append(channels.events, "serve")
+		return nil
+	})
+	if !errors.Is(err, errCleanup) {
+		t.Fatalf("Runtime.Serve error = %v, want cleanup error", err)
+	}
+	want := []string{"open", "serve", "close", "cleanup:second", "cleanup:first"}
+	if !reflect.DeepEqual(channels.events, want) {
+		t.Fatalf("events = %#v, want %#v", channels.events, want)
+	}
+}

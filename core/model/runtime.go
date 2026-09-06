@@ -1,14 +1,13 @@
-package contexture
+package model
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-)
 
-// ErrWrongDoor identifies a Tool invoked through the wrong fixed gateway door.
-var ErrWrongDoor = errors.New("Contexture Tool invoked through the wrong door")
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
+)
 
 type contextKey int
 
@@ -68,21 +67,24 @@ type Runtime struct {
 
 // Tool resolves an executable Tool in this Runtime's immutable Index.
 func (runtime *Runtime) Tool(ref string) (*Tool, error) {
-	node, err := runtime.index.Find(ref)
-	if err != nil {
-		return nil, err
+	node, ok := runtime.index.byRef[ref]
+	if !ok {
+		return nil, fmt.Errorf("unknown Contexture reference %q", ref)
 	}
 	tool, ok := node.(*Tool)
 	if !ok {
 		return nil, fmt.Errorf("%s names a %s, not a tool. Open it with contexture_open.", ref, node.nodeKind())
 	}
-	return tool, nil
+	return cloneNode(tool, runtime.index, ref).(*Tool), nil
 }
 
 // NewRuntime constructs a transport-neutral runtime over one bound Index.
 func NewRuntime(index *Index, selection, ceiling RootSelection, telemetry Telemetry) (*Runtime, error) {
 	if index == nil {
 		return nil, errors.New("runtime Index must not be nil")
+	}
+	if !index.bound {
+		return nil, errors.New("a disclosure-only Index cannot be upgraded into a Runtime")
 	}
 	selection, err := selection.Resolve(index)
 	if err != nil {
@@ -117,9 +119,9 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	if err := selection.RequireRef(ref); err != nil {
 		return nil, err
 	}
-	node, err := runtime.index.Find(ref)
-	if err != nil {
-		return nil, err
+	node, ok := runtime.index.byRef[ref]
+	if !ok {
+		return nil, fmt.Errorf("unknown Contexture reference %q", ref)
 	}
 	tool, ok := node.(*Tool)
 	if !ok {
@@ -149,18 +151,32 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	return value, callErr
 }
 
+// Serve holds the Application's Channels open around one serving lifetime.
+func (runtime *Runtime) Serve(ctx context.Context, serve func(context.Context) error) error {
+	if serve == nil {
+		return errors.New("Contexture serving function must not be nil")
+	}
+	_, err := WithChannels(ctx, runtime.index.channels, func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, serve(ctx)
+	})
+	return err
+}
+
 type wrongDoorError string
 
 func (err wrongDoorError) Error() string { return string(err) }
 func (err wrongDoorError) Unwrap() error { return ErrWrongDoor }
 
 // WithPrincipal derives a request context carrying framework identity.
-func WithPrincipal(ctx context.Context, principal any) context.Context {
+func WithPrincipal(ctx context.Context, principal *foundation.Principal) context.Context {
 	return context.WithValue(ctx, principalKey, principal)
 }
 
 // CurrentPrincipal returns framework identity for the exact current invocation.
-func CurrentPrincipal(ctx context.Context) any { return ctx.Value(principalKey) }
+func CurrentPrincipal(ctx context.Context) *foundation.Principal {
+	principal, _ := ctx.Value(principalKey).(*foundation.Principal)
+	return principal
+}
 
 // CurrentGraph returns the graph constrained to the exact current selection.
 func CurrentGraph(ctx context.Context) *SelectedGraph {

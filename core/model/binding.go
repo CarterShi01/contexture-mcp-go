@@ -1,4 +1,4 @@
-package contexture
+package model
 
 import (
 	"bytes"
@@ -11,9 +11,6 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 )
-
-// ErrInvalidInput identifies arguments that do not satisfy a Tool Binding.
-var ErrInvalidInput = errors.New("invalid Contexture tool arguments")
 
 // Binding owns one Tool's disclosed schema and validated invocation path.
 type Binding interface {

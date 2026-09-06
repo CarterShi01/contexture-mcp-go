@@ -1,6 +1,7 @@
-package contexture
+package model
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -16,12 +17,18 @@ type Disclosure struct {
 
 // NewDisclosure creates a model navigation view. Prompt roots remain person-reachable only.
 func NewDisclosure(index *Index, selection RootSelection) (*Disclosure, error) {
+	if index == nil || !index.bound {
+		return nil, errors.New("runtime Disclosure requires a bound Index")
+	}
 	return newDisclosure(index, selection, true)
 }
 
 // NewDisclosureOnly creates navigation that intentionally exposes no Tool schemas.
 // It is used by a disclosure-only Host with no execution bindings or Resources.
 func NewDisclosureOnly(index *Index, selection RootSelection) (*Disclosure, error) {
+	if index == nil || index.bound {
+		return nil, errors.New("disclosure-only navigation requires an unbound Index")
+	}
 	return newDisclosure(index, selection, false)
 }
 
@@ -36,6 +43,14 @@ func newDisclosure(index *Index, selection RootSelection, bound bool) (*Disclosu
 		prompts[ref] = struct{}{}
 	}
 	return &Disclosure{index: index, selection: selection, promptRoots: prompts, bound: bound}, nil
+}
+
+// Index returns the immutable canonical graph projected by this Disclosure.
+func (view *Disclosure) Index() *Index { return view.index }
+
+// EffectiveSelection applies the view's ceiling to one requested root selection.
+func (view *Disclosure) EffectiveSelection(requested RootSelection) (RootSelection, error) {
+	return view.selection.Intersect(requested)
 }
 
 // Discover returns routing cards for model-visible selected roots only.

@@ -18,8 +18,8 @@
     "10": { "status": "implemented", "evidence": ["disclosure_test.go"] },
     "11": { "status": "implemented", "evidence": ["runtime_test.go"] },
     "12": { "status": "implemented", "evidence": ["channels_test.go"] },
-    "13": { "status": "implemented", "evidence": ["golden_test.go"] },
-    "14": { "status": "implemented", "evidence": ["server/rest_test.go"] },
+    "13": { "status": "implemented", "evidence": ["application_test.go", "golden_test.go"] },
+    "14": { "status": "implemented", "evidence": ["web/surface_test.go"] },
     "15": { "status": "implemented", "evidence": ["runtime_test.go"] },
     "16": { "status": "implemented", "evidence": ["architecture_test.go"] }
   },

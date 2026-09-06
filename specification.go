@@ -1,9 +1,28 @@
 package contexture
 
+import "github.com/CarterShi01/contexture-mcp-go/core/foundation"
+
 const (
 	// SpecificationVersion is the Contexture contract targeted by this binding.
-	SpecificationVersion = "0.12"
+	SpecificationVersion = foundation.SpecificationVersion
 
 	// SpecificationRevision is the immutable upstream revision used by tests.
-	SpecificationRevision = "e107a81a933c5eb5b4530e762311619be3a7a80f"
+	SpecificationRevision = foundation.SpecificationRevision
+)
+
+var (
+	// ErrInvalidDeclaration identifies an invalid application declaration.
+	ErrInvalidDeclaration = foundation.ErrInvalidDeclaration
+	// ErrInvalidInput identifies arguments that do not satisfy a Tool Binding.
+	ErrInvalidInput = foundation.ErrInvalidInput
+	// ErrDuplicate identifies duplicate names, addresses, or node identity.
+	ErrDuplicate = foundation.ErrDuplicate
+	// ErrContainmentCycle identifies recursive containment factories.
+	ErrContainmentCycle = foundation.ErrContainmentCycle
+	// ErrUnresolvedReference identifies a uses reference absent from the forest.
+	ErrUnresolvedReference = foundation.ErrUnresolvedReference
+	// ErrWrongDoor identifies a Tool invoked through the wrong fixed gateway door.
+	ErrWrongDoor = foundation.ErrWrongDoor
+	// ErrInvalidSelection identifies an invalid root-level capability projection.
+	ErrInvalidSelection = foundation.ErrInvalidSelection
 )

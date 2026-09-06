@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/server/surface"
 )
 
 type podInput struct {
@@ -38,15 +40,15 @@ const rollbackInstructions = "A rollback destroys the evidence it was called for
 
 func goldenFixture(t *testing.T, name string) string {
 	t.Helper()
-	source, err := os.ReadFile(filepath.Join("..", "Contexture", "contexture", "demo", "fixtures.py"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	match := regexp.MustCompile(name + ` = """\\?\n([\s\S]*?)"""`).FindStringSubmatch(string(source))
-	if len(match) != 2 {
+	uri := map[string]string{
+		"CRASH_LOOP_RUNBOOK": "contexture://runbooks/crash-loop-backoff",
+		"ROLLBACK_POLICY":    "contexture://runbooks/rollback-policy",
+	}[name]
+	body, ok := goldenJSON(t, "reads.json").(map[string]any)[uri].(string)
+	if !ok {
 		t.Fatalf("missing reference fixture %s", name)
 	}
-	return match[1]
+	return body
 }
 
 func goldenTool[I any](name, description string, readOnly bool, handler func(context.Context, I) (string, error)) contexture.Factory {
@@ -59,7 +61,7 @@ func goldenTool[I any](name, description string, readOnly bool, handler func(con
 	}
 }
 
-func goldenDemo(t *testing.T) (*contexture.Gateway, *contexture.Publications) {
+func goldenDemo(t *testing.T) (*contexture.Gateway, *surface.Publications) {
 	t.Helper()
 	crashLoop := goldenFixture(t, "CRASH_LOOP_RUNBOOK")
 	rollbackPolicy := goldenFixture(t, "ROLLBACK_POLICY")
@@ -121,7 +123,7 @@ func goldenDemo(t *testing.T) (*contexture.Gateway, *contexture.Publications) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	publications, err := contexture.NewPublications(application, disclosure, runtime)
+	publications, err := surface.NewPublications(application, disclosure, runtime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +132,7 @@ func goldenDemo(t *testing.T) (*contexture.Gateway, *contexture.Publications) {
 
 func goldenJSON(t *testing.T, name string) any {
 	t.Helper()
-	source, err := os.ReadFile(filepath.Join("..", "Contexture", "spec", "golden", name))
+	source, err := os.ReadFile(filepath.Join("conformance", "golden", name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,12 +249,13 @@ func TestGoDemoMatchesPublicationGoldens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedInstructions, err := os.ReadFile(filepath.Join("..", "Contexture", "spec", "golden", "instructions.txt"))
+	expectedInstructions, err := os.ReadFile(filepath.Join("conformance", "golden", "instructions.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if instructions != string(expectedInstructions) {
-		t.Fatalf("instructions differ\n got %q\nwant %q", instructions, string(expectedInstructions))
+	expectedText := strings.TrimSuffix(string(expectedInstructions), "\n")
+	if instructions != expectedText {
+		t.Fatalf("instructions differ\n got %q\nwant %q", instructions, expectedText)
 	}
 	completions := goldenJSON(t, "completions.json").(map[string]any)
 	for input, expected := range completions {

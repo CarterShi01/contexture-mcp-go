@@ -1,19 +1,21 @@
-package contexture
+package model
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+
+	"github.com/CarterShi01/contexture-mcp-go/core/mcpinterface"
 )
 
-// GatewayName identifies one immutable Contexture system tool.
-type GatewayName string
+// GatewayName identifies one immutable Contexture system Tool.
+type GatewayName = mcpinterface.GatewayName
 
 const (
-	DiscoverGatewayName       GatewayName = "contexture_discover"
-	OpenGatewayName           GatewayName = "contexture_open"
-	InvokeReadOnlyGatewayName GatewayName = "contexture_invoke_read_only"
-	InvokeGatewayName         GatewayName = "contexture_invoke"
+	DiscoverGatewayName       = mcpinterface.DiscoverGatewayName
+	OpenGatewayName           = mcpinterface.OpenGatewayName
+	InvokeReadOnlyGatewayName = mcpinterface.InvokeReadOnlyGatewayName
+	InvokeGatewayName         = mcpinterface.InvokeGatewayName
 )
 
 // GatewayTool is one fixed model-controlled Contexture system tool.

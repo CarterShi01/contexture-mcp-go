@@ -1,4 +1,4 @@
-package server
+package web
 
 import (
 	"encoding/json"
@@ -9,13 +9,6 @@ import (
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 )
-
-// RestRoute is one explicit HTTP route over a fixed Contexture Tool ref.
-type RestRoute struct {
-	Method string
-	Path   string
-	Ref    string
-}
 
 // RestRouter is an allowlisted net/http adapter over Runtime Bindings.
 // It never accepts a caller-supplied Tool ref or principal.

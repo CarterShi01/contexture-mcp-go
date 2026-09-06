@@ -15,7 +15,7 @@ type runtimeInput struct {
 
 func TestRuntimeUsesBindingDoorsAndRequestContext(t *testing.T) {
 	read, err := contexture.NewTool("status", "Status.", true, func(ctx context.Context, input runtimeInput) (string, error) {
-		if contexture.CurrentPrincipal(ctx) != "alice" {
+		if principal := contexture.CurrentPrincipal(ctx); principal == nil || principal.Subject() != "alice" {
 			return "", errors.New("wrong principal")
 		}
 		if graph := contexture.CurrentGraph(ctx); graph == nil || len(graph.Walk()) != 3 {
@@ -45,7 +45,7 @@ func TestRuntimeUsesBindingDoorsAndRequestContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	value, err := runtime.InvokeReadOnly(contexture.WithPrincipal(context.Background(), "alice"), "operations/status", json.RawMessage(`{"value":"ok"}`), contexture.AllRoots())
+	value, err := runtime.InvokeReadOnly(contexture.WithPrincipal(context.Background(), contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "alice"})), "operations/status", json.RawMessage(`{"value":"ok"}`), contexture.AllRoots())
 	if err != nil || value != "ok" {
 		t.Fatalf("InvokeReadOnly = %#v, %v", value, err)
 	}
@@ -115,12 +115,15 @@ func TestRuntimeSelectionOnlyAttenuatesCeilingAndTelemetryCannotChangeOutcome(t 
 
 func TestRuntimeRequestFactsAreConcurrentAndLocal(t *testing.T) {
 	tool, err := contexture.NewTool("who", "Who.", true, func(ctx context.Context, _ runtimeInput) (string, error) {
-		principal, _ := contexture.CurrentPrincipal(ctx).(string)
+		principal := contexture.CurrentPrincipal(ctx)
 		graph := contexture.CurrentGraph(ctx)
 		if graph == nil || len(graph.Walk()) != 2 {
 			return "", errors.New("unexpected graph")
 		}
-		return principal, nil
+		if principal == nil {
+			return "", errors.New("missing principal")
+		}
+		return principal.Subject(), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -141,9 +144,10 @@ func TestRuntimeRequestFactsAreConcurrentAndLocal(t *testing.T) {
 	}
 	results := make(chan string, 2)
 	errs := make(chan error, 2)
-	for _, principal := range []string{"alice", "bob"} {
-		principal := principal
+	for _, subject := range []string{"alice", "bob"} {
+		subject := subject
 		go func() {
+			principal := contexture.NewPrincipal(contexture.PrincipalOptions{Subject: subject})
 			value, callErr := runtime.InvokeReadOnly(contexture.WithPrincipal(context.Background(), principal), "root/who", json.RawMessage(`{"value":"x"}`), contexture.AllRoots())
 			if callErr != nil {
 				errs <- callErr
@@ -163,5 +167,29 @@ func TestRuntimeRequestFactsAreConcurrentAndLocal(t *testing.T) {
 	}
 	if !seen["alice"] || !seen["bob"] {
 		t.Fatalf("request principals leaked: %#v", seen)
+	}
+}
+
+func TestPrincipalSnapshotsHostIdentityFacts(t *testing.T) {
+	claims := map[string]any{"tenant": "acme"}
+	principal := contexture.NewPrincipal(contexture.PrincipalOptions{
+		Subject:  "ada",
+		ClientID: "codex",
+		Issuer:   "https://issuer.example",
+		Scopes:   []string{"tools.read"},
+		Claims:   claims,
+	})
+	claims["tenant"] = "mutated"
+
+	if principal.Subject() != "ada" || principal.ClientID() != "codex" || principal.Issuer() != "https://issuer.example" {
+		t.Fatalf("unexpected identity: %#v", principal)
+	}
+	if !principal.HasScope("tools.read") || principal.HasScope("tools.write") {
+		t.Fatalf("unexpected scopes: %#v", principal.Scopes())
+	}
+	returnedClaims := principal.Claims()
+	returnedClaims["tenant"] = "changed again"
+	if principal.Claims()["tenant"] != "acme" {
+		t.Fatalf("claims were not immutable: %#v", principal.Claims())
 	}
 }

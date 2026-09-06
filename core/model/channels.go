@@ -1,4 +1,4 @@
-package contexture
+package model
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package contexture
+package surface
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	contexture "github.com/CarterShi01/contexture-mcp-go"
 )
 
 // PromptCard describes one MCP Prompt publication.
@@ -32,14 +34,14 @@ type ResourceCard struct {
 
 // Publications validates and projects prompts, resources, completion, and instructions.
 type Publications struct {
-	disclosure *Disclosure
-	runtime    *Runtime
-	prompts    []PromptDeclaration
-	resources  []ResourceDeclaration
+	disclosure *contexture.Disclosure
+	runtime    *contexture.Runtime
+	prompts    []contexture.PromptDeclaration
+	resources  []contexture.ResourceDeclaration
 }
 
 // NewPublications validates application publications over one compiled surface.
-func NewPublications(application *Application, disclosure *Disclosure, runtime *Runtime) (*Publications, error) {
+func NewPublications(application *contexture.Application, disclosure *contexture.Disclosure, runtime *contexture.Runtime) (*Publications, error) {
 	if application == nil || disclosure == nil {
 		return nil, errors.New("Contexture application and Disclosure must not be nil")
 	}
@@ -51,7 +53,7 @@ func NewPublications(application *Application, disclosure *Disclosure, runtime *
 }
 
 // PromptCards returns selected prompt cards plus Contexture's fixed goto prompt.
-func (publications *Publications) PromptCards(selection RootSelection) ([]PromptCard, error) {
+func (publications *Publications) PromptCards(selection contexture.RootSelection) ([]PromptCard, error) {
 	effective, err := publications.effective(selection)
 	if err != nil {
 		return nil, err
@@ -76,7 +78,7 @@ func (publications *Publications) ResourceCards() []ResourceCard {
 }
 
 // Command opens the node reserved by a named person-controlled Prompt.
-func (publications *Publications) Command(name string, selection RootSelection) (string, error) {
+func (publications *Publications) Command(name string, selection contexture.RootSelection) (string, error) {
 	for _, entry := range publications.prompts {
 		if publicationName(entry.Name, entry.Opens) == name {
 			return publications.openForPerson(entry.Opens, selection)
@@ -86,12 +88,12 @@ func (publications *Publications) Command(name string, selection RootSelection) 
 }
 
 // Goto opens a person-supplied ref through person-controlled navigation.
-func (publications *Publications) Goto(ref string, selection RootSelection) (string, error) {
+func (publications *Publications) Goto(ref string, selection contexture.RootSelection) (string, error) {
 	return publications.openForPerson(ref, selection)
 }
 
 // Complete returns selected canonical refs beginning with input, capped by limit.
-func (publications *Publications) Complete(input string, selection RootSelection, limit int) ([]string, int, error) {
+func (publications *Publications) Complete(input string, selection contexture.RootSelection, limit int) ([]string, int, error) {
 	effective, err := publications.effective(selection)
 	if err != nil {
 		return nil, 0, err
@@ -105,7 +107,7 @@ func (publications *Publications) Complete(input string, selection RootSelection
 	}
 	scored := []scoredRef{}
 	wanted := strings.ToLower(strings.TrimSpace(input))
-	for _, ref := range publications.disclosure.index.Walk() {
+	for _, ref := range publications.disclosure.Index().Walk() {
 		if !effective.ContainsRef(ref) {
 			continue
 		}
@@ -155,7 +157,7 @@ func anyRefPartStartsWith(ref, wanted string) bool {
 }
 
 // Read invokes the exact published Resource Tool through the same Binding.
-func (publications *Publications) Read(ctx context.Context, uri string, selection RootSelection) (any, error) {
+func (publications *Publications) Read(ctx context.Context, uri string, selection contexture.RootSelection) (any, error) {
 	if publications.runtime == nil {
 		return nil, errors.New("A disclosure-only application has no Resources.")
 	}
@@ -168,7 +170,7 @@ func (publications *Publications) Read(ctx context.Context, uri string, selectio
 }
 
 // Instructions describes selected model-controlled roles and their navigation door.
-func (publications *Publications) Instructions(selection RootSelection) (string, error) {
+func (publications *Publications) Instructions(selection contexture.RootSelection) (string, error) {
 	effective, err := publications.effective(selection)
 	if err != nil {
 		return "", err
@@ -183,22 +185,22 @@ func (publications *Publications) Instructions(selection RootSelection) (string,
 		"Collect evidence before stating a cause; never assert system state you have",
 		"not read.", "", "Capabilities:",
 	}
-	queue := publications.disclosure.index.ModelRoots()
+	queue := publications.disclosure.Index().ModelRoots()
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
-		ref, _ := publications.disclosure.index.RefOf(node)
+		ref, _ := publications.disclosure.Index().RefOf(node)
 		if !effective.ContainsRef(ref) {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("- %s: %s", ref, node.nodeDescription()))
-		if role, ok := node.(*Role); ok {
-			children, childErr := publications.disclosure.index.ChildrenOf(role)
+		lines = append(lines, fmt.Sprintf("- %s: %s", ref, node.NodeDescription()))
+		if role, ok := node.(*contexture.Role); ok {
+			children, childErr := publications.disclosure.Index().ChildrenOf(role)
 			if childErr != nil {
 				return "", childErr
 			}
 			for _, child := range children {
-				if child.nodeKind() == RoleKind {
+				if child.Kind() == contexture.RoleKind {
 					queue = append(queue, child)
 				}
 			}
@@ -208,11 +210,11 @@ func (publications *Publications) Instructions(selection RootSelection) (string,
 	return strings.Join(lines, "\n"), nil
 }
 
-func (publications *Publications) effective(selection RootSelection) (RootSelection, error) {
-	return publications.disclosure.selection.Intersect(selection)
+func (publications *Publications) effective(selection contexture.RootSelection) (contexture.RootSelection, error) {
+	return publications.disclosure.EffectiveSelection(selection)
 }
 
-func (publications *Publications) openForPerson(ref string, selection RootSelection) (string, error) {
+func (publications *Publications) openForPerson(ref string, selection contexture.RootSelection) (string, error) {
 	payload, err := publications.disclosure.OpenForPerson(ref, selection)
 	if err != nil {
 		return "", err
@@ -365,7 +367,7 @@ func marshalOrderedMap(values map[string]any, preferred []string, transform func
 	return []byte(buffer.String()), nil
 }
 
-func (publications *Publications) signposts(ref string, selection RootSelection) (string, error) {
+func (publications *Publications) signposts(ref string, selection contexture.RootSelection) (string, error) {
 	parts := strings.Split(ref, "/")
 	lines := []string{}
 	for depth := 1; depth < len(parts); depth++ {
@@ -393,7 +395,7 @@ func (publications *Publications) validate() error {
 		if strings.TrimSpace(entry.Opens) == "" || strings.TrimSpace(entry.Description) == "" {
 			return errors.New("A Contexture Prompt must name a node and have a description.")
 		}
-		if _, err := publications.disclosure.index.Find(entry.Opens); err != nil {
+		if _, err := publications.disclosure.Index().Find(entry.Opens); err != nil {
 			return err
 		}
 		name := publicationName(entry.Name, entry.Opens)
@@ -410,11 +412,11 @@ func (publications *Publications) validate() error {
 		if strings.TrimSpace(entry.Opens) == "" || strings.TrimSpace(entry.URI) == "" || strings.TrimSpace(entry.Description) == "" {
 			return errors.New("A Contexture Resource requires a Tool ref, URI, and description.")
 		}
-		node, err := publications.disclosure.index.Find(entry.Opens)
+		node, err := publications.disclosure.Index().Find(entry.Opens)
 		if err != nil {
 			return err
 		}
-		tool, ok := node.(*Tool)
+		tool, ok := node.(*contexture.Tool)
 		if !ok {
 			return fmt.Errorf("Resource %q must target a Tool.", entry.URI)
 		}

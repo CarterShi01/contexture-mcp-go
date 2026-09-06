@@ -1,6 +1,7 @@
 package contexture_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -76,3 +77,70 @@ func TestApplicationRequiresModelRoot(t *testing.T) {
 		t.Fatalf("DeclareApplication() error = %v, want ErrInvalidDeclaration", err)
 	}
 }
+
+func TestRuntimeAndDisclosureOnlyCompilationStaySeparate(t *testing.T) {
+	unbound := &contexture.Tool{Name: "status", Description: "Status.", ReadOnly: true}
+	runtimeDeclaration, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name:  "runtime",
+		Roots: []contexture.Factory{func() contexture.Node { return unbound }},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := contexture.Compile(runtimeDeclaration); !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("runtime compilation accepted a Tool without Binding: %v", err)
+	}
+
+	disclosureDeclaration, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name:  "disclosure",
+		Roots: []contexture.Factory{func() contexture.Node { return unbound }},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.CompileDisclosure(disclosureDeclaration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), nil); err == nil {
+		t.Fatal("disclosure-only Index was upgraded into a Runtime")
+	}
+	if _, err := contexture.NewDisclosure(index, contexture.AllRoots()); err == nil {
+		t.Fatal("disclosure-only Index was accepted by runtime Disclosure")
+	}
+	if _, err := contexture.NewDisclosureOnly(index, contexture.AllRoots()); err != nil {
+		t.Fatalf("NewDisclosureOnly rejected unbound Index: %v", err)
+	}
+
+	channelsDeclaration, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name:     "channels",
+		Channels: noOpChannels{},
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Skill{Name: "skill", Description: "Skill.", Instructions: "Read."}
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := contexture.CompileDisclosure(channelsDeclaration); !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("disclosure-only compilation accepted Channels: %v", err)
+	}
+	resourceDeclaration, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "resources",
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Skill{Name: "skill", Description: "Skill.", Instructions: "Read."}
+		}},
+		Resources: []contexture.ResourceDeclaration{{Opens: "skill", URI: "contexture://skill", Description: "Skill."}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := contexture.CompileDisclosure(resourceDeclaration); !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("disclosure-only compilation accepted Resources: %v", err)
+	}
+}
+
+type noOpChannels struct{}
+
+func (noOpChannels) Open(context.Context, contexture.CleanupRegistrar) error { return nil }
+func (noOpChannels) Close(context.Context) error                             { return nil }

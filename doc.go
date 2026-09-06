@@ -1,6 +1,5 @@
 // Package contexture declares progressively disclosed MCP applications.
 //
-// This repository is currently a scaffold. Its public surface establishes the
-// lazy declaration boundary while the compiler and protocol behavior are built
-// against the language-neutral Contexture specification.
+// The package implements the Contexture 0.12 language-neutral contract with a
+// Go-native declaration, compiler, runtime, publication, and Host adapter API.
 package contexture

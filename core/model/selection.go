@@ -1,13 +1,10 @@
-package contexture
+package model
 
 import (
 	"errors"
 	"fmt"
 	"strings"
 )
-
-// ErrInvalidSelection identifies an invalid root-level capability projection.
-var ErrInvalidSelection = errors.New("invalid Contexture root selection")
 
 // RootSelection is all roots or an exact immutable root-name allowlist.
 type RootSelection struct{ names map[string]struct{} }

@@ -2,8 +2,8 @@
 
 [English](README.md)
 
-Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露框架，目标是
-在能力持续增长时仍保持上下文可导航。
+Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露框架，用于在
+能力不断增长时保持上下文可导航。
 
 语言实现：
 [Python](https://github.com/CarterShi01/contexture-mcp) ·
@@ -11,49 +11,136 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [跨语言规范](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **当前状态：工程骨架，尚未发布。** 目前已经固定永久 module path，并建立
-> Go 原生声明边界、依赖分层、CI 和规范版本锁定，但还不能替代 Python 参考实现，
-> 也不应创建公开版本 tag。
+> **当前状态：符合 0.12 内核的原型，Python 完整产品等价正在进行。** 16 条内核
+> 规则均已有定向执行证据，但它尚不是 Python 发行版的可发布替代品。项目 CLI、
+> inspection API、内置 demo、模板以及消费者/发布 gate 都仍需单独实现与测试。
 
-## 架构边界
+## 节点模型
 
-业务声明和 Host 适配器保持分离：
+不依赖 SDK 的公开根 facade 暴露封闭节点集合；实现按职责分布在
+`core/model/` 下：
 
-```text
-应用声明
-   ↓
-不依赖 MCP SDK 的根包与内部编译器
-   ↓
-编译 → 披露 → 调用
-   ↓
-MCP 与可选 HTTP 表面
+- `Role`：职责与容器边界；
+- `Skill`：由模型遵循的操作过程；
+- `Tool`：拥有一份强类型 Binding 的可执行能力；
+- `Node`：只能由上述指针类型实现的封闭接口。
+
+`NewTool` 和 `NewToolWithSchema` 由 `core/model/binding.go` 支持。根 facade
+只暴露声明；MCP 与 web 适配器需要显式单独导入。
+
+## 示例
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/server"
+)
+
+type statusInput struct {
+	Service string `json:"service"`
+}
+
+func main() {
+	status, err := contexture.NewTool(
+		"status",
+		"Return one service status.",
+		true,
+		func(_ context.Context, input statusInput) (map[string]any, error) {
+			return map[string]any{"service": input.Service, "healthy": true}, nil
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "operations",
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{
+				Name:         "operations",
+				Description:  "Operate services.",
+				Instructions: "Inspect before changing anything.",
+				Skills: []contexture.Factory{func() contexture.Node {
+					return &contexture.Skill{
+						Name:         "diagnose",
+						Description:  "Diagnose an unhealthy service.",
+						Instructions: "Read status and explain the evidence.",
+						Uses:         []string{"operations/status"},
+					}
+				}},
+				Tools: []contexture.Factory{func() contexture.Node { return status }},
+			}
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	index, err := contexture.Compile(application)
+	if err != nil {
+		log.Fatal(err)
+	}
+	disclosure, err := contexture.NewDisclosure(index, contexture.AllRoots())
+	if err != nil {
+		log.Fatal(err)
+	}
+	runtime, err := contexture.NewRuntime(
+		index, contexture.AllRoots(), contexture.AllRoots(), nil,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	gateway, err := contexture.NewGateway(disclosure, runtime)
+	if err != nil {
+		log.Fatal(err)
+	}
+	adapter := server.NewContextureMCPServer(
+		server.Identity{Name: "operations", Version: "0.1.0"}, gateway,
+	)
+	_ = adapter.Server // 由 Host 将其连接到官方 MCP SDK transport。
+}
 ```
 
-根包不得导入 MCP SDK。`server` 是适配层边界；当前只验证官方 MCP Go SDK
-可以被正确集成，并不声称已经实现 Contexture 固定网关。
+业务 Tool 始终位于 Contexture 的四个固定网关 Tool 后面。根包不依赖 SDK；
+`server` 包拥有官方 MCP Go SDK，`web` 包拥有显式 `net/http` REST 适配器。请求级事实通过
+`context.Context` 传递，应用依赖通过 `Channels` 管理并按逆序清理。
 
-## 本地开发
+## 开发与内核一致性验证
 
-需要 Go 1.25 或更新版本，以及 Git。
+需要 Go 1.25 或更新版本。
 
 ```bash
 git clone https://github.com/CarterShi01/contexture-mcp-go.git
 cd contexture-mcp-go
 go mod download
+go run ./internal/conformancecheck
 go test -race ./...
 go vet ./...
 ```
 
-声明应用不会执行 root factory。编译、Index、披露和调用仍属于后续里程碑。
+该原型锁定 `conformance/specification.json` 中记录的 Contexture Specification
+0.12 提交。固定 fixtures 和 golden 输出保存在 `conformance/`；测试会先通过
+Go 实现生成真实观察结果，再与这些资产比较。上述命令验证的是已实现的内核，
+不是完整产品的发布 gate。
 
-## 一致性状态
+## 仓库结构
 
-本实现锁定 Contexture Specification 0.12，具体提交记录在
-[`conformance/specification.json`](conformance/specification.json)。只有通过共同
-fixture 和 golden 输出的行为才算实现，不能用复制文档代替验证。
+```text
+facade.go        面向声明的公开、SDK-neutral facade
+core/foundation/ 错误与锁定的规范身份
+core/mcpinterface/ SDK-neutral Prompt、Resource 与 gateway 声明
+core/model/      编译、披露、运行时、生命周期与 Binding
+server/          MCP SDK 适配器与发布表面
+web/             显式 HTTP route 与 REST 适配器
+conformance/    固定规范身份、fixtures 与 golden 数据
+```
 
-英文是项目第一语言，也是发生歧义时的权威文本。源代码注释、标识符、错误信息、
-API 文档和发布说明默认使用英文；简体中文文档作为用户翻译持续维护。
+英文是项目第一语言；简体中文文档作为翻译持续维护。
 
 ## 许可证
 

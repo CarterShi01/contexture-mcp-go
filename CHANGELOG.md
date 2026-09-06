@@ -5,5 +5,10 @@ Versioning once public releases begin.
 
 ## Unreleased
 
-- Establish the Go module, SDK-neutral root package, MCP adapter seam, tests,
-  CI, documentation, conformance lock, and guarded module-release workflow.
+- Implement all 16 Contexture 0.12 conformance rules across declarations,
+  compilation, disclosure, execution, publications, lifecycle, MCP, and REST.
+- Add repository-local byte-identical fixtures and golden assets so a standalone
+  clone can execute the conformance suite.
+- Make compiled Index nodes defensive snapshots, bind Channels to Application
+  serving, and enforce runtime/disclosure-only separation.
+- Keep the first Go module tag guarded pending final release review.

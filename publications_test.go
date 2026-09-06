@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/server/surface"
 )
 
 type emptyInput struct{}
@@ -52,7 +53,7 @@ func publicationApplication(t *testing.T) (*contexture.Application, *contexture.
 
 func TestPublicationsProjectPromptResourceCompletionAndInstructions(t *testing.T) {
 	application, disclosure, runtime := publicationApplication(t)
-	publications, err := contexture.NewPublications(application, disclosure, runtime)
+	publications, err := surface.NewPublications(application, disclosure, runtime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,13 +129,13 @@ func TestPublicationsRejectInvalidResourceTargetsAndDisclosureResources(t *testi
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := contexture.NewPublications(application, disclosure, runtime); err == nil {
+			if _, err := surface.NewPublications(application, disclosure, runtime); err == nil {
 				t.Fatal("NewPublications accepted invalid Resource")
 			}
 		})
 	}
 	application, disclosure, _ := publicationApplication(t)
-	if _, err := contexture.NewPublications(application, disclosure, nil); err == nil || errors.Is(err, contexture.ErrInvalidInput) {
+	if _, err := surface.NewPublications(application, disclosure, nil); err == nil || errors.Is(err, contexture.ErrInvalidInput) {
 		t.Fatalf("disclosure Resources = %v", err)
 	}
 }

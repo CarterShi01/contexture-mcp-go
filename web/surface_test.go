@@ -1,4 +1,4 @@
-package server_test
+package web_test
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
-	"github.com/CarterShi01/contexture-mcp-go/server"
+	"github.com/CarterShi01/contexture-mcp-go/web"
 )
 
 type restInput struct {
@@ -38,7 +38,7 @@ func TestRestRouterUsesExplicitAllowlistAndFixedDoors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	router, err := server.NewRestRouter(runtime, []server.RestRoute{{Method: http.MethodGet, Path: "/status", Ref: "ops/status"}, {Method: http.MethodPost, Path: "/restart", Ref: "ops/restart"}})
+	router, err := web.NewRestRouter(runtime, []web.RestRoute{{Method: http.MethodGet, Path: "/status", Ref: "ops/status"}, {Method: http.MethodPost, Path: "/restart", Ref: "ops/restart"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestRestRouterUsesExplicitAllowlistAndFixedDoors(t *testing.T) {
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("arbitrary ref = %d", response.Code)
 	}
-	if _, err := server.NewRestRouter(runtime, []server.RestRoute{{Method: http.MethodPost, Path: "/wrong", Ref: "ops/status"}}); err == nil {
+	if _, err := web.NewRestRouter(runtime, []web.RestRoute{{Method: http.MethodPost, Path: "/wrong", Ref: "ops/status"}}); err == nil {
 		t.Fatal("writing route accepted read-only Tool")
 	}
 }

@@ -90,7 +90,7 @@ func run() error {
 	if err := json.Unmarshal(schemaData, &schema); err != nil {
 		return fmt.Errorf("decode schema: %w", err)
 	}
-	source, err := os.ReadFile("specification.go")
+	source, err := os.ReadFile("core/foundation/specification.go")
 	if err != nil {
 		return fmt.Errorf("read specification constants: %w", err)
 	}
@@ -105,6 +105,16 @@ func run() error {
 	}
 	if !slices.Equal(current.Golden, expectedGolden) {
 		return errors.New("golden inventory is incomplete or unordered")
+	}
+	for _, fixture := range expectedFixtures {
+		if _, err := os.Stat("conformance/fixtures/" + fixture); err != nil {
+			return fmt.Errorf("fixture asset %q is unavailable: %w", fixture, err)
+		}
+	}
+	for _, golden := range expectedGolden {
+		if _, err := os.Stat("conformance/golden/" + golden); err != nil {
+			return fmt.Errorf("golden asset %q is unavailable: %w", golden, err)
+		}
 	}
 
 	implemented := make([]int, 0, 16)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/server/surface"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -16,8 +17,8 @@ type Identity struct {
 
 // NewMCPServer constructs the official MCP adapter without registering capabilities.
 //
-// Gateway registration belongs to the upcoming compilation layer. Keeping the
-// SDK dependency in this package enforces an SDK-neutral authoring core.
+// Keeping the SDK dependency in this package enforces an SDK-neutral authoring
+// core.
 func NewMCPServer(identity Identity) *mcp.Server {
 	return mcp.NewServer(&mcp.Implementation{
 		Name:    identity.Name,
@@ -34,7 +35,7 @@ type ContextureMCPServer struct {
 
 // NewContextureMCPServer registers only the fixed Contexture gateway.
 // Business Tools are payload cards, never MCP top-level tools.
-func NewContextureMCPServer(identity Identity, gateway *contexture.Gateway, publications ...*contexture.Publications) *ContextureMCPServer {
+func NewContextureMCPServer(identity Identity, gateway *contexture.Gateway, publications ...*surface.Publications) *ContextureMCPServer {
 	server := NewMCPServer(identity)
 	for _, tool := range gateway.Tools() {
 		registerGatewayTool(server, gateway, tool)
@@ -107,7 +108,7 @@ func toolFailure(err error) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}, IsError: true}
 }
 
-func registerPublications(server *mcp.Server, publications *contexture.Publications) {
+func registerPublications(server *mcp.Server, publications *surface.Publications) {
 	prompts, err := publications.PromptCards(contexture.AllRoots())
 	if err == nil {
 		for _, card := range prompts {
