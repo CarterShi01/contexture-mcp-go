@@ -33,6 +33,8 @@ import (
 var _ = contexture.NewPrincipal
 var _ = inspection.Replay
 var _ = server.NewMCPServer
+var _ = server.Auth{}
+var _ = server.HeaderRootSelector{}
 var _ = web.NewRestRouter
 
 func main() {}
