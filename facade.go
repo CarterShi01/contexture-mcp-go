@@ -40,6 +40,7 @@ type (
 	GatewayName               = model.GatewayName
 	GatewayTool               = model.GatewayTool
 	Gateway                   = model.Gateway
+	RefusedError              = model.RefusedError
 	Telemetry                 = model.Telemetry
 	CallEvent                 = model.CallEvent
 	NodeUsage                 = model.NodeUsage
@@ -133,6 +134,26 @@ func NewRuntime(index *Index, selection, ceiling RootSelection, telemetry Teleme
 func NewGateway(disclosure *Disclosure, runtime *Runtime) (*Gateway, error) {
 	return model.NewGateway(disclosure, runtime)
 }
+
+// GatewayTools returns the complete fixed system-tool inventory.
+func GatewayTools() []GatewayTool { return model.GatewayTools() }
+
+// DisclosureGatewayTools returns only discover and open.
+func DisclosureGatewayTools() []GatewayTool { return model.DisclosureGatewayTools() }
+
+// ExecutionGatewayTools returns only the two fixed invocation doors.
+func ExecutionGatewayTools() []GatewayTool { return model.ExecutionGatewayTools() }
+
+// UnresolvedMessage is the agent-facing recovery text for one typed lookup failure.
+func UnresolvedMessage(failure *NodeNotFoundError) string { return model.UnresolvedMessage(failure) }
+
+// WrongDoorMessage is the agent-facing recovery text for the other invocation door.
+func WrongDoorMessage(ref string, isReadOnly bool) string {
+	return model.WrongDoorMessage(ref, isReadOnly)
+}
+
+// TakenByPersonMessage is the fixed explanation for a person-reserved prompt target.
+func TakenByPersonMessage(ref string) string { return model.TakenByPersonMessage(ref) }
 
 // AllRoots returns the projection containing every root.
 func AllRoots() RootSelection {

@@ -3,7 +3,6 @@ package model
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -193,47 +192,18 @@ func (view *Disclosure) active(node Node, selection RootSelection) map[string]an
 }
 
 func (view *Disclosure) resolve(ref string, selection RootSelection, roots []Node) (Node, error) {
-	if ref == "" {
-		return nil, fmt.Errorf("A reference must name at least a root role. Call contexture_discover for the roles this server serves.")
+	// Index is the single owner of lookup facts. Keeping its typed diagnostic
+	// intact lets the gateway render an agent recovery while other Hosts can
+	// still classify the reason with errors.As/errors.Is.
+	node, err := view.index.Find(ref)
+	if err != nil {
+		return nil, err
 	}
-	parts := strings.Split(ref, "/")
-	var current Node
 	for _, root := range roots {
 		rootRef, _ := view.index.RefOf(root)
-		if root.nodeName() == parts[0] && selection.ContainsRef(rootRef) {
-			current = root
-			break
+		if selection.ContainsRef(rootRef) && strings.Split(ref, "/")[0] == rootRef {
+			return node, nil
 		}
 	}
-	if current == nil {
-		names := []string{}
-		for _, root := range roots {
-			names = append(names, root.nodeName())
-		}
-		sort.Strings(names)
-		return nil, fmt.Errorf("No root role named '%s'. This server serves: %s. Call contexture_discover for their cards, then open one to reach what is beneath it.", parts[0], strings.Join(names, ", "))
-	}
-	for _, part := range parts[1:] {
-		if current.nodeKind() != RoleKind {
-			return nil, fmt.Errorf("Reference '%s' continues past '%s', which is a %s and holds nothing. Open '%s' itself with contexture_open, or go back to the card the ref came from.", ref, current.nodeName(), current.nodeKind(), current.nodeName())
-		}
-		children, _ := view.index.ChildrenOf(current)
-		var next Node
-		for _, child := range children {
-			if child.nodeName() == part {
-				next = child
-				break
-			}
-		}
-		if next == nil {
-			names := []string{}
-			for _, child := range children {
-				names = append(names, child.nodeName())
-			}
-			sort.Strings(names)
-			return nil, fmt.Errorf("Role '%s' holds no member named '%s'. It holds: %s. Call contexture_open on '%s' to see each member with the ref that opens it.", current.nodeName(), part, strings.Join(names, ", "), current.nodeName())
-		}
-		current = next
-	}
-	return current, nil
+	return nil, view.index.lookupFailure(ref)
 }

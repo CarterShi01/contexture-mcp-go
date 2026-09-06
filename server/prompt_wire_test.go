@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -9,6 +10,39 @@ import (
 	"github.com/CarterShi01/contexture-mcp-go/server"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestPersonReservedPromptDoesNotRevealOutsideSelectedRoots(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "prompt-ceiling",
+		Roots: []contexture.Factory{
+			func() contexture.Node {
+				return &contexture.Role{Name: "alpha", Description: "Alpha.", Instructions: "Inspect.", Skills: []contexture.Factory{func() contexture.Node {
+					return &contexture.Skill{Name: "reserved", Description: "Reserved.", Instructions: "Ask."}
+				}}}
+			},
+			func() contexture.Node {
+				return &contexture.Role{Name: "beta", Description: "Beta.", Instructions: "Inspect."}
+			},
+		},
+		Prompts: []contexture.Prompt{{Name: "alpha-command", Opens: "alpha/reserved", Description: "Reserved.", ModelOpen: contexture.ModelReservedForPerson}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := server.CompileApplication(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beta, err := contexture.OnlyRoots("beta")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = compiled.Publications.OpenForModel("alpha/reserved", beta)
+	var outside *contexture.RootOutsideSelectionError
+	if !errors.As(err, &outside) || strings.Contains(err.Error(), "person") || strings.Contains(err.Error(), "command") {
+		t.Fatalf("reserved target leaked through ceiling: %v", err)
+	}
+}
 
 func TestOfficialSDKReservesPromptTargetFromModelOpenButNotPersonPrompt(t *testing.T) {
 	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{

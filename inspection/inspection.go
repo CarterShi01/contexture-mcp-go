@@ -5,6 +5,7 @@ package inspection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -143,6 +144,10 @@ func DiscoverStep(disclosure *contexture.Disclosure) Step {
 func OpenStep(disclosure *contexture.Disclosure, ref string) Step {
 	payload, err := disclosure.Open(ref, contexture.AllRoots())
 	if err != nil {
+		var failure *contexture.NodeNotFoundError
+		if errors.As(err, &failure) {
+			err = &contexture.RefusedError{Message: contexture.UnresolvedMessage(failure), Cause: err}
+		}
 		return step("contexture_open", err.Error(), Step{Ref: ref, Refused: true, Aside: "this recovery sentence is all the agent receives"})
 	}
 	result := Step{Ref: ref, Payload: payload, Checks: routingChecks(payload)}

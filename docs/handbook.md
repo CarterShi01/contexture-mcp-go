@@ -301,6 +301,19 @@ The declaration does not change when it is served. The server adapter exposes
 four fixed Contexture gateway Tools; business Tools are progressively disclosed
 behind them rather than registered at MCP top level.
 
+`GatewayTools()` exposes that immutable ordered inventory: `contexture_discover`,
+`contexture_open`, `contexture_invoke_read_only`, and `contexture_invoke`.
+`DisclosureGatewayTools()` is the first two for a navigation-only Host, while
+`ExecutionGatewayTools()` is the two invocation doors. They are framework
+controls, never business `Tool` nodes. A gateway lookup or wrong-door mistake
+returns a typed `RefusedError` with an agent-facing next action; its cause still
+retains `NodeNotFoundError` facts for a Host. A ref outside the selected root
+ceiling is deliberately different: it remains a typed
+`RootOutsideSelectionError`, is not converted to a recovery suggestion, and
+does not reveal excluded roots. A Prompt reserved for a person is checked only
+after that same ceiling, then tells the agent to ask the user to run the Host
+command rather than attempting a workaround.
+
 ```bash
 go run ./cmd/assistant serve
 go run ./cmd/contexture demo --transport streamable-http

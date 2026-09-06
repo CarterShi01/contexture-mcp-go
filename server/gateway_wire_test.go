@@ -118,6 +118,12 @@ func TestOfficialSDKExposesOnlyFixedGatewayAndPreservesInvocationDoors(t *testin
 	if !wrongDoor.IsError || len(wrongDoor.Content) != 1 || !strings.Contains(textOf(wrongDoor.Content[0]), "read-only") {
 		t.Fatalf("wrong door result = %#v", wrongDoor)
 	}
+	// The official SDK wire receives the same finished recovery instruction as
+	// a direct Gateway caller; business tools never become top-level entries.
+	missing, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_open", Arguments: map[string]any{"ref": "missing"}})
+	if err != nil || !missing.IsError || len(missing.Content) != 1 || !strings.Contains(textOf(missing.Content[0]), "contexture_discover") {
+		t.Fatalf("missing-ref recovery = %#v, %v", missing, err)
+	}
 }
 
 func textOf(content mcp.Content) string {

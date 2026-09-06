@@ -64,8 +64,17 @@ func NewPublications(application *contexture.Application, disclosure *contexture
 // normal model-visible node. The target card remains visible through its
 // parent, but only a person-controlled Prompt or goto may open a reserved ref.
 func (publications *Publications) OpenForModel(ref string, selection contexture.RootSelection) (map[string]any, error) {
+	// Check the request ceiling before any publication-specific reservation so a
+	// hidden root cannot reveal that it happens to be person-controlled.
+	effective, err := publications.effective(selection)
+	if err != nil {
+		return nil, err
+	}
+	if err := effective.RequireRef(ref); err != nil {
+		return nil, err
+	}
 	if _, reserved := publications.reserved[ref]; reserved {
-		return nil, fmt.Errorf("%s is opened by a person, not by an agent; tell the user which Contexture Prompt reaches it.", ref)
+		return nil, fmt.Errorf("%s", contexture.TakenByPersonMessage(ref))
 	}
 	return publications.disclosure.Open(ref, selection)
 }

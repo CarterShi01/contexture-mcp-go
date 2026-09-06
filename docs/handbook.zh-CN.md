@@ -254,6 +254,15 @@ application, err := contexture.DeclareApplication(contexture.ApplicationDeclarat
 服务时不改变 declaration。server adapter 提供四个固定的 Contexture gateway Tool；业务 Tool
 不会注册为 MCP 顶层 Tool，而是被渐进披露在 gateway 后面。
 
+`GatewayTools()` 暴露该不可变且有序的 inventory：`contexture_discover`、
+`contexture_open`、`contexture_invoke_read_only` 与 `contexture_invoke`。
+导航专用 Host 使用前两个的 `DisclosureGatewayTools()`；两个调用入口由
+`ExecutionGatewayTools()` 提供。它们是 framework control，而不是业务 `Tool` node。gateway
+查找或调用错入口时会返回带有 agent 下一步操作说明的 `RefusedError`；其 cause 仍保留供 Host
+使用的 `NodeNotFoundError` facts。超出 selected root ceiling 的 ref 则刻意不同：它保持类型化
+`RootOutsideSelectionError`，不会被改写成恢复建议，也不会透露被排除的 root。为 person 保留的
+Prompt target 也会先检查同一 ceiling；随后只提示 agent 请用户运行 Host command，而不要绕过它。
+
 ```bash
 go run ./cmd/assistant serve
 go run ./cmd/contexture demo --transport streamable-http
