@@ -6,6 +6,7 @@ import (
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 	"github.com/CarterShi01/contexture-mcp-go/server"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestNewMCPServerUsesOfficialSDK(t *testing.T) {
@@ -57,6 +58,35 @@ func TestNewContextureMCPServerExposesOnlyGatewayTools(t *testing.T) {
 	for position, name := range want {
 		if adapter.GatewayNames[position] != name {
 			t.Fatalf("GatewayNames = %#v", adapter.GatewayNames)
+		}
+	}
+	ctx := context.Background()
+	client := mcp.NewClient(&mcp.Implementation{Name: "contexture-client", Version: "0.0.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := adapter.Server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+	listed, err := clientSession.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Tools) != 4 {
+		t.Fatalf("MCP tools = %#v", listed.Tools)
+	}
+	seen := map[string]bool{}
+	for _, tool := range listed.Tools {
+		seen[tool.Name] = true
+	}
+	for _, name := range want {
+		if !seen[string(name)] {
+			t.Fatalf("MCP tool list misses %q: %#v", name, listed.Tools)
 		}
 	}
 }
