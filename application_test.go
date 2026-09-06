@@ -44,7 +44,7 @@ func TestApplicationDeclarationIsLazy(t *testing.T) {
 	t.Parallel()
 
 	constructions := 0
-	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+	application, err := contexture.Contexture(contexture.ApplicationDeclaration{
 		Name: "operations",
 		Roots: []contexture.Factory{func() contexture.Node {
 			constructions++
@@ -56,7 +56,7 @@ func TestApplicationDeclarationIsLazy(t *testing.T) {
 		}},
 	})
 	if err != nil {
-		t.Fatalf("DeclareApplication() error = %v", err)
+		t.Fatalf("Contexture() error = %v", err)
 	}
 	if application.Name() != "operations" {
 		t.Fatalf("Name() = %q, want operations", application.Name())
