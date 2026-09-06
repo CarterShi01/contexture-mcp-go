@@ -36,14 +36,19 @@ var _ = contexture.DeclareApplication
 var _ = contexture.Version
 var _ = contexture.ErrInvalidDeclaration
 var _ = contexture.ErrNodeNotFound
+var _ = contexture.ErrRootOutsideSelection
 var _ = contexture.NewMemoryTelemetry
 var _ = contexture.NewDisclosureWithTelemetry
 var _ = contexture.ReportTelemetry
 var _ = contexture.NewControllerManager
 var _ = contexture.NewControllerManagerWithChannels
 var _ = contexture.RegisterRoot
+var _ = contexture.NewSelectedGraph
 var _ contexture.NodeUsage
 var _ contexture.ControllerManager
+var _ contexture.RootSelectionError
+var _ contexture.RootOutsideSelectionError
+var _ contexture.NodeRef
 var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: contexture.ModelReservedForPerson}
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
@@ -59,7 +64,9 @@ func main() {
     _, _ = manager.RegisterRole(func() *contexture.Role {
         return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect."}
     })
-    _, _ = manager.Application("consumer")
+    application, _ := manager.Application("consumer")
+    index, _ := contexture.Compile(application)
+    _, _ = contexture.NewSelectedGraph(index, contexture.AllRoots())
 }
 `
 	if err := os.WriteFile(filepath.Join(temporaryRoot, "go.mod"), []byte(goMod), 0o600); err != nil {

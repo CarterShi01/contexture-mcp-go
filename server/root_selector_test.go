@@ -61,5 +61,7 @@ func TestHeaderRootSelectorRejectsMalformedAndOversizedRequests(t *testing.T) {
 	}
 	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "missing"}, nil); err == nil || !strings.Contains(err.Error(), "unknown root") {
 		t.Fatalf("unknown root error = %v", err)
+	} else if strings.Contains(err.Error(), "diagnose") || strings.Contains(err.Error(), "release") {
+		t.Fatalf("unknown root selection leaked undisclosed roots: %v", err)
 	}
 }

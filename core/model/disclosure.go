@@ -63,12 +63,20 @@ func (view *Disclosure) Index() *Index { return view.index }
 
 // EffectiveSelection applies the view's ceiling to one requested root selection.
 func (view *Disclosure) EffectiveSelection(requested RootSelection) (RootSelection, error) {
-	return view.selection.Intersect(requested)
+	selection, err := view.selection.Intersect(requested)
+	if err != nil {
+		return RootSelection{}, err
+	}
+	return selection.Resolve(view.index)
 }
 
 // Discover returns routing cards for model-visible selected roots only.
 func (view *Disclosure) Discover(requested RootSelection) (map[string][]map[string]any, error) {
 	selection, err := view.selection.Intersect(requested)
+	if err != nil {
+		return nil, err
+	}
+	selection, err = selection.Resolve(view.index)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +98,10 @@ func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]an
 	if err != nil {
 		return nil, err
 	}
+	selection, err = selection.Resolve(view.index)
+	if err != nil {
+		return nil, err
+	}
 	if err := selection.RequireRef(ref); err != nil {
 		return nil, err
 	}
@@ -108,6 +120,10 @@ func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]an
 // OpenForPerson resolves through both ordinary and Prompt roots.
 func (view *Disclosure) OpenForPerson(ref string, requested RootSelection) (map[string]any, error) {
 	selection, err := view.selection.Intersect(requested)
+	if err != nil {
+		return nil, err
+	}
+	selection, err = selection.Resolve(view.index)
 	if err != nil {
 		return nil, err
 	}

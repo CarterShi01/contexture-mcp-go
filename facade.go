@@ -27,27 +27,30 @@ type (
 	ModelOpenPolicy   = model.ModelOpenPolicy
 	// Resource is the native data declaration for one host-readable MCP resource.
 	// ResourceDeclaration remains an equivalent explicit spelling for compatibility.
-	Resource            = model.ResourceDeclaration
-	ResourceDeclaration = model.ResourceDeclaration
-	Binding             = model.Binding
-	CleanupRegistrar    = model.CleanupRegistrar
-	Channels            = model.Channels
-	Index               = model.Index
-	RootSelection       = model.RootSelection
-	Disclosure          = model.Disclosure
-	GatewayName         = model.GatewayName
-	GatewayTool         = model.GatewayTool
-	Gateway             = model.Gateway
-	Telemetry           = model.Telemetry
-	CallEvent           = model.CallEvent
-	NodeUsage           = model.NodeUsage
-	MemoryTelemetry     = model.MemoryTelemetry
-	Runtime             = model.Runtime
-	SelectedGraph       = model.SelectedGraph
-	Principal           = foundation.Principal
-	PrincipalOptions    = foundation.PrincipalOptions
-	LookupFailure       = foundation.LookupFailure
-	NodeNotFoundError   = foundation.NodeNotFoundError
+	Resource                  = model.ResourceDeclaration
+	ResourceDeclaration       = model.ResourceDeclaration
+	Binding                   = model.Binding
+	CleanupRegistrar          = model.CleanupRegistrar
+	Channels                  = model.Channels
+	Index                     = model.Index
+	RootSelection             = model.RootSelection
+	RootSelectionError        = model.RootSelectionError
+	RootOutsideSelectionError = model.RootOutsideSelectionError
+	Disclosure                = model.Disclosure
+	GatewayName               = model.GatewayName
+	GatewayTool               = model.GatewayTool
+	Gateway                   = model.Gateway
+	Telemetry                 = model.Telemetry
+	CallEvent                 = model.CallEvent
+	NodeUsage                 = model.NodeUsage
+	MemoryTelemetry           = model.MemoryTelemetry
+	Runtime                   = model.Runtime
+	SelectedGraph             = model.SelectedGraph
+	NodeRef                   = model.NodeRef
+	Principal                 = foundation.Principal
+	PrincipalOptions          = foundation.PrincipalOptions
+	LookupFailure             = foundation.LookupFailure
+	NodeNotFoundError         = foundation.NodeNotFoundError
 )
 
 const (
@@ -139,6 +142,11 @@ func AllRoots() RootSelection {
 // OnlyRoots constructs an exact non-empty root selection.
 func OnlyRoots(names ...string) (RootSelection, error) {
 	return model.OnlyRoots(names...)
+}
+
+// NewSelectedGraph creates a validated read-only root projection over Index.
+func NewSelectedGraph(index *Index, selection RootSelection) (*SelectedGraph, error) {
+	return model.NewSelectedGraph(index, selection)
 }
 
 // NewMemoryTelemetry creates a process-local aggregate collector.

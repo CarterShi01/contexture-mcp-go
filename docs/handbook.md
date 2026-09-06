@@ -152,6 +152,26 @@ serving. This is deliberately different from Python's arbitrary handle stamped
 onto each node: Go keeps dependencies on the compiled Index and never exposes
 them as model-node fields.
 
+### Request root projections
+
+`RootSelection` is either `AllRoots()` or an exact complete-root allowlist
+created with `OnlyRoots`. It rejects empty and descendant refs, resolves names
+without revealing unrelated roots, and only ever narrows through `Intersect`.
+`RootSelectionError` classifies invalid or contradictory selectors with
+`errors.Is(err, contexture.ErrInvalidSelection)`; a valid ref outside the
+effective request surface instead returns `*RootOutsideSelectionError`, which
+unwraps to `ErrRootOutsideSelection` and retains `Ref`.
+
+`NewSelectedGraph(index, selection)` provides the request-safe graph view:
+`Roots`, `Walk`, `NodesWithRefs`, `Find`, `RefOf`, `ParentOf`, `ChildrenOf`,
+`UsesOf`, `DependentsOf`, and `MatchingRefs` all retain canonical ordering while
+excluding other roots. Cross-root `uses` and dependents are filtered rather
+than disclosed. `CurrentGraph(ctx)` and `CurrentSelection(ctx)` are scoped to a
+Tool invocation; outside an invocation selection safely defaults to all roots.
+`HeaderRootSelector` treats `Contexture-Roots` solely as an attenuation request:
+it validates unknown names without listing other roots and intersects it with
+the authenticated principal's ceiling.
+
 ### Telemetry
 
 `ApplicationDeclaration.Telemetry` optionally supplies the one usage collector

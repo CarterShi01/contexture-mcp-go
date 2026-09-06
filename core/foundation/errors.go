@@ -39,6 +39,10 @@ var ErrWrongDoor = errors.New("Contexture Tool invoked through the wrong door")
 // ErrInvalidSelection identifies an invalid root-level capability projection.
 var ErrInvalidSelection = errors.New("invalid Contexture root selection")
 
+// ErrRootOutsideSelection identifies a ref excluded from a request's root
+// projection. It is intentionally distinct from malformed selection input.
+var ErrRootOutsideSelection = errors.New("Contexture ref outside selected roots")
+
 // ErrNodeNotFound classifies a failed canonical node lookup with errors.Is.
 var ErrNodeNotFound = errors.New("Contexture node not found")
 

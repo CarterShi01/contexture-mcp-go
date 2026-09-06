@@ -130,6 +130,21 @@ Application。`RebindChannels` 只影响之后生成的 Application/Index snapsh
 serving 的 server。这有意区别于 Python 会把任意 handle stamp 到每个 node 的做法：Go 将 dependency 保留在
 compiled Index，绝不将它作为 model-node field 暴露。
 
+### Request root projections
+
+`RootSelection` 要么是 `AllRoots()`，要么是用 `OnlyRoots` 创建的完整 root 精确 allowlist。它会拒绝
+空 ref 和 descendant ref，在 resolve name 时不会泄露无关 root，并且只能通过 `Intersect` 收窄。
+`RootSelectionError` 通过 `errors.Is(err, contexture.ErrInvalidSelection)` 分类无效或矛盾的 selector；
+有效但位于当前 request surface 之外的 ref 则返回 `*RootOutsideSelectionError`，它会 unwrap 到
+`ErrRootOutsideSelection` 并保留 `Ref`。
+
+`NewSelectedGraph(index, selection)` 提供 request-safe graph view：`Roots`、`Walk`、`NodesWithRefs`、
+`Find`、`RefOf`、`ParentOf`、`ChildrenOf`、`UsesOf`、`DependentsOf` 和 `MatchingRefs` 都会保留 canonical
+ordering，同时排除其他 root。跨 root 的 `uses` 与 dependent 会被过滤而不是披露。`CurrentGraph(ctx)` 与
+`CurrentSelection(ctx)` 仅在 Tool invocation 内有效；在 invocation 外 selection 会安全地默认为 all roots。
+`HeaderRootSelector` 仅将 `Contexture-Roots` 当作 attenuation request：它会验证未知 name 而不列出其他 root，
+并与经过认证的 principal ceiling 求交。
+
 ### Telemetry
 
 `ApplicationDeclaration.Telemetry` 可选地提供一个 usage collector；

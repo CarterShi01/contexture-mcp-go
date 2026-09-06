@@ -160,6 +160,10 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	if err != nil {
 		return nil, err
 	}
+	selection, err = selection.Resolve(runtime.index)
+	if err != nil {
+		return nil, err
+	}
 	if err := selection.RequireRef(ref); err != nil {
 		return nil, err
 	}
@@ -184,7 +188,10 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	if err != nil {
 		return nil, err
 	}
-	graph := &SelectedGraph{index: runtime.index, selection: selection}
+	graph, err := NewSelectedGraph(runtime.index, selection)
+	if err != nil {
+		return nil, err
+	}
 	principal := CurrentPrincipal(ctx)
 	ctx = context.WithValue(ctx, graphKey, graph)
 	ctx = context.WithValue(ctx, selectionKey, selection)
@@ -264,7 +271,10 @@ func CurrentGraph(ctx context.Context) *SelectedGraph {
 
 // CurrentSelection returns the current effective root selection.
 func CurrentSelection(ctx context.Context) RootSelection {
-	selection, _ := ctx.Value(selectionKey).(RootSelection)
+	selection, ok := ctx.Value(selectionKey).(RootSelection)
+	if !ok {
+		return AllRoots()
+	}
 	return selection
 }
 
@@ -272,29 +282,4 @@ func CurrentSelection(ctx context.Context) RootSelection {
 func CurrentTelemetry(ctx context.Context) Telemetry {
 	telemetry, _ := ctx.Value(telemetryKey).(Telemetry)
 	return telemetry
-}
-
-// SelectedGraph exposes only selected roots and descendants.
-type SelectedGraph struct {
-	index     *Index
-	selection RootSelection
-}
-
-// Walk returns selected addresses in canonical order.
-func (graph *SelectedGraph) Walk() []string {
-	result := []string{}
-	for _, ref := range graph.index.Walk() {
-		if graph.selection.ContainsRef(ref) {
-			result = append(result, ref)
-		}
-	}
-	return result
-}
-
-// Find resolves an address only when selected.
-func (graph *SelectedGraph) Find(ref string) (Node, error) {
-	if err := graph.selection.RequireRef(ref); err != nil {
-		return nil, err
-	}
-	return graph.index.Find(ref)
 }

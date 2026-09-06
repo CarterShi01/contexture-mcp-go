@@ -292,6 +292,15 @@ func (index *Index) DependentsOf(ref string) ([]string, error) {
 	return append([]string(nil), index.dependents[ref]...), nil
 }
 
+// UsesOf returns declared dependency targets in their node declaration order.
+func (index *Index) UsesOf(ref string) ([]string, error) {
+	node, err := index.Find(ref)
+	if err != nil {
+		return nil, err
+	}
+	return node.nodeUses(), nil
+}
+
 // ChildrenOf returns immediate containment members in declaration order.
 func (index *Index) ChildrenOf(node Node) ([]Node, error) {
 	internal, ok := index.internalNode(node)
