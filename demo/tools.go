@@ -15,7 +15,7 @@ type podInput struct {
 type logsInput struct {
 	Namespace string `json:"namespace"`
 	Pod       string `json:"pod"`
-	Previous  bool   `json:"previous"`
+	Previous  *bool  `json:"previous,omitempty" default:"false"`
 }
 
 type deploymentInput struct {
@@ -44,7 +44,13 @@ func getPodStatus() contexture.Node {
 }
 
 func getPodLogs() contexture.Node {
-	return mustTool(contexture.NewTool("get_pod_logs", "Return the recent container logs for a Pod.", true, func(_ context.Context, input logsInput) (string, error) {
+	return mustTool(contexture.NewToolWithSchema("get_pod_logs", "Return the recent container logs for a Pod.", true, map[string]any{
+		"type": "object", "properties": map[string]any{
+			"namespace": map[string]any{"type": "string"},
+			"pod":       map[string]any{"type": "string"},
+			"previous":  map[string]any{"type": "boolean", "default": false},
+		}, "required": []any{"namespace", "pod"},
+	}, func(_ context.Context, input logsInput) (string, error) {
 		return PodLogs, requirePod(podInput{Namespace: input.Namespace, Pod: input.Pod})
 	}))
 }

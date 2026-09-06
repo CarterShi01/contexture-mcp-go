@@ -1,0 +1,43 @@
+package cli_test
+
+import (
+	"bytes"
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/CarterShi01/contexture-mcp-go/cli"
+	"github.com/CarterShi01/contexture-mcp-go/demo"
+)
+
+func runDemo(t *testing.T, arguments ...string) (int, string, string) {
+	t.Helper()
+	application, err := demo.Application()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	status := cli.RunApplication(context.Background(), application, arguments, stdout, stderr)
+	return status, stdout.String(), stderr.String()
+}
+
+func TestRunApplicationRunsLocalProjectWorkflows(t *testing.T) {
+	if status, stdout, stderr := runDemo(t, "check"); status != 0 || !strings.Contains(stdout, "OK contexture-demo: 3 role(s), 2 skill(s), 7 tool(s)") || stderr != "" {
+		t.Fatalf("check = %d, %q, %q", status, stdout, stderr)
+	}
+	if status, stdout, stderr := runDemo(t, "list"); status != 0 || !strings.Contains(stdout, "roll_back_deployment  (needs approval)") || stderr != "" {
+		t.Fatalf("list = %d, %q, %q", status, stdout, stderr)
+	}
+	if status, stdout, stderr := runDemo(t, "inspect", "--all", "--json"); status != 0 || !strings.Contains(stdout, "contexture_discover") || stderr != "" {
+		t.Fatalf("inspect = %d, %q, %q", status, stdout, stderr)
+	}
+	if status, stdout, stderr := runDemo(t, "call", "kubernetes-platform/incident-response/get_pod_logs", "--input", `{"namespace":"prod","pod":"payments-api-7d9c"}`); status != 0 || !strings.Contains(stdout, "DB_URL is missing") || stderr != "" {
+		t.Fatalf("call = %d, %q, %q", status, stdout, stderr)
+	}
+	if status, _, stderr := runDemo(t, "call", "kubernetes-platform/deployment-ops/roll_back_deployment", "--input", `{"namespace":"prod","deployment":"payments-api"}`); status != 2 || !strings.Contains(stderr, "--allow-write") {
+		t.Fatalf("unsafe write = %d, %q", status, stderr)
+	}
+	if status, stdout, stderr := runDemo(t, "call", "kubernetes-platform/deployment-ops/roll_back_deployment", "--input", `{"namespace":"prod","deployment":"payments-api"}`, "--allow-write"); status != 0 || !strings.Contains(stdout, "Rolled prod/payments-api") || stderr != "" {
+		t.Fatalf("approved write = %d, %q, %q", status, stdout, stderr)
+	}
+}
