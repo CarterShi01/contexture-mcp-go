@@ -11,10 +11,21 @@ type Disclosure struct {
 	index       *Index
 	selection   RootSelection
 	promptRoots map[string]struct{}
+	bound       bool
 }
 
 // NewDisclosure creates a model navigation view. Prompt roots remain person-reachable only.
 func NewDisclosure(index *Index, selection RootSelection) (*Disclosure, error) {
+	return newDisclosure(index, selection, true)
+}
+
+// NewDisclosureOnly creates navigation that intentionally exposes no Tool schemas.
+// It is used by a disclosure-only Host with no execution bindings or Resources.
+func NewDisclosureOnly(index *Index, selection RootSelection) (*Disclosure, error) {
+	return newDisclosure(index, selection, false)
+}
+
+func newDisclosure(index *Index, selection RootSelection, bound bool) (*Disclosure, error) {
 	selection, err := selection.Resolve(index)
 	if err != nil {
 		return nil, err
@@ -24,7 +35,7 @@ func NewDisclosure(index *Index, selection RootSelection) (*Disclosure, error) {
 		ref, _ := index.RefOf(node)
 		prompts[ref] = struct{}{}
 	}
-	return &Disclosure{index: index, selection: selection, promptRoots: prompts}, nil
+	return &Disclosure{index: index, selection: selection, promptRoots: prompts, bound: bound}, nil
 }
 
 // Discover returns routing cards for model-visible selected roots only.
@@ -85,7 +96,7 @@ func (view *Disclosure) card(node Node, bound bool) map[string]any {
 	card := map[string]any{"kind": string(node.nodeKind()), "name": node.nodeName(), "description": node.nodeDescription(), "ref": ref}
 	if tool, ok := node.(*Tool); ok {
 		card["read_only"] = tool.ReadOnly
-		if bound {
+		if bound && view.bound {
 			if binding, err := tool.Binding(); err == nil {
 				card["input_schema"] = binding.Schema()
 			}
