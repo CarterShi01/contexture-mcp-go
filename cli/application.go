@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -144,7 +145,7 @@ func runCall(ctx context.Context, application *server.RuntimeApplication, argume
 		return fail(stderr, 2, "call needs a Tool ref.")
 	}
 	ref, arguments := arguments[0], arguments[1:]
-	input, allowWrite := []byte("{}"), false
+	input, allowWrite, inputSource := []byte("{}"), false, ""
 	for len(arguments) > 0 {
 		if arguments[0] == "--allow-write" {
 			if allowWrite {
@@ -153,10 +154,23 @@ func runCall(ctx context.Context, application *server.RuntimeApplication, argume
 			allowWrite, arguments = true, arguments[1:]
 			continue
 		}
-		if arguments[0] != "--input" || len(arguments) < 2 {
-			return fail(stderr, 2, "use call REF [--input JSON] [--allow-write].")
+		if (arguments[0] != "--input" && arguments[0] != "--input-file") || len(arguments) < 2 {
+			return fail(stderr, 2, "use call REF [--input JSON | --input-file FILE] [--allow-write].")
 		}
-		input, arguments = []byte(arguments[1]), arguments[2:]
+		if inputSource != "" {
+			return fail(stderr, 2, "use exactly one of --input or --input-file.")
+		}
+		inputSource = arguments[0]
+		if inputSource == "--input" {
+			input = []byte(arguments[1])
+		} else {
+			contents, err := os.ReadFile(arguments[1])
+			if err != nil {
+				return fail(stderr, 2, "cannot read Tool input file: "+err.Error())
+			}
+			input = contents
+		}
+		arguments = arguments[2:]
 	}
 	var decoded map[string]any
 	if err := json.Unmarshal(input, &decoded); err != nil {

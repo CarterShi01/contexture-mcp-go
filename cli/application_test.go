@@ -3,6 +3,8 @@ package cli_test
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -73,5 +75,19 @@ func TestInspectControlsItsRealDisclosureReplay(t *testing.T) {
 	}
 	if status, _, stderr := runDemo(t, "inspect", "--roster-budget", "-1"); status != 2 || !strings.Contains(stderr, "roster-budget") {
 		t.Fatalf("negative roster budget = %d, %q", status, stderr)
+	}
+}
+
+func TestCallReadsJSONInputFromAFile(t *testing.T) {
+	inputFile := filepath.Join(t.TempDir(), "pod.json")
+	if err := os.WriteFile(inputFile, []byte(`{"namespace":"prod","pod":"payments-api-7d9c"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, stdout, stderr := runDemo(t, "call", "kubernetes-platform/incident-response/get_pod_logs", "--input-file", inputFile)
+	if status != 0 || !strings.Contains(stdout, "DB_URL is missing") || stderr != "" {
+		t.Fatalf("input file call = %d, %q, %q", status, stdout, stderr)
+	}
+	if status, _, stderr := runDemo(t, "call", "kubernetes-platform/incident-response/get_pod_logs", "--input", `{}`, "--input-file", inputFile); status != 2 || !strings.Contains(stderr, "exactly one") {
+		t.Fatalf("duplicate input source = %d, %q", status, stderr)
 	}
 }
