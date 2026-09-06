@@ -63,7 +63,7 @@ func TestNewProjectWritesStarterAndRefusesOverwrite(t *testing.T) {
 	}
 }
 
-func TestGeneratedProjectRunsItsNativeCheckWorkflow(t *testing.T) {
+func TestGeneratedProjectRunsItsNativeLocalWorkflow(t *testing.T) {
 	root, err := NewProject("Generated Context", t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -85,14 +85,26 @@ func TestGeneratedProjectRunsItsNativeCheckWorkflow(t *testing.T) {
 	if output, err := tidy.CombinedOutput(); err != nil {
 		t.Fatalf("generated go mod tidy failed: %v\n%s", err, output)
 	}
-	command := exec.CommandContext(t.Context(), "go", "run", "./cmd/assistant", "check")
-	command.Dir = root
-	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("generated check failed: %v\n%s", err, output)
+	run := func(arguments ...string) string {
+		command := exec.CommandContext(t.Context(), "go", append([]string{"run", "./cmd/assistant"}, arguments...)...)
+		command.Dir = root
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("generated %s failed: %v\n%s", strings.Join(arguments, " "), err, output)
+		}
+		return string(output)
 	}
-	if !strings.Contains(string(output), "OK generated-context: 1 role(s), 1 skill(s), 1 tool(s)") {
+	if output := run("check"); !strings.Contains(output, "OK generated-context: 1 role(s), 1 skill(s), 1 tool(s)") {
 		t.Fatalf("generated check output = %q", output)
+	}
+	if output := run("list"); !strings.Contains(output, "generated-context-assistant") {
+		t.Fatalf("generated list output = %q", output)
+	}
+	if output := run("inspect", "--all", "--json"); !strings.Contains(output, "contexture_discover") {
+		t.Fatalf("generated inspect output = %q", output)
+	}
+	if output := run("call", "generated-context-assistant/ping", "--input", `{"target":"local"}`); !strings.Contains(output, `"healthy":true`) {
+		t.Fatalf("generated call output = %q", output)
 	}
 }
 
