@@ -37,6 +37,39 @@ func NewTool[I any, O any](name, description string, readOnly bool, handler func
 	if err != nil {
 		return nil, fmt.Errorf("derive Tool schema: %w", err)
 	}
+	return newToolWithSchema(name, description, readOnly, typeOf, schema, handler)
+}
+
+// NewToolWithSchema couples an explicit JSON Schema to the same validated,
+// typed invocation Binding. It covers constraints that Go reflection cannot
+// express directly, such as a string enum.
+func NewToolWithSchema[I any, O any](name, description string, readOnly bool, inputSchema map[string]any, handler func(context.Context, I) (O, error)) (*Tool, error) {
+	if handler == nil {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("tool handler must not be nil"))
+	}
+	typeOf := reflect.TypeFor[I]()
+	if typeOf.Kind() != reflect.Struct {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("tool input must be a struct"))
+	}
+	if err := requireJSONTags(typeOf); err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(inputSchema)
+	if err != nil {
+		return nil, fmt.Errorf("marshal explicit Tool schema: %w", err)
+	}
+	var schema jsonschema.Schema
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return nil, fmt.Errorf("decode explicit Tool schema: %w", err)
+	}
+	return newToolWithSchema(name, description, readOnly, typeOf, &schema, handler)
+}
+
+func newToolWithSchema[I any, O any](name, description string, readOnly bool, typeOf reflect.Type, schema *jsonschema.Schema, handler func(context.Context, I) (O, error)) (*Tool, error) {
+	validator, err := schema.Resolve(nil)
+	if err != nil {
+		return nil, fmt.Errorf("resolve Tool schema: %w", err)
+	}
 	raw, err := json.Marshal(schema)
 	if err != nil {
 		return nil, fmt.Errorf("marshal Tool schema: %w", err)
@@ -46,7 +79,7 @@ func NewTool[I any, O any](name, description string, readOnly bool, handler func
 		return nil, fmt.Errorf("decode Tool schema: %w", err)
 	}
 	normalizeSchema(rendered, typeOf)
-	return &Tool{Name: name, Description: description, ReadOnly: readOnly, binding: &typedBinding[I, O]{schema: rendered, handler: handler}}, nil
+	return &Tool{Name: name, Description: description, ReadOnly: readOnly, binding: &typedBinding[I, O]{schema: rendered, validator: validator, handler: handler}}, nil
 }
 
 func normalizeSchema(schema map[string]any, input reflect.Type) {
@@ -100,8 +133,9 @@ func (tool *Tool) Binding() (Binding, error) {
 }
 
 type typedBinding[I any, O any] struct {
-	schema  map[string]any
-	handler func(context.Context, I) (O, error)
+	schema    map[string]any
+	validator *jsonschema.Resolved
+	handler   func(context.Context, I) (O, error)
 }
 
 func (binding *typedBinding[I, O]) Schema() map[string]any { return cloneJSON(binding.schema) }
@@ -109,6 +143,15 @@ func (binding *typedBinding[I, O]) Schema() map[string]any { return cloneJSON(bi
 func (binding *typedBinding[I, O]) Call(ctx context.Context, arguments json.RawMessage) (any, error) {
 	if len(arguments) == 0 || string(arguments) == "null" {
 		arguments = json.RawMessage("{}")
+	}
+	var rawInput any
+	if err := json.Unmarshal(arguments, &rawInput); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+	}
+	if binding.validator != nil {
+		if err := binding.validator.Validate(&rawInput); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+		}
 	}
 	decoder := json.NewDecoder(bytes.NewReader(arguments))
 	decoder.DisallowUnknownFields()
