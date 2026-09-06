@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/server/messages"
 	"github.com/CarterShi01/contexture-mcp-go/server/surface"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -130,8 +131,8 @@ func registerPublications(server *mcp.Server, publications *surface.Publications
 			server.AddPrompt(&mcp.Prompt{Name: card.Name, Description: card.Description, Arguments: arguments}, func(ctx context.Context, request *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 				var text string
 				var callErr error
-				if card.Name == "goto" {
-					text, callErr = publications.Goto(request.Params.Arguments["ref"], selection)
+				if card.Name == messages.GotoPrompt {
+					text, callErr = publications.Goto(request.Params.Arguments[messages.GotoArgument], selection)
 				} else {
 					text, callErr = publications.Command(card.Name, selection)
 				}

@@ -10,6 +10,7 @@ import (
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 	"github.com/CarterShi01/contexture-mcp-go/server/instructions"
+	"github.com/CarterShi01/contexture-mcp-go/server/messages"
 )
 
 // PromptCard describes one MCP Prompt publication.
@@ -62,10 +63,10 @@ func (publications *Publications) PromptCards(selection contexture.RootSelection
 	result := []PromptCard{}
 	for _, entry := range publications.prompts {
 		if effective.ContainsRef(entry.Opens) {
-			result = append(result, PromptCard{Name: publicationName(entry.Name, entry.Opens), Description: fmt.Sprintf("%s (%s)", entry.Description, entry.Opens), Arguments: []PromptArgument{}})
+			result = append(result, PromptCard{Name: publicationName(entry.Name, entry.Opens), Description: messages.CommandDescription(entry.Opens, entry.Description), Arguments: []PromptArgument{}})
 		}
 	}
-	result = append(result, PromptCard{Name: "goto", Description: "Open any capability this server holds, by reference. The reference completes as you type, so the whole tree can be browsed here without asking the agent to go and look.", Arguments: []PromptArgument{{Name: "ref", Required: true}}})
+	result = append(result, PromptCard{Name: messages.GotoPrompt, Description: messages.GotoDescription, Arguments: []PromptArgument{{Name: messages.GotoArgument, Required: true}}})
 	return result, nil
 }
 
@@ -107,7 +108,7 @@ func (publications *Publications) Complete(input string, selection contexture.Ro
 		return nil, 0, err
 	}
 	if limit <= 0 {
-		limit = 100
+		limit = messages.CompletionLimit
 	}
 	type scoredRef struct {
 		rank, length int
@@ -199,11 +200,11 @@ func (publications *Publications) openForPerson(ref string, selection contexture
 	if err != nil {
 		return "", err
 	}
-	parts := []string{fmt.Sprintf("You are at %s, opened by name at a person's request.", ref)}
+	parts := []string{strings.Replace(messages.CommandPreamble, "{ref}", ref, 1)}
 	if signposts != "" {
 		parts = append(parts, signposts)
 	}
-	parts = append(parts, string(rendered), "Continue with contexture_open, contexture_invoke_read_only or contexture_invoke, using refs taken from what is above. Nothing listed here was reached by navigating, so nothing beside it has been shown to you.")
+	parts = append(parts, string(rendered), messages.CommandClosing)
 	return strings.Join(parts, "\n\n"), nil
 }
 
@@ -341,7 +342,7 @@ func marshalOrderedMap(values map[string]any, preferred []string, transform func
 
 func (publications *Publications) signposts(ref string, selection contexture.RootSelection) (string, error) {
 	parts := strings.Split(ref, "/")
-	lines := []string{}
+	levels := []messages.SignpostLevel{}
 	for depth := 1; depth < len(parts); depth++ {
 		ancestor := strings.Join(parts[:depth], "/")
 		payload, err := publications.disclosure.OpenForPerson(ancestor, selection)
@@ -349,16 +350,9 @@ func (publications *Publications) signposts(ref string, selection contexture.Roo
 			return "", err
 		}
 		roles, _ := payload["roles"].([]map[string]any)
-		if len(roles) > 0 {
-			lines = append(lines, fmt.Sprintf("- %s: %d sub-role(s) here; contexture_open to see them.", ancestor, len(roles)))
-		} else {
-			lines = append(lines, fmt.Sprintf("- %s: no sub-roles; contexture_open to see what it holds.", ancestor))
-		}
+		levels = append(levels, messages.SignpostLevel{Ref: ancestor, SubRoleCount: len(roles)})
 	}
-	if len(lines) == 0 {
-		return "", nil
-	}
-	return "Signposts for the path above it. These are **not disclosed**: you may open one with contexture_open, and until you do you know only that it exists. Do not assert anything about what any of them holds.\n" + strings.Join(lines, "\n"), nil
+	return messages.Signpost(levels), nil
 }
 
 func (publications *Publications) validate() error {
