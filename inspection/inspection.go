@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -49,13 +50,13 @@ type Check struct {
 // Step is one thing an agent receives while connecting or navigating.
 type Step struct {
 	Call    string  `json:"call"`
-	Ref     string  `json:"ref,omitempty"`
+	Ref     string  `json:"ref"`
 	Refused bool    `json:"refused"`
 	Body    string  `json:"body"`
 	Payload any     `json:"payload"`
 	Checks  []Check `json:"checks"`
 	Cost    Cost    `json:"cost"`
-	Aside   string  `json:"aside,omitempty"`
+	Aside   string  `json:"aside"`
 }
 
 func step(call, body string, options Step) Step {
@@ -64,6 +65,33 @@ func step(call, body string, options Step) Step {
 		options.Checks = []Check{}
 	}
 	return options
+}
+
+// MarshalJSON preserves the reference API's explicit nulls for absent fields.
+// Empty refs are not valid user-facing addresses, so they are the Go-native
+// representation of an omitted optional value in Step.
+func (item Step) MarshalJSON() ([]byte, error) {
+	type encodedStep struct {
+		Call    string  `json:"call"`
+		Ref     *string `json:"ref"`
+		Refused bool    `json:"refused"`
+		Body    string  `json:"body"`
+		Payload any     `json:"payload"`
+		Checks  []Check `json:"checks"`
+		Cost    Cost    `json:"cost"`
+		Aside   *string `json:"aside"`
+	}
+	var ref, aside *string
+	if item.Ref != "" {
+		ref = &item.Ref
+	}
+	if item.Aside != "" {
+		aside = &item.Aside
+	}
+	return json.Marshal(encodedStep{
+		Call: item.Call, Ref: ref, Refused: item.Refused, Body: item.Body,
+		Payload: item.Payload, Checks: item.Checks, Cost: item.Cost, Aside: aside,
+	})
 }
 
 // Trace is an ordered transport-free disclosure replay.
@@ -90,25 +118,16 @@ func (trace Trace) Failures() []Step {
 // ConnectStep measures bootstrap instructions exactly as a Host receives them.
 func ConnectStep(disclosure *contexture.Disclosure, text string) Step {
 	cost := CostOf(text)
-	rootRefs := map[string]bool{}
-	roots := 0
-	if disclosure != nil {
-		for _, node := range disclosure.Index().ModelRoots() {
-			if node != nil {
-				roots++
-				ref, _ := disclosure.Index().RefOf(node)
-				rootRefs[ref] = true
-			}
-		}
-	}
-	listed, cut := rosterLines(text, rootRefs)
+	roles := modelRoleCount(disclosure)
+	listed, cut := rosterLines(text)
 	checks := []Check{
 		{OK: cost.Bytes <= instructions.InstructionsLimit, Note: fmt.Sprintf("%d of %d bytes — Claude Code truncates what is over, mid-sentence", cost.Bytes, instructions.InstructionsLimit)},
 		{OK: strings.Contains(string([]rune(text)[:min(utf8.RuneCountInString(text), instructions.SelfContainedPrefix)]), "contexture_open"), Note: fmt.Sprintf("contexture_open named in the first %d characters — that is how far Codex reads while deciding whether to use this server", instructions.SelfContainedPrefix)},
-		{OK: !cut && listed == roots, Note: fmt.Sprintf("roster lists %d of %d role(s)%s", listed, roots, map[bool]string{true: " — the rest were cut for budget", false: ""}[cut])},
+		{OK: !cut && listed == roles, Note: fmt.Sprintf("roster lists %d of %d role(s)%s", listed, roles, map[bool]string{true: " — the rest were cut for budget", false: ""}[cut])},
 	}
-	payload := map[string]any{"instructions": text}
-	return step(Connect, text, Step{Payload: payload, Checks: checks})
+	gateway := gatewayFacts(disclosure)
+	payload := map[string]any{"instructions": text, "gateway": gateway}
+	return step(Connect, text, Step{Payload: payload, Checks: checks, Aside: fmt.Sprintf("the %d gateway tool descriptions arrive here too, costing %d more estimated tokens; they are fixed, so they are not counted below", len(gateway), gatewayCost(gateway).Tokens)})
 }
 
 // DiscoverStep replays the fixed model discovery response.
@@ -126,11 +145,18 @@ func OpenStep(disclosure *contexture.Disclosure, ref string) Step {
 	if err != nil {
 		return step("contexture_open", err.Error(), Step{Ref: ref, Refused: true, Aside: "this recovery sentence is all the agent receives"})
 	}
-	return step("contexture_open", wire(payload), Step{Ref: ref, Payload: payload, Checks: routingChecks(payload)})
+	result := Step{Ref: ref, Payload: payload, Checks: routingChecks(payload)}
+	if contentTool(disclosure, ref) {
+		result.Aside = "the document itself is not here — an agent runs it with contexture_invoke_read_only; pass --read to include it and its cost"
+	}
+	return step("contexture_open", wire(payload), result)
 }
 
 // ReadStep invokes a no-argument read-only Tool only when inspection requests it.
 func ReadStep(ctx context.Context, runtime *contexture.Runtime, ref string) Step {
+	if runtime == nil {
+		return step("contexture_invoke_read_only", "inspection needs an execution Runtime to read content", Step{Ref: ref, Refused: true})
+	}
 	value, err := runtime.InvokeReadOnly(ctx, ref, json.RawMessage("{}"), contexture.AllRoots())
 	if err != nil {
 		return step("contexture_invoke_read_only", err.Error(), Step{Ref: ref, Refused: true})
@@ -146,9 +172,19 @@ func ReadStep(ctx context.Context, runtime *contexture.Runtime, ref string) Step
 
 // EveryRef walks visible roles breadth-first and each role's leaf members once.
 func EveryRef(disclosure *contexture.Disclosure) []string {
+	if disclosure == nil {
+		return []string{}
+	}
+	selection, err := disclosure.EffectiveSelection(contexture.AllRoots())
+	if err != nil {
+		return []string{}
+	}
 	result, queue := []string{}, []*contexture.Role{}
 	for _, node := range disclosure.Index().ModelRoots() {
 		ref, _ := disclosure.Index().RefOf(node)
+		if !selection.ContainsRef(ref) {
+			continue
+		}
 		if node.Kind() == contexture.RoleKind {
 			queue = append(queue, node.(*contexture.Role))
 		} else {
@@ -163,6 +199,9 @@ func EveryRef(disclosure *contexture.Disclosure) []string {
 		children, _ := disclosure.Index().ChildrenOf(role)
 		for _, child := range children {
 			childRef, _ := disclosure.Index().RefOf(child)
+			if !selection.ContainsRef(childRef) {
+				continue
+			}
 			if child.Kind() == contexture.RoleKind {
 				queue = append(queue, child.(*contexture.Role))
 			} else {
@@ -185,7 +224,7 @@ func Replay(ctx context.Context, disclosure *contexture.Disclosure, runtime *con
 	for _, ref := range refs {
 		opened := OpenStep(disclosure, ref)
 		steps = append(steps, opened)
-		if includeRead && isContent(runtime, ref) && !opened.Refused {
+		if includeRead && runtime != nil && contentTool(disclosure, ref) && !opened.Refused {
 			steps = append(steps, ReadStep(ctx, runtime, ref))
 		}
 	}
@@ -199,12 +238,13 @@ func Replay(ctx context.Context, disclosure *contexture.Disclosure, runtime *con
 // isContent identifies an executable Resource-equivalent: a read-only Tool
 // whose schema takes no arguments. Inspection must never guess arguments or
 // call parameterized diagnostics merely because --read was requested.
-func isContent(runtime *contexture.Runtime, ref string) bool {
-	if runtime == nil {
+func contentTool(disclosure *contexture.Disclosure, ref string) bool {
+	if disclosure == nil {
 		return false
 	}
-	tool, err := runtime.Tool(ref)
-	if err != nil || !tool.ReadOnly {
+	node, err := disclosure.Index().Find(ref)
+	tool, ok := node.(*contexture.Tool)
+	if err != nil || !ok || !tool.ReadOnly {
 		return false
 	}
 	binding, err := tool.Binding()
@@ -240,13 +280,105 @@ func Render(trace Trace, payloads bool) string {
 		}
 		lines = append(lines, "")
 	}
-	return strings.Join(append(lines, fmt.Sprintf("total  %d characters, %d bytes, ~%d tokens over %d step(s)", trace.Total.Characters, trace.Total.Bytes, trace.Total.Tokens, len(trace.Steps))), "\n")
+	return strings.Join(append(lines, renderSummary(trace)...), "\n")
 }
 
 // AsJSON renders a trace for scenario comparison.
 func AsJSON(trace Trace) (string, error) {
 	raw, err := json.MarshalIndent(trace, "", "  ")
 	return string(raw), err
+}
+
+func modelRoleCount(disclosure *contexture.Disclosure) int {
+	if disclosure == nil {
+		return 0
+	}
+	selection, err := disclosure.EffectiveSelection(contexture.AllRoots())
+	if err != nil {
+		return 0
+	}
+	modelRoots := map[string]bool{}
+	for _, root := range disclosure.Index().ModelRoots() {
+		ref, _ := disclosure.Index().RefOf(root)
+		modelRoots[strings.Split(ref, "/")[0]] = true
+	}
+	roles := 0
+	for _, ref := range disclosure.Index().Walk() {
+		node, err := disclosure.Index().Find(ref)
+		if err == nil && node.Kind() == contexture.RoleKind && modelRoots[strings.Split(ref, "/")[0]] && selection.ContainsRef(ref) {
+			roles++
+		}
+	}
+	return roles
+}
+
+func gatewayFacts(disclosure *contexture.Disclosure) []map[string]any {
+	gateway, err := contexture.NewGateway(disclosure, nil)
+	if err != nil {
+		return []map[string]any{}
+	}
+	facts := make([]map[string]any, 0, len(gateway.Tools()))
+	for _, tool := range gateway.Tools() {
+		facts = append(facts, map[string]any{
+			"name":        string(tool.Name),
+			"description": tool.Description,
+			"read_only":   tool.ReadOnly,
+		})
+	}
+	return facts
+}
+
+func gatewayCost(gateway []map[string]any) Cost {
+	text := ""
+	for _, tool := range gateway {
+		text += fmt.Sprint(tool["name"]) + fmt.Sprint(tool["description"])
+	}
+	return CostOf(text)
+}
+
+func renderSummary(trace Trace) []string {
+	width := 3
+	for _, item := range trace.Steps {
+		if len(item.Ref) > width {
+			width = len(item.Ref)
+		}
+	}
+	if width > 52 {
+		width = 52
+	}
+	rule := strings.Repeat("-", 36+width)
+	lines := []string{rule, fmt.Sprintf("%2s  %-26s  %-*s  ~tok", "#", "call", width, "ref")}
+	running := Cost{}
+	for index, item := range trace.Steps {
+		running = running.Add(item.Cost)
+		ref := item.Ref
+		if ref == "" {
+			ref = "-"
+		}
+		if len(ref) > width {
+			ref = "…" + ref[len(ref)-width+1:]
+		}
+		lines = append(lines, fmt.Sprintf("%2d  %-26s  %-*s  %5d  (running %d)", index, item.Call, width, ref, item.Cost.Tokens, running.Tokens))
+	}
+	lines = append(lines, rule, fmt.Sprintf("total  %d characters, %d bytes, ~%d tokens over %d step(s)", trace.Total.Characters, trace.Total.Bytes, trace.Total.Tokens, len(trace.Steps)))
+	refused, failed := 0, 0
+	for _, item := range trace.Steps {
+		if item.Refused {
+			refused++
+		}
+		for _, check := range item.Checks {
+			if !check.OK {
+				failed++
+			}
+		}
+	}
+	if refused > 0 {
+		lines = append(lines, fmt.Sprintf("       %d step(s) refused", refused))
+	}
+	if failed > 0 {
+		lines = append(lines, fmt.Sprintf("       %d host limit(s) not met", failed))
+	}
+	return lines
 }
 
 func routingChecks(payload map[string]any) []Check {
@@ -267,16 +399,28 @@ func routingChecks(payload map[string]any) []Check {
 			long = append(long, name)
 		}
 	}
-	named := []string{}
-	description := fmt.Sprint(payload["description"])
-	for name := range held {
-		if name != fmt.Sprint(payload["name"]) && strings.Contains(description, name) {
-			named = append(named, name)
+	named := map[string]bool{}
+	for _, card := range cards {
+		for name := range held {
+			if name != fmt.Sprint(card["name"]) && strings.Contains(fmt.Sprint(card["description"]), name) {
+				named[fmt.Sprint(card["name"])] = true
+			}
 		}
 	}
+	description := fmt.Sprint(payload["description"])
+	for name := range held {
+		if strings.Contains(description, name) {
+			named[fmt.Sprint(payload["name"])] = true
+		}
+	}
+	listing := make([]string, 0, len(named))
+	for name := range named {
+		listing = append(listing, name)
+	}
+	sort.Strings(listing)
 	return []Check{
 		{OK: len(long) == 0, Note: conditionalNote(len(long) == 0, "every routing sentence is within 200 characters", "over 200 characters: "+strings.Join(long, ", "))},
-		{OK: len(named) == 0, Note: conditionalNote(len(named) == 0, "no routing sentence names what its node holds", strings.Join(named, ", ")+" name(s) their own members")},
+		{OK: len(listing) == 0, Note: conditionalNote(len(listing) == 0, "no routing sentence names what its node holds", strings.Join(listing, ", ")+" name(s) their own members — the inside is what opening delivers, and describing it twice is how the two copies start disagreeing")},
 	}
 }
 
@@ -286,16 +430,13 @@ func conditionalNote(ok bool, accepted, rejected string) string {
 	}
 	return rejected
 }
-func rosterLines(text string, roots map[string]bool) (int, bool) {
+func rosterLines(text string) (int, bool) {
 	listed, cut := 0, false
 	for _, line := range strings.Split(text, "\n") {
 		if strings.HasPrefix(line, "- ...and ") {
 			cut = true
 		} else if strings.HasPrefix(line, "- ") {
-			ref := strings.TrimSpace(strings.SplitN(strings.TrimPrefix(line, "- "), ":", 2)[0])
-			if roots[ref] {
-				listed++
-			}
+			listed++
 		}
 	}
 	return listed, cut

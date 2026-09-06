@@ -15,6 +15,8 @@ import (
 
 const cliVersion = "0.12.0rc1"
 
+var errNoProject = errors.New("no Go Contexture project found in this directory or above it")
+
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
 // run executes implemented Contexture CLI workflows and returns a process exit code.
@@ -71,6 +73,15 @@ func runProjectCommand(arguments []string, stdout, stderr io.Writer) int {
 	}
 	root, err := findProject()
 	if err != nil {
+		if command == "inspect" && errors.Is(err, errNoProject) {
+			application, demoErr := demo.Application()
+			if demoErr != nil {
+				_, _ = fmt.Fprintf(stderr, "contexture: cannot build bundled demo: %v\n", demoErr)
+				return 1
+			}
+			_, _ = fmt.Fprintln(stderr, "No Contexture project was found, so this is the bundled demo.")
+			return cli.RunApplication(context.Background(), application, arguments, stdout, stderr)
+		}
 		_, _ = fmt.Fprintf(stderr, "contexture: %v\n", err)
 		return 2
 	}
@@ -107,5 +118,5 @@ func findProject() (string, error) {
 		}
 		current = parent
 	}
-	return "", fmt.Errorf("no Go Contexture project found in this directory or above it. Run contexture new first.")
+	return "", fmt.Errorf("%w. Run contexture new first.", errNoProject)
 }

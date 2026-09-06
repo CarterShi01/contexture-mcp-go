@@ -114,6 +114,22 @@ func main() {
 `contexture.Contexture(declaration)` 是 `contexture.DeclareApplication` 的具名公开别名；
 两者创建相同的惰性 application 声明。
 
+## 检查 Agent 可见 context
+
+`contexture inspect` 会重放原生实现生成的准确 instructions、discovery payload 和
+渐进披露卡片，不会启动 MCP transport。修改声明后、连接 Host 前使用它：
+
+```bash
+go run ./cmd/contexture inspect operations --all --summary
+go run ./cmd/contexture inspect operations/runbook --read
+go run ./cmd/contexture inspect --all --json > contexture-trace.json
+```
+
+`--all` 按 Role 的广度优先顺序逐一遍历每个可见 ref；`--summary` 保留成本和 Host
+限制检查、隐藏 payload body；`--json` 生成可供 CI 比对的稳定 trace。`--read` 会额外
+调用一个无参数、只读的内容 Tool，因此只应在确实需要本地读取时使用。未找到项目配置且
+未指定 target 时，`inspect` 会重放内置 demo，并在 stderr 报告此回退。
+
 ## Host 配置
 
 Host 配置应当指向启动服务器的命令，而不是复制应用已经声明的 context。`server.Launch`

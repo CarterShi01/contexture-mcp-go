@@ -118,6 +118,26 @@ application dependencies use `Channels` with reverse-order cleanup.
 `contexture.Contexture(declaration)` is the named public alias for
 `contexture.DeclareApplication`; both create the same lazy application declaration.
 
+## Inspect agent-visible context
+
+`contexture inspect` replays the exact instructions, discovery payload, and
+progressive-disclosure cards produced by the native implementation. It starts
+no MCP transport. Use it after changing a declaration, before connecting a
+Host:
+
+```bash
+go run ./cmd/contexture inspect operations --all --summary
+go run ./cmd/contexture inspect operations/runbook --read
+go run ./cmd/contexture inspect --all --json > contexture-trace.json
+```
+
+`--all` walks every visible ref once in breadth-first role order; `--summary`
+keeps the cost and host-limit checks while omitting payload bodies; `--json`
+creates a stable trace for CI comparison. `--read` additionally calls only a
+no-argument, read-only content Tool, so use it only when that local read is
+intended. With no project configuration or explicit target, `inspect` replays
+the bundled demo and reports that fallback on stderr.
+
 ## Host configuration
 
 Keep host configuration as a pointer to the server command, rather than a copy
