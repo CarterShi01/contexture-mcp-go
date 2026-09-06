@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -18,6 +19,9 @@ const packageVersion = "0.12.0rc1"
 type ApplicationServer struct {
 	application *RuntimeApplication
 	identity    Identity
+	buildOnce   sync.Once
+	adapter     *ContextureMCPServer
+	buildErr    error
 }
 
 type rootSelectionContextKey struct{}
@@ -33,7 +37,13 @@ func BuildServer(application *contexture.Application) (*ApplicationServer, error
 
 // Build constructs a fresh official-SDK server for one Contexture transport service.
 func (server *ApplicationServer) Build() (*ContextureMCPServer, error) {
-	return server.BuildForRoots(contexture.AllRoots())
+	if server == nil {
+		return nil, fmt.Errorf("Contexture application server must not be nil")
+	}
+	server.buildOnce.Do(func() {
+		server.adapter, server.buildErr = server.BuildForRoots(contexture.AllRoots())
+	})
+	return server.adapter, server.buildErr
 }
 
 // BuildForRoots constructs an adapter whose gateway and publications share one

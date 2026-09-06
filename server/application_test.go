@@ -42,4 +42,19 @@ func TestCompileApplicationSharesOneBoundRuntimeSurface(t *testing.T) {
 	if _, err := compiled.Gateway(); err != nil {
 		t.Fatal(err)
 	}
+	container, err := server.BuildServer(declaration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := container.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := container.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("Build() constructed more than one default MCP adapter")
+	}
 }
