@@ -213,7 +213,8 @@ Go 实现生成真实观察结果，再与这些资产比较。上述命令验�
 
 ## 仓库结构
 
-架构文档也提供[英文原文](docs/architecture.md)。
+请阅读 [Go 使用手册](docs/handbook.zh-CN.md)、其[英文原文](docs/handbook.md)和
+[架构文档](docs/architecture.zh-CN.md)。
 
 ```text
 facade.go        面向声明的公开、SDK-neutral facade
