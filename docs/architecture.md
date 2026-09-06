@@ -24,17 +24,22 @@ package projects Prompts and Resources. The independent `web` package maps an
 explicit route allowlist to `net/http`. Business Tools never become top-level
 MCP tools; Contexture exposes a fixed navigation and invocation gateway.
 
-## Implemented contract areas
+## Implemented areas
 
 1. Core node model, registration, validation, and immutable Index.
 2. Disclosure API and exact golden discover/open/refusal payloads.
 3. Typed Tool binding, `context.Context` call state, and fixed MCP gateway.
 4. Prompt, Resource, completion, and selected-root behavior.
-5. Channels lifecycle, identity, telemetry, HTTP, and explicit REST routes.
+5. Channels lifecycle, principal context, telemetry, HTTP, and explicit REST routes.
+6. Native CLI project generation and discovery, local check/list/inspect/call
+   workflows, safe transport options, and a real MCP stdio/streamable-HTTP
+   launcher.
+7. The maintained Kubernetes demo, including complete reference procedures,
+   resources, prompt publication, and runtime integration tests.
 
-The first five areas have focused kernel-conformance evidence. The following
-Python product modules remain absent and must be implemented before a parity or
-release claim: `cli/`, `inspection.py`, `demo/`, project templates, server
-assembly/options/root selection, external-consumer verification, and the
-release workflow. Their absence is deliberate status, not an equivalent
-language-native substitution.
+The first five areas have focused kernel-conformance evidence; the last two
+have native product-workflow tests. This is still not a parity or release
+claim. Hosted identity and request-selected roots, the full documentation and
+scenario inventory, and the clean-checkout release audit remain open. They
+must be finished with direct evidence rather than treated as a language-native
+substitution.

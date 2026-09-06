@@ -11,9 +11,10 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [跨语言规范](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **当前状态：符合 0.12 内核的原型，Python 完整产品等价正在进行。** 16 条内核
-> 规则均已有定向执行证据，但它尚不是 Python 发行版的可发布替代品。项目 CLI、
-> inspection API、内置 demo、模板以及消费者/发布 gate 都仍需单独实现与测试。
+> **当前状态：正在推进的 0.12 产品移植，尚不是 Python 的可发布替代品。** 内核已有
+> 定向执行证据；本仓库现已具备原生项目命令、inspection、可生成的应用、真实 MCP
+> launcher 与维护中的 demo。托管身份/根选择、完整文档和场景映射、以及干净检出环境
+> 的发布审计仍待完成；请勿将当前分支视为完整产品等价。
 
 ## 节点模型
 
@@ -110,7 +111,34 @@ func main() {
 `server` 包拥有官方 MCP Go SDK，`web` 包拥有显式 `net/http` REST 适配器。请求级事实通过
 `context.Context` 传递，应用依赖通过 `Channels` 管理并按逆序清理。
 
-## 开发与内核一致性验证
+## 运行项目
+
+Go CLI 运行项目 `cmd/assistant/main.go` 中静态声明的 application；它不会依据字符串
+任意导入源文件。
+
+```bash
+go run ./cmd/contexture new my-context
+cd my-context
+go mod tidy
+go run ./cmd/assistant check
+go run ./cmd/assistant list
+go run ./cmd/assistant inspect --all --read --summary
+go run ./cmd/assistant serve                    # MCP stdio；会阻塞
+go run ./cmd/assistant serve --transport streamable-http
+```
+
+在生成项目内，已安装的 `contexture` 命令会把同样的 `check`、`list`、`inspect`、
+`call` 与 `serve` 工作流转发给该 application。`call` 默认拒绝写 Tool，除非显式传入
+`--allow-write`；JSON 参数只能来自 `--input` 或 `--input-file` 其中之一。
+
+维护中的确定性 Kubernetes 应用可通过以下方式运行：
+
+```bash
+go run ./cmd/contexture demo                    # MCP stdio；会阻塞
+go run ./cmd/contexture demo --transport streamable-http
+```
+
+## 开发检查
 
 需要 Go 1.25 或更新版本。
 
@@ -123,7 +151,7 @@ go test -race ./...
 go vet ./...
 ```
 
-该原型锁定 `conformance/specification.json` 中记录的 Contexture Specification
+该移植锁定 `conformance/specification.json` 中记录的 Contexture Specification
 0.12 提交。固定 fixtures 和 golden 输出保存在 `conformance/`；测试会先通过
 Go 实现生成真实观察结果，再与这些资产比较。上述命令验证的是已实现的内核，
 不是完整产品的发布 gate。

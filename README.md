@@ -11,11 +11,12 @@ Implementations:
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **Status: 0.12 kernel-conformant prototype; full Python-product parity is in
-> progress.** The 16 kernel rules have focused execution evidence, but this is
-> not yet a release-ready replacement for the Python distribution. The project
-> CLI, inspection API, bundled demo, templates, and consumer/release gates
-> still need their own implementation and tests.
+> **Status: active 0.12 product port; not yet a release-ready replacement for
+> Python.** The kernel has focused execution evidence, and this repository now
+> has native project commands, inspection, a generated application, a real MCP
+> launcher, and the maintained demo. Remaining parity work includes hosted
+> identity/root selection, complete documentation and scenario mapping, and a
+> clean-checkout release audit. Do not treat this branch as full product parity.
 
 ## Node model
 
@@ -114,7 +115,35 @@ package is SDK-neutral; `server` owns the official MCP Go SDK and `web` owns
 explicit `net/http` REST adapters. Request-local facts use `context.Context`, and
 application dependencies use `Channels` with reverse-order cleanup.
 
-## Development and kernel conformance
+## Run a project
+
+The Go CLI runs the static application declared by a project's
+`cmd/assistant/main.go`; it never imports arbitrary source based on a string.
+
+```bash
+go run ./cmd/contexture new my-context
+cd my-context
+go mod tidy
+go run ./cmd/assistant check
+go run ./cmd/assistant list
+go run ./cmd/assistant inspect --all --read --summary
+go run ./cmd/assistant serve                    # MCP stdio; blocks
+go run ./cmd/assistant serve --transport streamable-http
+```
+
+From inside a generated project, an installed `contexture` command forwards
+the same `check`, `list`, `inspect`, `call`, and `serve` workflows to that
+application. `call` refuses a writing Tool unless `--allow-write` is explicit;
+it accepts JSON from `--input` or `--input-file`, never both.
+
+Run the maintained deterministic Kubernetes application with:
+
+```bash
+go run ./cmd/contexture demo                    # MCP stdio; blocks
+go run ./cmd/contexture demo --transport streamable-http
+```
+
+## Development checks
 
 Requires Go 1.25 or newer.
 
@@ -127,11 +156,11 @@ go test -race ./...
 go vet ./...
 ```
 
-The prototype targets Contexture Specification 0.12 at the immutable revision in
+The port targets Contexture Specification 0.12 at the immutable revision in
 [`conformance/specification.json`](conformance/specification.json). Pinned
 fixtures and golden outputs are stored under `conformance/`; tests construct and
 run the Go implementation before comparing its observations with them. These
-commands validate the implemented kernel, not a full-product release.
+checks validate implemented behavior, not a full-product release claim.
 
 ## Repository map
 
