@@ -46,7 +46,7 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 			return nil, errors.Join(ErrInvalidDeclaration, errors.New("application roots must be lazy factories"))
 		}
 	}
-	return &Application{name: declaration.Name, roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...), channels: declaration.Channels, prompts: append([]PromptDeclaration(nil), declaration.Prompts...), resources: append([]ResourceDeclaration(nil), declaration.Resources...)}, nil
+	return &Application{name: strings.TrimSpace(declaration.Name), roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...), channels: declaration.Channels, prompts: append([]PromptDeclaration(nil), declaration.Prompts...), resources: append([]ResourceDeclaration(nil), declaration.Resources...)}, nil
 }
 
 // Name returns the declared application name.

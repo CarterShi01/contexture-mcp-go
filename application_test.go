@@ -45,7 +45,7 @@ func TestApplicationDeclarationIsLazy(t *testing.T) {
 
 	constructions := 0
 	application, err := contexture.Contexture(contexture.ApplicationDeclaration{
-		Name: "operations",
+		Name: " operations ",
 		Roots: []contexture.Factory{func() contexture.Node {
 			constructions++
 			return &contexture.Role{
@@ -73,6 +73,18 @@ func TestApplicationRequiresModelRoot(t *testing.T) {
 	t.Parallel()
 
 	_, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "empty"})
+	if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("DeclareApplication() error = %v, want ErrInvalidDeclaration", err)
+	}
+}
+
+func TestApplicationRejectsBlankName(t *testing.T) {
+	_, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: " \t ",
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect."}
+		}},
+	})
 	if !errors.Is(err, contexture.ErrInvalidDeclaration) {
 		t.Fatalf("DeclareApplication() error = %v, want ErrInvalidDeclaration", err)
 	}
