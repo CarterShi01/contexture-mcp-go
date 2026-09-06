@@ -122,6 +122,22 @@ The facade intentionally does not import the MCP SDK, `server`, or `web`.
 Import `server` or `web` only when the declaration is ready to be compiled for
 one of those Host surfaces.
 
+### Telemetry
+
+`ApplicationDeclaration.Telemetry` optionally supplies the one usage collector
+shared by `server.CompileApplication`'s disclosure, gateway, and Runtime. If
+omitted, compilation creates a `MemoryTelemetry`. `NodeUsage` is a typed,
+JSON-ready snapshot with `ref`, `call_count`, `error_count`, and
+`last_used_at`; an unseen ref has its ref and zero counts.
+
+The framework records only successful Role and Skill opens and actual Tool
+invocations (including a failing invocation). `discover` and opening a Tool
+card do not count as use. `CurrentTelemetry(ctx)` is non-nil only inside the
+Tool handler's request context. Exporter errors and panics are ignored so
+telemetry cannot change a business result. `MemoryTelemetry.Events()` returns
+non-destructive snapshots and deliberately retains all events; use a custom
+`Telemetry` implementation when bounded retention or remote export is needed.
+
 ## 3. Choose the right node
 
 | Use | When it belongs there |

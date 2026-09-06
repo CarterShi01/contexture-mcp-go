@@ -108,6 +108,19 @@ boolean。默认值 `contexture.ModelMayOpen` 同时允许 model navigation 与�
 该 facade 有意不导入 MCP SDK、`server` 或 `web`。只有在 declaration 准备好被编译到某个 Host
 surface 时，才导入 `server` 或 `web`。
 
+### Telemetry
+
+`ApplicationDeclaration.Telemetry` 可选地提供一个 usage collector；
+`server.CompileApplication` 生成的 disclosure、gateway 和 Runtime 会共享它。若未提供，编译会创建
+`MemoryTelemetry`。`NodeUsage` 是带类型、可直接 JSON 编码的 snapshot，包含 `ref`、`call_count`、
+`error_count` 与 `last_used_at`；从未见过的 ref 保留该 ref 且计数为零。
+
+框架只记录成功打开的 Role 与 Skill，以及实际执行的 Tool invocation（包括失败的 invocation）。
+`discover` 和打开 Tool card 都不算一次 use。`CurrentTelemetry(ctx)` 只会在 Tool handler 的 request
+context 内非 nil。exporter 的 error 或 panic 会被忽略，因此 telemetry 不会改变业务结果。
+`MemoryTelemetry.Events()` 返回非破坏性的 snapshot，并有意保留全部 event；需要有界保留或远程导出时，
+应提供自定义 `Telemetry` 实现。
+
 ## 3. 选择正确的节点
 
 | 使用 | 适用情形 |

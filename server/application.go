@@ -14,6 +14,7 @@ type RuntimeApplication struct {
 	Index        *contexture.Index
 	Disclosure   *contexture.Disclosure
 	Runtime      *contexture.Runtime
+	Telemetry    contexture.Telemetry
 	Publications *surface.Publications
 }
 
@@ -26,11 +27,15 @@ func CompileApplication(application *contexture.Application) (*RuntimeApplicatio
 	if err != nil {
 		return nil, err
 	}
-	disclosure, err := contexture.NewDisclosure(index, contexture.AllRoots())
+	telemetry := application.Telemetry()
+	if telemetry == nil {
+		telemetry = contexture.NewMemoryTelemetry()
+	}
+	disclosure, err := contexture.NewDisclosureWithTelemetry(index, contexture.AllRoots(), telemetry)
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), nil)
+	runtime, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), telemetry)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +43,7 @@ func CompileApplication(application *contexture.Application) (*RuntimeApplicatio
 	if err != nil {
 		return nil, err
 	}
-	return &RuntimeApplication{Application: application, Index: index, Disclosure: disclosure, Runtime: runtime, Publications: publications}, nil
+	return &RuntimeApplication{Application: application, Index: index, Disclosure: disclosure, Runtime: runtime, Telemetry: telemetry, Publications: publications}, nil
 }
 
 // Gateway returns the fixed Contexture gateway over this application's runtime projections.

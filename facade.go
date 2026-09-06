@@ -36,6 +36,7 @@ type (
 	Gateway             = model.Gateway
 	Telemetry           = model.Telemetry
 	CallEvent           = model.CallEvent
+	NodeUsage           = model.NodeUsage
 	MemoryTelemetry     = model.MemoryTelemetry
 	Runtime             = model.Runtime
 	SelectedGraph       = model.SelectedGraph
@@ -92,6 +93,11 @@ func NewDisclosure(index *Index, selection RootSelection) (*Disclosure, error) {
 	return model.NewDisclosure(index, selection)
 }
 
+// NewDisclosureWithTelemetry creates navigation over a shared usage collector.
+func NewDisclosureWithTelemetry(index *Index, selection RootSelection, telemetry Telemetry) (*Disclosure, error) {
+	return model.NewDisclosureWithTelemetry(index, selection, telemetry)
+}
+
 // NewDisclosureOnly creates an unbound navigation-only view.
 func NewDisclosureOnly(index *Index, selection RootSelection) (*Disclosure, error) {
 	return model.NewDisclosureOnly(index, selection)
@@ -117,7 +123,7 @@ func OnlyRoots(names ...string) (RootSelection, error) {
 	return model.OnlyRoots(names...)
 }
 
-// NewMemoryTelemetry creates a bounded non-blocking telemetry sink.
+// NewMemoryTelemetry creates a process-local aggregate collector.
 func NewMemoryTelemetry() *MemoryTelemetry {
 	return model.NewMemoryTelemetry()
 }

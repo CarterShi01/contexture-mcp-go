@@ -13,6 +13,7 @@ type ApplicationDeclaration struct {
 	Roots       []Factory
 	PromptRoots []Factory
 	Channels    Channels
+	Telemetry   Telemetry
 	Prompts     []PromptDeclaration
 	Resources   []ResourceDeclaration
 }
@@ -37,6 +38,7 @@ type Application struct {
 	roots       []Factory
 	promptRoots []Factory
 	channels    Channels
+	telemetry   Telemetry
 	prompts     []PromptDeclaration
 	resources   []ResourceDeclaration
 }
@@ -73,7 +75,7 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Resource name must be non-empty when supplied"))
 		}
 	}
-	return &Application{name: strings.TrimSpace(declaration.Name), roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...), channels: declaration.Channels, prompts: append([]PromptDeclaration(nil), declaration.Prompts...), resources: append([]ResourceDeclaration(nil), declaration.Resources...)}, nil
+	return &Application{name: strings.TrimSpace(declaration.Name), roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...), channels: declaration.Channels, telemetry: declaration.Telemetry, prompts: append([]PromptDeclaration(nil), declaration.Prompts...), resources: append([]ResourceDeclaration(nil), declaration.Resources...)}, nil
 }
 
 // Name returns the declared application name.
@@ -84,6 +86,9 @@ func (application *Application) RootCount() int { return len(application.roots) 
 
 // PromptRootCount returns user-controlled factories without calling them.
 func (application *Application) PromptRootCount() int { return len(application.promptRoots) }
+
+// Telemetry returns the optional collector declared for compiled Host surfaces.
+func (application *Application) Telemetry() Telemetry { return application.telemetry }
 
 // Prompts returns publication declarations in declaration order.
 func (application *Application) Prompts() []PromptDeclaration {

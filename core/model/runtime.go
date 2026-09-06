@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
@@ -18,43 +20,90 @@ const (
 	telemetryKey
 )
 
-// Telemetry observes calls and never changes their outcome.
-type Telemetry interface{ Record(CallEvent) error }
+// NodeUsage is the framework-owned aggregate for one compiled node.
+type NodeUsage struct {
+	Ref        string `json:"ref"`
+	CallCount  int    `json:"call_count"`
+	ErrorCount int    `json:"error_count"`
+	LastUsedAt string `json:"last_used_at,omitempty"`
+}
 
-// CallEvent records one attempted Tool invocation.
+// Telemetry observes node usage and never changes business outcomes.
+type Telemetry interface {
+	Record(CallEvent) error
+	Usage(ref string) NodeUsage
+}
+
+// CallEvent records one observed node use. Role and Skill opens have Failed
+// false; Tool invocations set Failed when their Binding returns an error.
 type CallEvent struct {
-	Ref    string
-	Failed bool
+	Ref        string
+	Failed     bool
+	OccurredAt string
 }
 
-// MemoryTelemetry is a race-safe test and inspection exporter.
-type MemoryTelemetry struct{ events chan CallEvent }
+// MemoryTelemetry is a race-safe, non-lossy process-local usage collector.
+type MemoryTelemetry struct {
+	mu     sync.RWMutex
+	usage  map[string]NodeUsage
+	events []CallEvent
+}
 
-// NewMemoryTelemetry creates a bounded non-blocking telemetry sink.
+// NewMemoryTelemetry creates a process-local collector. It retains every
+// event for diagnostics; applications that need bounded or remote retention
+// should provide their own Telemetry implementation.
 func NewMemoryTelemetry() *MemoryTelemetry {
-	return &MemoryTelemetry{events: make(chan CallEvent, 1024)}
+	return &MemoryTelemetry{usage: map[string]NodeUsage{}}
 }
 
-// Record records a call without blocking an invocation.
+// Record aggregates a call and retains a non-destructive event snapshot.
 func (telemetry *MemoryTelemetry) Record(event CallEvent) error {
-	select {
-	case telemetry.events <- event:
-	default:
+	if telemetry == nil {
+		return nil
 	}
+	if event.OccurredAt == "" {
+		event.OccurredAt = time.Now().UTC().Format(time.RFC3339Nano)
+	}
+	telemetry.mu.Lock()
+	defer telemetry.mu.Unlock()
+	previous := telemetry.usage[event.Ref]
+	telemetry.usage[event.Ref] = NodeUsage{
+		Ref: event.Ref, CallCount: previous.CallCount + 1,
+		ErrorCount: previous.ErrorCount + boolCount(event.Failed), LastUsedAt: event.OccurredAt,
+	}
+	telemetry.events = append(telemetry.events, event)
 	return nil
 }
 
-// Events returns all events observed so far.
-func (telemetry *MemoryTelemetry) Events() []CallEvent {
-	result := []CallEvent{}
-	for {
-		select {
-		case event := <-telemetry.events:
-			result = append(result, event)
-		default:
-			return result
-		}
+// Usage returns a snapshot, including a zero-count usage for an unseen ref.
+func (telemetry *MemoryTelemetry) Usage(ref string) NodeUsage {
+	if telemetry == nil {
+		return NodeUsage{Ref: ref}
 	}
+	telemetry.mu.RLock()
+	defer telemetry.mu.RUnlock()
+	usage, exists := telemetry.usage[ref]
+	if !exists {
+		return NodeUsage{Ref: ref}
+	}
+	return usage
+}
+
+// Events returns all observed events without consuming or dropping them.
+func (telemetry *MemoryTelemetry) Events() []CallEvent {
+	if telemetry == nil {
+		return nil
+	}
+	telemetry.mu.RLock()
+	defer telemetry.mu.RUnlock()
+	return append([]CallEvent(nil), telemetry.events...)
+}
+
+func boolCount(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 // Runtime invokes bound Tools under explicit request context.
@@ -77,6 +126,9 @@ func NewRuntime(index *Index, selection, ceiling RootSelection, telemetry Teleme
 	}
 	if !index.bound {
 		return nil, errors.New("a disclosure-only Index cannot be upgraded into a Runtime")
+	}
+	if telemetry == nil {
+		telemetry = NewMemoryTelemetry()
 	}
 	selection, err := selection.Resolve(index)
 	if err != nil {
@@ -139,10 +191,24 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	ctx = context.WithValue(ctx, telemetryKey, runtime.telemetry)
 	ctx = context.WithValue(ctx, principalKey, principal)
 	value, callErr := binding.Call(ctx, arguments)
-	if runtime.telemetry != nil {
-		_ = runtime.telemetry.Record(CallEvent{Ref: ref, Failed: callErr != nil})
-	}
+	reportTelemetry(runtime.telemetry, CallEvent{Ref: ref, Failed: callErr != nil})
 	return value, callErr
+}
+
+// Telemetry returns the collector shared by this Runtime's invocation path.
+func (runtime *Runtime) Telemetry() Telemetry { return runtime.telemetry }
+
+func reportTelemetry(telemetry Telemetry, event CallEvent) {
+	if telemetry == nil {
+		return
+	}
+	// Telemetry is side-channel evidence, never a business dependency.
+	defer func() {
+		// A third-party exporter must not turn a successful binding into a
+		// panic or replace a binding error that has already occurred.
+		_ = recover()
+	}()
+	_ = telemetry.Record(event)
 }
 
 // Serve holds the Application's Channels open around one serving lifetime.

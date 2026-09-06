@@ -66,6 +66,8 @@ func (failingTelemetry) Record(contexture.CallEvent) error {
 	return errors.New("telemetry unavailable")
 }
 
+func (failingTelemetry) Usage(ref string) contexture.NodeUsage { return contexture.NodeUsage{Ref: ref} }
+
 func TestRuntimeSelectionOnlyAttenuatesCeilingAndTelemetryCannotChangeOutcome(t *testing.T) {
 	tool, err := contexture.NewTool("status", "Status.", true, func(context.Context, runtimeInput) (string, error) { return "ok", nil })
 	if err != nil {

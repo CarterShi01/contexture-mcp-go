@@ -13,6 +13,7 @@ type Disclosure struct {
 	selection   RootSelection
 	promptRoots map[string]struct{}
 	bound       bool
+	telemetry   Telemetry
 }
 
 // NewDisclosure creates a model navigation view. Prompt roots remain person-reachable only.
@@ -20,7 +21,19 @@ func NewDisclosure(index *Index, selection RootSelection) (*Disclosure, error) {
 	if index == nil || !index.bound {
 		return nil, errors.New("runtime Disclosure requires a bound Index")
 	}
-	return newDisclosure(index, selection, true)
+	return newDisclosure(index, selection, true, NewMemoryTelemetry())
+}
+
+// NewDisclosureWithTelemetry creates model navigation sharing one collector
+// with an execution Runtime compiled for the same application.
+func NewDisclosureWithTelemetry(index *Index, selection RootSelection, telemetry Telemetry) (*Disclosure, error) {
+	if index == nil || !index.bound {
+		return nil, errors.New("runtime Disclosure requires a bound Index")
+	}
+	if telemetry == nil {
+		telemetry = NewMemoryTelemetry()
+	}
+	return newDisclosure(index, selection, true, telemetry)
 }
 
 // NewDisclosureOnly creates navigation that intentionally exposes no Tool schemas.
@@ -29,10 +42,10 @@ func NewDisclosureOnly(index *Index, selection RootSelection) (*Disclosure, erro
 	if index == nil || index.bound {
 		return nil, errors.New("disclosure-only navigation requires an unbound Index")
 	}
-	return newDisclosure(index, selection, false)
+	return newDisclosure(index, selection, false, NewMemoryTelemetry())
 }
 
-func newDisclosure(index *Index, selection RootSelection, bound bool) (*Disclosure, error) {
+func newDisclosure(index *Index, selection RootSelection, bound bool, telemetry Telemetry) (*Disclosure, error) {
 	selection, err := selection.Resolve(index)
 	if err != nil {
 		return nil, err
@@ -42,7 +55,7 @@ func newDisclosure(index *Index, selection RootSelection, bound bool) (*Disclosu
 		ref, _ := index.RefOf(node)
 		prompts[ref] = struct{}{}
 	}
-	return &Disclosure{index: index, selection: selection, promptRoots: prompts, bound: bound}, nil
+	return &Disclosure{index: index, selection: selection, promptRoots: prompts, bound: bound, telemetry: telemetry}, nil
 }
 
 // Index returns the immutable canonical graph projected by this Disclosure.
@@ -87,7 +100,9 @@ func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]an
 	if err != nil {
 		return nil, err
 	}
-	return view.active(node, selection), nil
+	result := view.active(node, selection)
+	view.reportOpen(ref, node)
+	return result, nil
 }
 
 // OpenForPerson resolves through both ordinary and Prompt roots.
@@ -103,7 +118,15 @@ func (view *Disclosure) OpenForPerson(ref string, requested RootSelection) (map[
 	if err != nil {
 		return nil, err
 	}
-	return view.active(node, selection), nil
+	result := view.active(node, selection)
+	view.reportOpen(ref, node)
+	return result, nil
+}
+
+func (view *Disclosure) reportOpen(ref string, node Node) {
+	if node.nodeKind() == RoleKind || node.nodeKind() == SkillKind {
+		reportTelemetry(view.telemetry, CallEvent{Ref: ref})
+	}
 }
 
 func (view *Disclosure) card(node Node, bound bool) map[string]any {
