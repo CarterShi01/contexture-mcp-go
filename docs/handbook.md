@@ -166,7 +166,32 @@ values; if more match, the final visible value says how many remain while the
 response keeps the true `total` and `hasMore` facts. A completion request for
 another Prompt or argument returns no Contexture refs.
 
-## 7. Serve through an MCP Host
+## 7. Publish host-readable documents
+
+A `ResourceDeclaration` gives a Host a stable URI for content that already
+belongs to a Tool. It must name an argument-free, read-only Tool, so a resource
+read uses the same validated binding as a local read-only call and cannot
+change the world. The resource metadata is what a Host lists; the URI is what
+it reads.
+
+```go
+application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+	// Roots: ... including a read-only operations/runbook Tool with no input.
+	Resources: []contexture.ResourceDeclaration{{
+		Opens:       "operations/runbook",
+		URI:         "contexture://operations/runbook",
+		Description: "The current operations runbook.",
+		MIMEType:    "text/markdown",
+	}},
+})
+```
+
+Resources outside the Host's selected root surface are neither listed nor
+readable. Do not use a Resource for a parameterized lookup, a write, or a
+second implementation of a Tool; use the declared Tool through Contexture's
+gateway instead.
+
+## 8. Serve through an MCP Host
 
 The declaration does not change when it is served. The server adapter exposes
 four fixed Contexture gateway Tools; business Tools are progressively disclosed
@@ -186,7 +211,7 @@ For Claude Code, Cursor, or Codex configuration, use `server.Launch`. It
 renders Host configuration from the server command instead of duplicating the
 application's declared context.
 
-## 8. Keep the contract honest
+## 9. Keep the contract honest
 
 Run the full repository gate before proposing a change:
 

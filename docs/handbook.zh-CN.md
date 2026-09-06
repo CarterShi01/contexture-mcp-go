@@ -150,7 +150,28 @@ description 中重复其 procedure。
 ref。它最多返回 100 个值；若还有更多匹配，最后一个可见值会说明剩余数量，而 response 仍保留真实的
 `total` 与 `hasMore`。针对其他 Prompt 或参数的 completion request 不会返回任何 Contexture ref。
 
-## 7. 通过 MCP Host 提供服务
+## 7. 发布可由 Host 读取的文档
+
+`ResourceDeclaration` 为树中已存在的 Tool 内容提供稳定 URI。它必须指向一个无参数、只读的 Tool，
+因此 resource read 使用的仍是与本地只读 call 相同的已验证 Binding，也就不可能修改外部世界。Host
+列出的是 resource metadata，读取的是 URI。
+
+```go
+application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+	// Roots: ... including a read-only operations/runbook Tool with no input.
+	Resources: []contexture.ResourceDeclaration{{
+		Opens:       "operations/runbook",
+		URI:         "contexture://operations/runbook",
+		Description: "The current operations runbook.",
+		MIMEType:    "text/markdown",
+	}},
+})
+```
+
+位于 Host selected root surface 外的 Resource 既不会被列出，也不可读取。不要用 Resource 实现带参数的
+查询、写操作，或再实现一次 Tool；这类能力应当通过 Contexture gateway 使用已声明的 Tool。
+
+## 8. 通过 MCP Host 提供服务
 
 服务时不改变 declaration。server adapter 提供四个固定的 Contexture gateway Tool；业务 Tool
 不会注册为 MCP 顶层 Tool，而是被渐进披露在 gateway 后面。
@@ -167,7 +188,7 @@ stdio 是默认 transport。只有在明确配置 Host 与网络时才使用 `--
 Claude Code、Cursor 和 Codex 配置请使用 `server.Launch`。它从 server command 渲染 Host
 configuration，而不是复制 application 已声明的 context。
 
-## 8. 保持合同真实
+## 9. 保持合同真实
 
 提出改动前运行完整 repository gate：
 
