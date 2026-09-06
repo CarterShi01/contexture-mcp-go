@@ -77,6 +77,24 @@ type ApplicationDeclaration struct {
 	Name        string
 	Roots       []Factory
 	PromptRoots []Factory
+	Prompts     []PromptDeclaration
+	Resources   []ResourceDeclaration
+}
+
+// PromptDeclaration publishes person-controlled navigation to one node.
+type PromptDeclaration struct {
+	Name        string
+	Opens       string
+	Description string
+}
+
+// ResourceDeclaration publishes an argument-free, read-only Tool by URI.
+type ResourceDeclaration struct {
+	Name        string
+	Opens       string
+	URI         string
+	Description string
+	MIMEType    string
 }
 
 // Application holds a validated declaration without evaluating its factories.
@@ -84,6 +102,8 @@ type Application struct {
 	name        string
 	roots       []Factory
 	promptRoots []Factory
+	prompts     []PromptDeclaration
+	resources   []ResourceDeclaration
 }
 
 // DeclareApplication validates a composition root without constructing nodes.
@@ -99,7 +119,7 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 			return nil, errors.Join(ErrInvalidDeclaration, errors.New("application roots must be lazy factories"))
 		}
 	}
-	return &Application{name: declaration.Name, roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...)}, nil
+	return &Application{name: declaration.Name, roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...), prompts: append([]PromptDeclaration(nil), declaration.Prompts...), resources: append([]ResourceDeclaration(nil), declaration.Resources...)}, nil
 }
 
 // Name returns the declared application name.
@@ -110,3 +130,13 @@ func (application *Application) RootCount() int { return len(application.roots) 
 
 // PromptRootCount returns user-controlled factories without calling them.
 func (application *Application) PromptRootCount() int { return len(application.promptRoots) }
+
+// Prompts returns publication declarations in declaration order.
+func (application *Application) Prompts() []PromptDeclaration {
+	return append([]PromptDeclaration(nil), application.prompts...)
+}
+
+// Resources returns publication declarations in declaration order.
+func (application *Application) Resources() []ResourceDeclaration {
+	return append([]ResourceDeclaration(nil), application.resources...)
+}
