@@ -64,3 +64,34 @@ func TestAuthMiddlewareRejectsUnauthenticatedRequests(t *testing.T) {
 		t.Fatalf("authenticated status = %d", accepted.Code)
 	}
 }
+
+func TestAuthMiddlewarePreservesVerifiedPrincipalWithNativeNumericExpiry(t *testing.T) {
+	principal := contexture.NewPrincipal(contexture.PrincipalOptions{
+		Subject: "person", ClientID: "client", Issuer: "https://issuer.example",
+		Scopes: []string{"mcp"}, Claims: map[string]any{"exp": int64(2_000_000_000), "tenant": "example"},
+	})
+	identity := server.Auth{Verifier: tokenVerifier(func(_ context.Context, token string) (*contexture.Principal, error) {
+		if token == "valid" {
+			return principal, nil
+		}
+		return nil, nil
+	}), Issuer: "https://issuer.example", Resource: "https://mcp.example/mcp", RequiredScopes: []string{"mcp"}}
+	middleware, err := identity.Middleware()
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := middleware(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		got := server.PrincipalOf(request.Context())
+		if got == nil || got.Subject() != "person" || got.ClientID() != "client" || got.Issuer() != "https://issuer.example" || !got.HasScope("mcp") || got.Claims()["tenant"] != "example" {
+			t.Fatalf("principal round trip = %#v", got)
+		}
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	request := httptest.NewRequest(http.MethodPost, "http://server/mcp", nil)
+	request.Header.Set("Authorization", "Bearer valid")
+	recorded := httptest.NewRecorder()
+	handler.ServeHTTP(recorded, request)
+	if recorded.Code != http.StatusNoContent {
+		t.Fatalf("authenticated status = %d", recorded.Code)
+	}
+}
