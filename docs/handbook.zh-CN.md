@@ -123,7 +123,30 @@ Host-limit finding、隐藏 payload body。`--json` 适合 CI diff。`--read` �
 内容 Tool，因此仅在确实需要本地读取时使用。在 project 外执行时，`contexture inspect` 会刻意
 重放内置 demo，并把提示写到 stderr，以保证 JSON stdout 仍然有效。
 
-## 6. 通过 MCP Host 提供服务
+## 6. 提供由人控制的导航
+
+Prompt 面向在 Host 菜单中做选择的人，而不是模型的第二个 surface。一个声明的
+`PromptDeclaration` 打开一个固定 ref；每个已服务的 application 还会发布 `goto`，它所需的
+`ref` 参数让人无需先要求模型导航就能浏览已知路径。
+
+```go
+application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+	// Roots: ...,
+	Prompts: []contexture.PromptDeclaration{{
+		Name:         "open-change-window",
+		Opens:        "operations/change-window",
+		Description:  "Open the change-window procedure.",
+		ModelMayOpen: false,
+	}},
+})
+```
+
+具名 Prompt 与 `goto` 都使用同一条由人控制的打开路径。其文本会说明 ref、提供但不披露内容的
+ancestor signpost，最后展示正常 node payload。`ModelMayOpen: false` 会把已声明 capability 保留在
+模型导航之外；它不会对拥有 Host 的人隐藏该 capability。不要把 Prompt 当成 business Tool，也不要在
+description 中重复其 procedure。
+
+## 7. 通过 MCP Host 提供服务
 
 服务时不改变 declaration。server adapter 提供四个固定的 Contexture gateway Tool；业务 Tool
 不会注册为 MCP 顶层 Tool，而是被渐进披露在 gateway 后面。
@@ -140,7 +163,7 @@ stdio 是默认 transport。只有在明确配置 Host 与网络时才使用 `--
 Claude Code、Cursor 和 Codex 配置请使用 `server.Launch`。它从 server command 渲染 Host
 configuration，而不是复制 application 已声明的 context。
 
-## 7. 保持合同真实
+## 8. 保持合同真实
 
 提出改动前运行完整 repository gate：
 
