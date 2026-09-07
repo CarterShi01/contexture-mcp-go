@@ -92,6 +92,14 @@ func main() {
 `errors.Is` 判断，而不是使用 Python exception class。`contexture.Version` 是 binding package version，
 与 `contexture.SpecificationVersion` 不同。
 
+`contexture.PackageName` 是 framework metadata（`"contexture"`），绝不是 application 的 MCP identity：
+Host 仍发布所声明的 application name。`contexture.ReferenceSeparator` 是 reference segment 之间规范的
+`"/"`。四个面向 model 的固定名称是有类型的 `GatewayName` value：`DiscoverGatewayName`、
+`OpenGatewayName`、`InvokeReadOnlyGatewayName` 与 `InvokeGatewayName`。它们由 model 与 MCP primitive
+layer 共用同一个 foundation vocabulary。JSON-ready card 和 schema 使用 Go 原生的 `map[string]any`/`[]any`；
+Contexture 有意不为 Python 中仅用于 static typing 的 recursive JSON type 或未使用的 `RequestId` annotation
+暴露一个没有约束力的 `any` alias。
+
 `Principal` 是不可变的 request fact，而不是 authorization policy。它的 accessor 会为 scope 和 claim 返回
 defensive copy。普通 Go diagnostic formatting（`%v`、`%+v` 与 `%#v`）只包含 subject、client ID、issuer
 和排序后的 scope；claim 会被刻意脱敏，因为其中可能有 decoded token 或其他 sensitive value。

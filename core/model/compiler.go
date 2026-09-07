@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
 
 // Index is the immutable canonical address view of one fresh compilation.
@@ -109,7 +111,7 @@ func (state *compiler) build(factory Factory, parent *Role, path []string) (Node
 	if err := validateNode(declaration); err != nil {
 		return nil, err
 	}
-	ref := strings.Join(append(append([]string(nil), path...), declaration.nodeName()), "/")
+	ref := strings.Join(append(append([]string(nil), path...), declaration.nodeName()), foundation.ReferenceSeparator)
 	if _, exists := state.index.byRef[ref]; exists {
 		return nil, fmt.Errorf("%w: address %q", ErrDuplicate, ref)
 	}
@@ -142,7 +144,7 @@ func (state *compiler) build(factory Factory, parent *Role, path []string) (Node
 
 func (state *compiler) buildGroup(factories []Factory, parent *Role, ref string, expected Kind) error {
 	for _, factory := range factories {
-		child, err := state.build(factory, parent, strings.Split(ref, "/"))
+		child, err := state.build(factory, parent, strings.Split(ref, foundation.ReferenceSeparator))
 		if err != nil {
 			return err
 		}
@@ -154,8 +156,8 @@ func (state *compiler) buildGroup(factories []Factory, parent *Role, ref string,
 }
 
 func validateNode(node Node) error {
-	if strings.TrimSpace(node.nodeName()) == "" || strings.Contains(node.nodeName(), "/") {
-		return errors.Join(ErrInvalidDeclaration, errors.New("node name must be non-empty and cannot contain /"))
+	if strings.TrimSpace(node.nodeName()) == "" || strings.Contains(node.nodeName(), foundation.ReferenceSeparator) {
+		return errors.Join(ErrInvalidDeclaration, fmt.Errorf("node name must be non-empty and cannot contain %s", foundation.ReferenceSeparator))
 	}
 	if strings.TrimSpace(node.nodeDescription()) == "" {
 		return errors.Join(ErrInvalidDeclaration, errors.New("node description must not be empty"))
@@ -240,17 +242,17 @@ func (index *Index) Find(ref string) (Node, error) {
 // Index lookup therefore returns one canonical address spelling.
 func canonicalRef(ref string) string {
 	segments := make([]string, 0)
-	for _, segment := range strings.Split(ref, "/") {
+	for _, segment := range strings.Split(ref, foundation.ReferenceSeparator) {
 		if segment != "" {
 			segments = append(segments, segment)
 		}
 	}
-	return strings.Join(segments, "/")
+	return strings.Join(segments, foundation.ReferenceSeparator)
 }
 
 func (index *Index) lookupFailure(ref string) *NodeNotFoundError {
 	segments := []string{}
-	for _, segment := range strings.Split(ref, "/") {
+	for _, segment := range strings.Split(ref, foundation.ReferenceSeparator) {
 		if segment != "" {
 			segments = append(segments, segment)
 		}
@@ -482,10 +484,10 @@ func (index *Index) Signpost(ref string) ([]SignpostLevel, error) {
 	if _, err := index.Find(ref); err != nil {
 		return nil, err
 	}
-	parts := strings.Split(canonicalRef(ref), "/")
+	parts := strings.Split(canonicalRef(ref), foundation.ReferenceSeparator)
 	result := make([]SignpostLevel, 0, len(parts)-1)
 	for depth := 1; depth < len(parts); depth++ {
-		ancestor := strings.Join(parts[:depth], "/")
+		ancestor := strings.Join(parts[:depth], foundation.ReferenceSeparator)
 		node, err := index.Find(ancestor)
 		if err != nil {
 			return nil, err
@@ -519,9 +521,9 @@ func (index *Index) Crossings() []ReferenceCrossing {
 	}
 	result := []ReferenceCrossing{}
 	for _, source := range index.order {
-		root := source[:strings.Index(source+"/", "/")]
+		root := source[:strings.Index(source+foundation.ReferenceSeparator, foundation.ReferenceSeparator)]
 		for _, target := range index.byRef[source].nodeUses() {
-			targetRoot := target[:strings.Index(target+"/", "/")]
+			targetRoot := target[:strings.Index(target+foundation.ReferenceSeparator, foundation.ReferenceSeparator)]
 			if targetRoot != root {
 				result = append(result, ReferenceCrossing{SourceRef: source, TargetRef: target, TargetRoot: targetRoot})
 			}

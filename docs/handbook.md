@@ -100,6 +100,17 @@ error sentinels such as `ErrInvalidDeclaration`, `ErrDuplicate`, and
 classes. `contexture.Version` is the binding package version; it is distinct
 from `contexture.SpecificationVersion`.
 
+`contexture.PackageName` is framework metadata (`"contexture"`), never an
+application's MCP identity: the Host continues to publish the declared
+application name. `contexture.ReferenceSeparator` is the canonical `"/"`
+between reference segments. The four fixed model-facing names are typed
+`GatewayName` values: `DiscoverGatewayName`, `OpenGatewayName`,
+`InvokeReadOnlyGatewayName`, and `InvokeGatewayName`. They share one
+foundation vocabulary with the model and MCP primitive layer. JSON-ready cards
+and schemas use Go's native `map[string]any`/`[]any`; Contexture intentionally
+does not expose a vacuous `any` alias for Python's static-only recursive JSON
+types or unused `RequestId` annotation.
+
 `Principal` is an immutable request fact, not an authorization policy. Its
 accessors return defensive copies for scopes and claims. Normal Go diagnostic
 formatting (`%v`, `%+v`, and `%#v`) includes only subject, client ID, issuer,

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
 
 // Disclosure is a pure progressive navigation projection over one Index.
@@ -104,7 +106,7 @@ func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]an
 	if err := selection.RequireRef(ref); err != nil {
 		return nil, err
 	}
-	if _, prompt := view.promptRoots[strings.Split(ref, "/")[0]]; prompt {
+	if _, prompt := view.promptRoots[strings.Split(ref, foundation.ReferenceSeparator)[0]]; prompt {
 		return nil, fmt.Errorf("%s is opened by a person, not by an agent", ref)
 	}
 	node, err := view.resolve(ref, selection, view.index.ModelRoots())
@@ -215,7 +217,7 @@ func (view *Disclosure) resolve(ref string, selection RootSelection, roots []Nod
 	}
 	for _, root := range roots {
 		rootRef, _ := view.index.RefOf(root)
-		if selection.ContainsRef(rootRef) && strings.Split(ref, "/")[0] == rootRef {
+		if selection.ContainsRef(rootRef) && strings.Split(ref, foundation.ReferenceSeparator)[0] == rootRef {
 			return node, nil
 		}
 	}

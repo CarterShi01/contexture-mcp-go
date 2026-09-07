@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
 
 // NodeRef is one canonical node encountered during a selected graph walk.
@@ -186,7 +188,7 @@ func matchingRefs(refs []string, value string, limit int) ([]string, int) {
 		switch {
 		case wanted == "" || strings.HasPrefix(lowered, wanted):
 			rank = 0
-		case strings.HasPrefix(lowered[strings.LastIndex(lowered, "/")+1:], wanted):
+		case strings.HasPrefix(lowered[strings.LastIndex(lowered, foundation.ReferenceSeparator)+len(foundation.ReferenceSeparator):], wanted):
 			rank = 1
 		case matchingPart(lowered, wanted):
 			rank = 2
@@ -238,7 +240,7 @@ func (graph *SelectedGraph) filterRefs(refs []string) []string {
 }
 
 func matchingPart(ref, wanted string) bool {
-	for _, part := range strings.Split(ref, "/") {
+	for _, part := range strings.Split(ref, foundation.ReferenceSeparator) {
 		if strings.HasPrefix(part, wanted) {
 			return true
 		}

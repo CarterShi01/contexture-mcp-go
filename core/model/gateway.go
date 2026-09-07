@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CarterShi01/contexture-mcp-go/core/mcpinterface"
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
 
 // RefusedError is a completed, agent-facing recovery instruction.  It is used
@@ -33,13 +33,13 @@ func (err *RefusedError) Unwrap() error {
 }
 
 // GatewayName identifies one immutable Contexture system Tool.
-type GatewayName = mcpinterface.GatewayName
+type GatewayName = foundation.GatewayName
 
 const (
-	DiscoverGatewayName       = mcpinterface.DiscoverGatewayName
-	OpenGatewayName           = mcpinterface.OpenGatewayName
-	InvokeReadOnlyGatewayName = mcpinterface.InvokeReadOnlyGatewayName
-	InvokeGatewayName         = mcpinterface.InvokeGatewayName
+	DiscoverGatewayName       = foundation.DiscoverGatewayName
+	OpenGatewayName           = foundation.OpenGatewayName
+	InvokeReadOnlyGatewayName = foundation.InvokeReadOnlyGatewayName
+	InvokeGatewayName         = foundation.InvokeGatewayName
 )
 
 // GatewayTool is one fixed model-controlled Contexture system tool.
@@ -104,7 +104,7 @@ func (gateway *Gateway) Open(ref string, selection RootSelection) (map[string]an
 // InvokeReadOnly runs a read-only Tool through the fixed read-only door.
 func (gateway *Gateway) InvokeReadOnly(ctx context.Context, ref string, arguments json.RawMessage, selection RootSelection) (any, error) {
 	if gateway.runtime == nil {
-		return nil, &RefusedError{Message: "This Contexture server is disclosure-only. Call contexture_discover or contexture_open instead."}
+		return nil, &RefusedError{Message: fmt.Sprintf("This Contexture server is disclosure-only. Call %s or %s instead.", DiscoverGatewayName, OpenGatewayName)}
 	}
 	result, err := gateway.runtime.InvokeReadOnly(ctx, ref, arguments, selection)
 	return result, gateway.recover(err)
@@ -113,7 +113,7 @@ func (gateway *Gateway) InvokeReadOnly(ctx context.Context, ref string, argument
 // Invoke runs a writing Tool through the fixed writing door.
 func (gateway *Gateway) Invoke(ctx context.Context, ref string, arguments json.RawMessage, selection RootSelection) (any, error) {
 	if gateway.runtime == nil {
-		return nil, &RefusedError{Message: "This Contexture server is disclosure-only. Call contexture_discover or contexture_open instead."}
+		return nil, &RefusedError{Message: fmt.Sprintf("This Contexture server is disclosure-only. Call %s or %s instead.", DiscoverGatewayName, OpenGatewayName)}
 	}
 	result, err := gateway.runtime.Invoke(ctx, ref, arguments, selection)
 	return result, gateway.recover(err)
@@ -144,26 +144,26 @@ func (gateway *Gateway) recover(err error) error {
 // action. It intentionally does not see selection failures.
 func UnresolvedMessage(failure *NodeNotFoundError) string {
 	if failure == nil {
-		return "A reference could not be resolved. Call contexture_discover for the roles this server serves."
+		return fmt.Sprintf("A reference could not be resolved. Call %s for the roles this server serves.", DiscoverGatewayName)
 	}
 	known := strings.Join(failure.Known, ", ")
 	switch failure.Reason {
 	case EmptyRef:
-		return "A reference must name at least a root role. Call contexture_discover for the roles this server serves."
+		return fmt.Sprintf("A reference must name at least a root role. Call %s for the roles this server serves.", DiscoverGatewayName)
 	case NoSuchRoot:
-		return fmt.Sprintf("No root role named '%s'. This server serves: %s. Call contexture_discover for their cards, then open one to reach what is beneath it.", failure.Scope, known)
+		return fmt.Sprintf("No root role named '%s'. This server serves: %s. Call %s for their cards, then open one to reach what is beneath it.", failure.Scope, known, DiscoverGatewayName)
 	case NotAContainer:
-		return fmt.Sprintf("Reference '%s' continues past '%s', which is a %s and holds nothing. Open '%s' itself with contexture_open, or go back to the card the ref came from.", failure.Ref, failure.Scope, failure.Kind, failure.Scope)
+		return fmt.Sprintf("Reference '%s' continues past '%s', which is a %s and holds nothing. Open '%s' itself with %s, or go back to the card the ref came from.", failure.Ref, failure.Scope, failure.Kind, failure.Scope, OpenGatewayName)
 	case NoSuchMember:
 		holds := "It holds nothing."
 		if known != "" {
 			holds = "It holds: " + known + "."
 		}
-		return fmt.Sprintf("Role '%s' holds no member named '%s'. %s Call contexture_open on '%s' to see each member with the ref that opens it.", failure.Scope, failure.Segment, holds, failure.Scope)
+		return fmt.Sprintf("Role '%s' holds no member named '%s'. %s Call %s on '%s' to see each member with the ref that opens it.", failure.Scope, failure.Segment, holds, OpenGatewayName, failure.Scope)
 	case WrongKind:
-		recovery := "Open it with contexture_open."
+		recovery := fmt.Sprintf("Open it with %s.", OpenGatewayName)
 		if failure.Kind == string(ToolKind) {
-			recovery = "Run it with contexture_invoke_read_only or contexture_invoke, whichever its card says."
+			recovery = fmt.Sprintf("Run it with %s or %s, whichever its card says.", InvokeReadOnlyGatewayName, InvokeGatewayName)
 		}
 		found, wanted := failure.Kind, failure.Wanted
 		if found == "" {
@@ -174,15 +174,15 @@ func UnresolvedMessage(failure *NodeNotFoundError) string {
 		}
 		return fmt.Sprintf("%s names a %s, not a %s. %s", failure.Ref, found, wanted, recovery)
 	default:
-		return fmt.Sprintf("%q could not be resolved. Call contexture_discover for the roles this server serves.", failure.Ref)
+		return fmt.Sprintf("%q could not be resolved. Call %s for the roles this server serves.", failure.Ref, DiscoverGatewayName)
 	}
 }
 
 // WrongDoorMessage identifies the one safe fixed invocation entry point.
 func WrongDoorMessage(ref string, isReadOnly bool) string {
-	correct, stated := "contexture_invoke", "not read-only"
+	correct, stated := string(InvokeGatewayName), "not read-only"
 	if isReadOnly {
-		correct, stated = "contexture_invoke_read_only", "read-only"
+		correct, stated = string(InvokeReadOnlyGatewayName), "read-only"
 	}
 	return fmt.Sprintf("%s is %s, so it must be run through %s.", ref, stated, correct)
 }

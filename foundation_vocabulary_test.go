@@ -1,0 +1,74 @@
+package contexture_test
+
+import (
+	"errors"
+	"testing"
+
+	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
+	"github.com/CarterShi01/contexture-mcp-go/core/mcpinterface"
+)
+
+func TestFoundationVocabularyHasOneCanonicalSpelling(t *testing.T) {
+	t.Parallel()
+
+	if contexture.PackageName != "contexture" || contexture.Version != "0.12.0rc1" {
+		t.Fatalf("root package vocabulary = (%q, %q), want Contexture 0.12 release facts", contexture.PackageName, contexture.Version)
+	}
+	if contexture.ReferenceSeparator != foundation.ReferenceSeparator {
+		t.Fatalf("ReferenceSeparator = %q, want foundation value %q", contexture.ReferenceSeparator, foundation.ReferenceSeparator)
+	}
+	if foundation.ReferenceSeparator != "/" {
+		t.Fatalf("foundation ReferenceSeparator = %q, want slash", foundation.ReferenceSeparator)
+	}
+	want := []foundation.GatewayName{
+		foundation.DiscoverGatewayName,
+		foundation.OpenGatewayName,
+		foundation.InvokeReadOnlyGatewayName,
+		foundation.InvokeGatewayName,
+	}
+	got := []contexture.GatewayName{
+		contexture.DiscoverGatewayName,
+		contexture.OpenGatewayName,
+		contexture.InvokeReadOnlyGatewayName,
+		contexture.InvokeGatewayName,
+	}
+	for position := range want {
+		if got[position] != want[position] {
+			t.Fatalf("root gateway name %d = %q, want foundation %q", position, got[position], want[position])
+		}
+	}
+	if mcpinterface.OpenGatewayName != foundation.OpenGatewayName {
+		t.Fatalf("MCP primitive spelling = %q, want foundation %q", mcpinterface.OpenGatewayName, foundation.OpenGatewayName)
+	}
+}
+
+func TestReferenceSeparatorDrivesCoreReferenceParsing(t *testing.T) {
+	t.Parallel()
+
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "separator",
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{
+				Name: "operations", Description: "Operate.", Instructions: "Inspect.",
+				Skills: []contexture.Factory{func() contexture.Node {
+					return &contexture.Skill{Name: "diagnose", Description: "Diagnose.", Instructions: "Read."}
+				}},
+			}
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.CompileDisclosure(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := "operations" + contexture.ReferenceSeparator + "diagnose"
+	if node, err := index.Find(contexture.ReferenceSeparator + ref + contexture.ReferenceSeparator); err != nil || node.NodeName() != "diagnose" {
+		t.Fatalf("Find normalized public separator ref = %#v, %v", node, err)
+	}
+	if _, err := contexture.OnlyRoots("operations" + contexture.ReferenceSeparator + "diagnose"); !errors.Is(err, contexture.ErrInvalidSelection) {
+		t.Fatalf("OnlyRoots accepted descendant spelled with ReferenceSeparator: %v", err)
+	}
+}

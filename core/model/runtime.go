@@ -247,7 +247,7 @@ func (*WrongDoorError) Unwrap() error     { return ErrWrongDoor }
 type runtimeWrongKindError struct{ failure *NodeNotFoundError }
 
 func (err runtimeWrongKindError) Error() string {
-	return fmt.Sprintf("%s names a %s, not a tool. Open it with contexture_open.", err.failure.Ref, err.failure.Kind)
+	return fmt.Sprintf("%s names a %s, not a tool. Open it with %s.", err.failure.Ref, err.failure.Kind, OpenGatewayName)
 }
 
 func (err runtimeWrongKindError) Unwrap() error { return err.failure }

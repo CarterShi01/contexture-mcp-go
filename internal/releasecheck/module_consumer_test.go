@@ -41,6 +41,8 @@ var _ = contexture.NewToolWithSchema[struct{}, bool]
 var _ = contexture.Contexture
 var _ = contexture.DeclareApplication
 var _ = contexture.Version
+var _ = contexture.PackageName
+var _ = contexture.ReferenceSeparator
 var _ = contexture.ErrInvalidDeclaration
 var _ = contexture.ErrNodeNotFound
 var _ = contexture.ErrRootOutsideSelection
@@ -71,6 +73,12 @@ var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
 
 func main() {
+    if contexture.PackageName != "contexture" || contexture.Version != "0.12.0rc1" || contexture.ReferenceSeparator != "/" {
+        panic("public Contexture vocabulary has an unexpected spelling")
+    }
+    if contexture.DiscoverGatewayName != "contexture_discover" || contexture.OpenGatewayName != "contexture_open" || contexture.InvokeReadOnlyGatewayName != "contexture_invoke_read_only" || contexture.InvokeGatewayName != "contexture_invoke" {
+        panic("public fixed gateway vocabulary has an unexpected spelling")
+    }
     principal := contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "consumer", Claims: map[string]any{"secret": "do-not-log"}})
     copiedPrincipal := *principal
     for _, receiver := range []any{principal, copiedPrincipal} {
@@ -113,14 +121,15 @@ func main() {
     graphIndex, _ := contexture.Compile(graphApplication)
     skillDisclosure, disclosureErr := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
     if disclosureErr != nil { panic(disclosureErr) }
-    openedSkill, skillOpenErr := skillDisclosure.Open("graph/check", contexture.AllRoots())
+    checkRef := "graph" + contexture.ReferenceSeparator + "check"
+    openedSkill, skillOpenErr := skillDisclosure.Open(checkRef, contexture.AllRoots())
     if skillOpenErr != nil || openedSkill["instructions"] != "Read graph facts first." {
         panic("public Skill did not compile and disclose its active procedure")
     }
     openedRole, roleOpenErr := skillDisclosure.Open("graph", contexture.AllRoots())
     if roleOpenErr != nil { panic(roleOpenErr) }
     skillCards, cardsOK := openedRole["skills"].([]map[string]any)
-    if !cardsOK || len(skillCards) != 1 || skillCards[0]["ref"] != "graph/check" || skillCards[0]["instructions"] != nil {
+    if !cardsOK || len(skillCards) != 1 || skillCards[0]["ref"] != checkRef || skillCards[0]["instructions"] != nil {
         panic("public Role did not keep Skill as a route card")
     }
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)

@@ -66,6 +66,8 @@ func TestDeclarationFacadeInventory(t *testing.T) {
 		"ModelMayOpen":                     contexture.ModelMayOpen,
 		"ModelReservedForPerson":           contexture.ModelReservedForPerson,
 		"Version":                          contexture.Version,
+		"PackageName":                      contexture.PackageName,
+		"ReferenceSeparator":               contexture.ReferenceSeparator,
 		"NewMemoryTelemetry":               contexture.NewMemoryTelemetry,
 		"NewDisclosureWithTelemetry":       contexture.NewDisclosureWithTelemetry,
 		"ReportTelemetry":                  contexture.ReportTelemetry,

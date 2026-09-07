@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
 
 // RootSelectionError reports malformed, empty, unknown, or contradictory root
@@ -27,7 +29,7 @@ func (err *RootOutsideSelectionError) Error() string {
 	if err == nil {
 		return ErrRootOutsideSelection.Error()
 	}
-	return fmt.Sprintf("reference %q is outside this request's root surface; call contexture_discover and use a ref from its result", err.Ref)
+	return fmt.Sprintf("reference %q is outside this request's root surface; call %s and use a ref from its result", err.Ref, DiscoverGatewayName)
 }
 
 func (*RootOutsideSelectionError) Unwrap() error { return ErrRootOutsideSelection }
@@ -51,7 +53,7 @@ func OnlyRoots(names ...string) (RootSelection, error) {
 		if name == "" {
 			return RootSelection{}, selectionError("a root selection must name at least one root")
 		}
-		if strings.Contains(name, "/") {
+		if strings.Contains(name, foundation.ReferenceSeparator) {
 			return RootSelection{}, selectionError(fmt.Sprintf("root selection accepts root refs only, not descendant refs: %q", name))
 		}
 		selection.names[name] = struct{}{}
@@ -115,7 +117,7 @@ func (selection RootSelection) ContainsRef(ref string) bool {
 	if selection.names == nil {
 		return true
 	}
-	for _, segment := range strings.Split(ref, "/") {
+	for _, segment := range strings.Split(ref, foundation.ReferenceSeparator) {
 		if segment != "" {
 			_, ok := selection.names[segment]
 			return ok

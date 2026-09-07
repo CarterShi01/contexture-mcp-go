@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
 
 // RoleFactory constructs one root Role when a ControllerManager registers it.
@@ -213,7 +215,7 @@ func captureGroup(factories []Factory, expected Kind, parent string, seen map[No
 		if member.nodeKind() != expected {
 			return nil, fmt.Errorf("%w: role member %q is a %s in the %s group", ErrInvalidDeclaration, member.nodeName(), member.nodeKind(), expected)
 		}
-		captured, err := captureRegisteredNode(member, parent+"/"+member.nodeName(), seen, active, addresses)
+		captured, err := captureRegisteredNode(member, parent+foundation.ReferenceSeparator+member.nodeName(), seen, active, addresses)
 		if err != nil {
 			return nil, err
 		}

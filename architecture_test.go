@@ -91,6 +91,33 @@ func TestMCPInterfaceDoesNotImportModelOrHostLayers(t *testing.T) {
 	}
 }
 
+// Gateway names are shared foundation vocabulary. The model must not climb
+// into the MCP primitive package merely to learn their string spellings.
+func TestGatewayModelUsesFoundationVocabulary(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := parser.ParseFile(token.NewFileSet(), "core/model/gateway.go", nil, parser.ImportsOnly)
+	if err != nil {
+		t.Fatalf("parse gateway model: %v", err)
+	}
+	foundFoundation := false
+	for _, imported := range parsed.Imports {
+		importPath, unquoteErr := strconv.Unquote(imported.Path.Value)
+		if unquoteErr != nil {
+			t.Fatalf("unquote gateway import: %v", unquoteErr)
+		}
+		if importPath == "github.com/CarterShi01/contexture-mcp-go/core/mcpinterface" {
+			t.Fatalf("gateway model imports MCP primitive vocabulary instead of foundation")
+		}
+		if importPath == "github.com/CarterShi01/contexture-mcp-go/core/foundation" {
+			foundFoundation = true
+		}
+	}
+	if !foundFoundation {
+		t.Fatal("gateway model does not import shared foundation vocabulary")
+	}
+}
+
 func TestRootFacadeDoesNotImportHostLayers(t *testing.T) {
 	t.Parallel()
 

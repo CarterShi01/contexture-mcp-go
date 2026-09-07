@@ -3,9 +3,17 @@ package contexture
 import "github.com/CarterShi01/contexture-mcp-go/core/foundation"
 
 const (
+	// PackageName is Contexture framework metadata, not an application or MCP
+	// server identity.
+	PackageName = foundation.PackageName
+
 	// Version is the Go binding package version. It is independent from the
 	// specification version because one binding release can target one contract.
-	Version = "0.12.0rc1"
+	Version = foundation.PackageVersion
+
+	// ReferenceSeparator spells the boundary between Contexture reference
+	// segments. It is shared by declaration, lookup, and navigation APIs.
+	ReferenceSeparator = foundation.ReferenceSeparator
 
 	// SpecificationVersion is the Contexture contract targeted by this binding.
 	SpecificationVersion = foundation.SpecificationVersion
