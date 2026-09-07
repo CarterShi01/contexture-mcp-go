@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -137,6 +138,7 @@ func main() {
         panic("public WrongDoorError did not retain a direct Runtime error's facts")
     }
 }
+
 `
 	if err := os.WriteFile(filepath.Join(temporaryRoot, "go.mod"), []byte(goMod), 0o600); err != nil {
 		t.Fatal(err)
@@ -151,6 +153,71 @@ func main() {
 		output, err := command.CombinedOutput()
 		if err != nil {
 			t.Fatalf("external module consumer %q failed: %v\n%s", arguments, err, output)
+		}
+	}
+}
+
+// TestExternalModuleCanDeclareAnInertApplication proves the small authoring
+// import works independently of every Host adapter. It deliberately does not
+// import server or web, and the factory's counter makes declaration-time
+// evaluation observable to a real downstream module.
+func TestExternalModuleCanDeclareAnInertApplication(t *testing.T) {
+	t.Parallel()
+
+	repositoryRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	temporaryRoot := t.TempDir()
+	goMod := "module contexture-inert-consumer\n\ngo 1.25.0\n\nrequire github.com/CarterShi01/contexture-mcp-go v0.0.0\n\nreplace github.com/CarterShi01/contexture-mcp-go => " + filepath.ToSlash(repositoryRoot) + "\n"
+	main := `package main
+
+import (
+    "fmt"
+    contexture "github.com/CarterShi01/contexture-mcp-go"
+)
+
+func main() {
+    built := 0
+    application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+        Name: " inert ",
+        Roots: []contexture.Factory{func() contexture.Node {
+            built++
+            return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect."}
+        }},
+    })
+    if err != nil || built != 0 || application.Name() != "inert" || application.RootCount() != 1 {
+        panic(fmt.Sprintf("inert declaration = application=%#v built=%d err=%v", application, built, err))
+    }
+}
+`
+	if err := os.WriteFile(filepath.Join(temporaryRoot, "go.mod"), []byte(goMod), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(temporaryRoot, "main.go"), []byte(main), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, arguments := range [][]string{{"mod", "tidy"}, {"run", "."}} {
+		command := exec.Command("go", arguments...)
+		command.Dir = temporaryRoot
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("inert external consumer %q failed: %v\n%s", arguments, err, output)
+		}
+	}
+	command := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}", ".")
+	command.Dir = temporaryRoot
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("list inert external consumer dependencies: %v\n%s", err, output)
+	}
+	for _, dependency := range strings.Fields(string(output)) {
+		if dependency == "net/http" ||
+			strings.HasPrefix(dependency, "github.com/CarterShi01/contexture-mcp-go/server") ||
+			strings.HasPrefix(dependency, "github.com/CarterShi01/contexture-mcp-go/web") ||
+			strings.HasPrefix(dependency, "github.com/modelcontextprotocol/go-sdk") {
+			t.Fatalf("inert external consumer transitively imports Host dependency %q", dependency)
 		}
 	}
 }

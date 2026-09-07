@@ -4,6 +4,7 @@ import (
 	"errors"
 	"go/parser"
 	"go/token"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -174,6 +175,31 @@ func TestDeclarationFacadeDoesNotImportHostLayers(t *testing.T) {
 		}
 		if strings.Contains(path, "/server") || strings.Contains(path, "/web") || strings.Contains(path, "modelcontextprotocol") || path == "net/http" {
 			t.Fatalf("declaration facade imports Host layer %q", path)
+		}
+	}
+}
+
+// TestDeclarationFacadeTransitiveClosureDoesNotImportHostLayers is stronger
+// than the source-import check above: it catches a future core dependency that
+// would silently pull an adapter, net/http, or the official MCP SDK into a
+// declaration-only program.
+func TestDeclarationFacadeTransitiveClosureDoesNotImportHostLayers(t *testing.T) {
+	command := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}", ".")
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("list declaration facade dependencies: %v\n%s", err, output)
+	}
+	assertNoFacadeHostDependencies(t, string(output))
+}
+
+func assertNoFacadeHostDependencies(t *testing.T, output string) {
+	t.Helper()
+	for _, dependency := range strings.Fields(output) {
+		if dependency == "net/http" ||
+			strings.HasPrefix(dependency, "github.com/CarterShi01/contexture-mcp-go/server") ||
+			strings.HasPrefix(dependency, "github.com/CarterShi01/contexture-mcp-go/web") ||
+			strings.HasPrefix(dependency, "github.com/modelcontextprotocol/go-sdk") {
+			t.Fatalf("declaration facade transitively imports Host dependency %q", dependency)
 		}
 	}
 }
