@@ -115,9 +115,12 @@ func main() {
     if strictErr != nil { panic(strictErr) }
     write, writeErr := contexture.NewTool("write", "Change one value.", false, func(_ context.Context, _ graphInput) (string, error) { return "changed", nil })
     if writeErr != nil { panic(writeErr) }
-    graphApplication, _ := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-consumer", Roots: []contexture.Factory{func() contexture.Node {
+    graphApplication, graphApplicationErr := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-consumer", Prompts: []contexture.Prompt{{Name: "check-graph", Opens: "graph/check", Description: "Open graph checks.", ModelOpen: contexture.ModelReservedForPerson}}, Resources: []contexture.Resource{{Name: "strict-schema", Opens: "graph/strict", URI: "contexture://graph/strict", Description: "Read strict schema."}}, Roots: []contexture.Factory{func() contexture.Node {
         return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Skills: []contexture.Factory{func() contexture.Node { return &contexture.Skill{Name: "check", Description: "Check.", Instructions: "Read graph facts first."} }}, Tools: []contexture.Factory{func() contexture.Node { return tool }, func() contexture.Node { return strict }, func() contexture.Node { return write }}}
     }}})
+    if graphApplicationErr != nil || len(graphApplication.Prompts()) != 1 || graphApplication.Prompts()[0].AllowsModelOpen() || len(graphApplication.Resources()) != 1 || graphApplication.Resources()[0].URI != "contexture://graph/strict" {
+        panic("public Prompt/Resource declarations did not retain foundation facts")
+    }
     graphIndex, _ := contexture.Compile(graphApplication)
     skillDisclosure, disclosureErr := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
     if disclosureErr != nil { panic(disclosureErr) }

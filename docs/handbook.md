@@ -111,6 +111,11 @@ and schemas use Go's native `map[string]any`/`[]any`; Contexture intentionally
 does not expose a vacuous `any` alias for Python's static-only recursive JSON
 types or unused `RequestId` annotation.
 
+`Prompt`, `Resource`, and `ModelOpenPolicy` are likewise shared
+foundation-owned declaration data. The retained `mcpinterface` spellings are
+type aliases for compatibility, so an application model does not need to
+depend on an MCP primitive package merely to validate publications.
+
 `Principal` is an immutable request fact, not an authorization policy. Its
 accessors return defensive copies for scopes and claims. Normal Go diagnostic
 formatting (`%v`, `%+v`, and `%#v`) includes only subject, client ID, issuer,

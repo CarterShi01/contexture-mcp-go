@@ -67,6 +67,36 @@ func TestCorePackagesDoNotImportHostSDKs(t *testing.T) {
 	}
 }
 
+// Foundation is the shared floor for model and MCP primitive declarations. It
+// cannot import either sibling (or a Host layer) without recreating the
+// dependency cycle this vocabulary slice removes.
+func TestFoundationDoesNotImportHigherLayers(t *testing.T) {
+	t.Parallel()
+
+	files, err := filepath.Glob("core/foundation/*.go")
+	if err != nil {
+		t.Fatalf("glob foundation files: %v", err)
+	}
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		parsed, parseErr := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
+		if parseErr != nil {
+			t.Fatalf("parse %s: %v", file, parseErr)
+		}
+		for _, imported := range parsed.Imports {
+			importPath, unquoteErr := strconv.Unquote(imported.Path.Value)
+			if unquoteErr != nil {
+				t.Fatalf("unquote import in %s: %v", file, unquoteErr)
+			}
+			if strings.Contains(importPath, "/core/model") || strings.Contains(importPath, "/core/mcpinterface") || strings.Contains(importPath, "/server") || strings.Contains(importPath, "/web") {
+				t.Fatalf("foundation imports a higher layer in %s: %s", file, importPath)
+			}
+		}
+	}
+}
+
 func TestMCPInterfaceDoesNotImportModelOrHostLayers(t *testing.T) {
 	t.Parallel()
 
@@ -91,30 +121,33 @@ func TestMCPInterfaceDoesNotImportModelOrHostLayers(t *testing.T) {
 	}
 }
 
-// Gateway names are shared foundation vocabulary. The model must not climb
-// into the MCP primitive package merely to learn their string spellings.
-func TestGatewayModelUsesFoundationVocabulary(t *testing.T) {
+// Model owns declarations and reference semantics, while mcpinterface owns
+// only its SDK-free primitive projection. Shared declaration vocabulary must
+// live below both layers, so no model file may import mcpinterface.
+func TestModelDoesNotImportMCPInterface(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := parser.ParseFile(token.NewFileSet(), "core/model/gateway.go", nil, parser.ImportsOnly)
+	files, err := filepath.Glob("core/model/*.go")
 	if err != nil {
-		t.Fatalf("parse gateway model: %v", err)
+		t.Fatalf("glob model files: %v", err)
 	}
-	foundFoundation := false
-	for _, imported := range parsed.Imports {
-		importPath, unquoteErr := strconv.Unquote(imported.Path.Value)
-		if unquoteErr != nil {
-			t.Fatalf("unquote gateway import: %v", unquoteErr)
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
 		}
-		if importPath == "github.com/CarterShi01/contexture-mcp-go/core/mcpinterface" {
-			t.Fatalf("gateway model imports MCP primitive vocabulary instead of foundation")
+		parsed, parseErr := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
+		if parseErr != nil {
+			t.Fatalf("parse %s: %v", file, parseErr)
 		}
-		if importPath == "github.com/CarterShi01/contexture-mcp-go/core/foundation" {
-			foundFoundation = true
+		for _, imported := range parsed.Imports {
+			importPath, unquoteErr := strconv.Unquote(imported.Path.Value)
+			if unquoteErr != nil {
+				t.Fatalf("unquote import in %s: %v", file, unquoteErr)
+			}
+			if importPath == "github.com/CarterShi01/contexture-mcp-go/core/mcpinterface" {
+				t.Fatalf("model imports MCP primitive vocabulary in %s", file)
+			}
 		}
-	}
-	if !foundFoundation {
-		t.Fatal("gateway model does not import shared foundation vocabulary")
 	}
 }
 

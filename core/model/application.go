@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/CarterShi01/contexture-mcp-go/core/mcpinterface"
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
 
 // ApplicationDeclaration is the lazy composition-root input.
@@ -19,18 +19,18 @@ type ApplicationDeclaration struct {
 }
 
 // PromptDeclaration is the SDK-free person-controlled MCP Prompt declaration.
-type PromptDeclaration = mcpinterface.PromptDeclaration
+type PromptDeclaration = foundation.PromptDeclaration
 
 // ModelOpenPolicy controls whether a prompt target also admits model navigation.
-type ModelOpenPolicy = mcpinterface.ModelOpenPolicy
+type ModelOpenPolicy = foundation.ModelOpenPolicy
 
 const (
-	ModelMayOpen           = mcpinterface.ModelMayOpen
-	ModelReservedForPerson = mcpinterface.ModelReservedForPerson
+	ModelMayOpen           = foundation.ModelMayOpen
+	ModelReservedForPerson = foundation.ModelReservedForPerson
 )
 
 // ResourceDeclaration is the SDK-free host-controlled MCP Resource declaration.
-type ResourceDeclaration = mcpinterface.ResourceDeclaration
+type ResourceDeclaration = foundation.ResourceDeclaration
 
 // Application holds a validated declaration without evaluating its factories.
 type Application struct {
@@ -63,7 +63,7 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 		if prompt.Name != "" && strings.TrimSpace(prompt.Name) == "" {
 			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Prompt name must be non-empty when supplied"))
 		}
-		if prompt.ModelOpen != mcpinterface.ModelMayOpen && prompt.ModelOpen != mcpinterface.ModelReservedForPerson {
+		if prompt.ModelOpen != foundation.ModelMayOpen && prompt.ModelOpen != foundation.ModelReservedForPerson {
 			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Prompt model open policy is not supported"))
 		}
 	}

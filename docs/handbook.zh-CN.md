@@ -100,6 +100,10 @@ layer 共用同一个 foundation vocabulary。JSON-ready card 和 schema 使用 
 Contexture 有意不为 Python 中仅用于 static typing 的 recursive JSON type 或未使用的 `RequestId` annotation
 暴露一个没有约束力的 `any` alias。
 
+`Prompt`、`Resource` 与 `ModelOpenPolicy` 同样是由 foundation 拥有的 shared declaration data。保留的
+`mcpinterface` 写法是兼容性 type alias，因此 application model 无需为了验证 publication 而依赖 MCP
+primitive package。
+
 `Principal` 是不可变的 request fact，而不是 authorization policy。它的 accessor 会为 scope 和 claim 返回
 defensive copy。普通 Go diagnostic formatting（`%v`、`%+v` 与 `%#v`）只包含 subject、client ID、issuer
 和排序后的 scope；claim 会被刻意脱敏，因为其中可能有 decoded token 或其他 sensitive value。

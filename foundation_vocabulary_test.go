@@ -41,6 +41,14 @@ func TestFoundationVocabularyHasOneCanonicalSpelling(t *testing.T) {
 	if mcpinterface.OpenGatewayName != foundation.OpenGatewayName {
 		t.Fatalf("MCP primitive spelling = %q, want foundation %q", mcpinterface.OpenGatewayName, foundation.OpenGatewayName)
 	}
+	prompt := mcpinterface.PromptDeclaration{Opens: "operations", Description: "Operate.", ModelOpen: mcpinterface.ModelReservedForPerson}
+	if prompt.AllowsModelOpen() || foundation.PromptDeclaration(prompt).ModelOpen != foundation.ModelReservedForPerson {
+		t.Fatalf("MCP prompt alias lost the shared model-open policy: %#v", prompt)
+	}
+	resource := mcpinterface.ResourceDeclaration{Opens: "operations/status", URI: "contexture://operations/status", Description: "Status."}
+	if foundation.ResourceDeclaration(resource).URI != "contexture://operations/status" {
+		t.Fatalf("MCP resource alias lost shared declaration facts: %#v", resource)
+	}
 }
 
 func TestReferenceSeparatorDrivesCoreReferenceParsing(t *testing.T) {
