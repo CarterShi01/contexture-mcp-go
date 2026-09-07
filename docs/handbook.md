@@ -134,6 +134,13 @@ This matches the binding's strict `encoding/json` decoder, preserves that
 unknown-field policy in the disclosed explicit schema, and rejects drift with
 `ErrInvalidDeclaration` before an Application is compiled.
 
+The reference-derived `NewTool` card intentionally omits
+`additionalProperties`, so it and its decoder accept unknown arguments, just
+as the pinned Python/MCP binding does. Its required and typed fields are still
+validated. Choose `NewToolWithSchema` when the contract needs strict unknown
+field rejection; the explicit `additionalProperties: false` is then both
+published and enforced recursively for nested input structs.
+
 JSON tag options are scanned rather than positionally interpreted, so both
 `json:"value,omitempty,string"` and `json:"value,string,omitempty"` make
 `value` optional. Property-level JSON Schema constraints may narrow accepted

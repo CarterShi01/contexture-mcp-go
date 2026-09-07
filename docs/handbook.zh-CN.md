@@ -117,6 +117,11 @@ required name 必须与未使用 `omitempty` 或 `omitzero` 的 field 精确一�
 `additionalProperties: false`。这与 binding 的严格 `encoding/json` decoder 一致，在披露的 explicit schema
 中保留该 unknown-field policy，并会在 Application compile 前以 `ErrInvalidDeclaration` 拒绝 drift。
 
+reference-derived 的 `NewTool` card 有意省略 `additionalProperties`，因此它和 decoder 都会接受 unknown
+argument，这与 pinned Python/MCP binding 一致；required 与 typed field 仍会被校验。若 contract 需要严格拒绝
+unknown field，应选择 `NewToolWithSchema`；此时 explicit 的 `additionalProperties: false` 会被发布，并递归地
+对 nested input struct 生效。
+
 JSON tag option 会被完整扫描，而不是按位置解释，因此 `json:"value,omitempty,string"` 与
 `json:"value,string,omitempty"` 都会让 `value` 成为 optional。property-level JSON Schema constraint 可以
 收窄可接受的 value，但不能重塑 top-level object 或削弱 unknown-field policy。调用失败仍是

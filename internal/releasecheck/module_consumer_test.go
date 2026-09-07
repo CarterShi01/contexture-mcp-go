@@ -26,6 +26,7 @@ func TestExternalModuleConsumerCompilesPublicEntrypoints(t *testing.T) {
 import (
     "context"
     "encoding/json"
+    "errors"
     contexture "github.com/CarterShi01/contexture-mcp-go"
     "github.com/CarterShi01/contexture-mcp-go/inspection"
     "github.com/CarterShi01/contexture-mcp-go/server"
@@ -79,20 +80,26 @@ func main() {
     _ = index.RolesByLevel()
     _, _ = index.MatchingRefs("operations", 10)
 
-    tool, _ := contexture.NewToolWithSchema("graph", "Read the request graph.", true, map[string]any{"type": "object", "properties": map[string]any{}, "required": []any{}, "additionalProperties": false}, func(ctx context.Context, _ struct{}) (bool, error) {
+    type graphInput struct { Name string ` + "`json:\"name\"`" + ` }
+    tool, toolErr := contexture.NewTool("graph", "Read the request graph.", true, func(ctx context.Context, _ graphInput) (bool, error) {
         return contexture.CurrentGraph(ctx) != nil, nil
     })
+    if toolErr != nil { panic(toolErr) }
     graphApplication, _ := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-consumer", Roots: []contexture.Factory{func() contexture.Node {
         return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return tool }}}
     }}})
     graphIndex, _ := contexture.Compile(graphApplication)
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
-    graphValue, graphErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{}"), contexture.AllRoots())
+    graphValue, graphErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{\"name\":\"Ada\"}"), contexture.AllRoots())
     if graphErr != nil {
         panic(graphErr)
     }
     if present, ok := graphValue.(bool); !ok || !present {
         panic("CurrentGraph was not available inside the external consumer Tool handler")
+    }
+    _, rejectedErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{}"), contexture.AllRoots())
+    if !errors.Is(rejectedErr, contexture.ErrInvalidInput) {
+        panic("public tagged Tool did not reject a missing required input field")
     }
 }
 `

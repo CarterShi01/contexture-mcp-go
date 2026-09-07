@@ -41,6 +41,14 @@ type strictInput struct {
 	Filter string `json:"filter,omitempty"`
 }
 
+type scalarInput struct {
+	Count int `json:"count"`
+}
+
+type nestedStrictInput struct {
+	Nested nestedInput `json:"nested"`
+}
+
 func strictInputSchema() map[string]any {
 	return map[string]any{
 		"type": "object", "additionalProperties": false,
@@ -66,24 +74,57 @@ func TestToolBindingSharesSchemaValidationAndHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	schema := binding.Schema()
-	if schema["type"] != "object" {
+	if schema["type"] != "object" || schema["additionalProperties"] != nil {
 		t.Fatalf("schema type = %#v", schema["type"])
 	}
 	if _, ok := schema["properties"].(map[string]any)["service"]; !ok {
 		t.Fatalf("schema omits service: %#v", schema)
 	}
-	if _, err := binding.Call(context.Background(), json.RawMessage(`{"service":"api","extra":true}`)); !errors.Is(err, contexture.ErrInvalidInput) {
-		t.Fatalf("Call error = %v, want invalid input", err)
+	result, err := binding.Call(context.Background(), json.RawMessage(`{"service":"api","extra":true}`))
+	if err != nil || result.(toolInput).Service != "api" {
+		t.Fatalf("unknown argument should follow the derived schema: %#v, %v", result, err)
 	}
-	if calls != 0 {
-		t.Fatalf("handler calls = %d, want 0", calls)
+	if calls != 1 {
+		t.Fatalf("handler calls = %d, want 1", calls)
 	}
-	result, err := binding.Call(context.Background(), json.RawMessage(`{"service":"api"}`))
+	if _, err := binding.Call(context.Background(), json.RawMessage(`{}`)); !errors.Is(err, contexture.ErrInvalidInput) {
+		t.Fatalf("missing required argument error = %v, want invalid input", err)
+	}
+	result, err = binding.Call(context.Background(), json.RawMessage(`{"service":"api"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.(toolInput).Service != "api" || calls != 1 {
+	if result.(toolInput).Service != "api" || calls != 2 {
 		t.Fatalf("result = %#v, calls = %d", result, calls)
+	}
+}
+
+func TestNewToolMatchesTheDerivedSchemaUnknownFieldPolicyRecursively(t *testing.T) {
+	calls := 0
+	tool, err := contexture.NewTool("nested", "Nested.", true, func(context.Context, nestedStrictInput) (string, error) {
+		calls++
+		return "ok", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := tool.Binding()
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := binding.Schema()
+	if schema["additionalProperties"] != nil {
+		t.Fatalf("derived root schema unexpectedly advertises strict decoding: %#v", schema)
+	}
+	nested := schema["properties"].(map[string]any)["nested"].(map[string]any)
+	if nested["additionalProperties"] != nil {
+		t.Fatalf("derived nested schema unexpectedly advertises strict decoding: %#v", nested)
+	}
+	if _, err := binding.Call(context.Background(), json.RawMessage(`{"nested":{"name":"ok","unknown":true}}`)); err != nil {
+		t.Fatalf("derived nested unknown field error = %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("nested unknown field handler calls = %d", calls)
 	}
 }
 
@@ -158,6 +199,63 @@ func TestNewToolWithSchemaRejectsTransportContractDriftAtDeclaration(t *testing.
 				t.Fatalf("NewToolWithSchema error = %v, want invalid declaration", err)
 			}
 		})
+	}
+}
+
+func TestNewToolWithSchemaRejectsScalarAndNestedDecodeDriftAtDeclaration(t *testing.T) {
+	_, err := contexture.NewToolWithSchema("scalar", "Scalar.", true, map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{"count": map[string]any{"type": "string"}},
+		"required":   []any{"count"},
+	}, func(context.Context, scalarInput) (string, error) { return "unexpected", nil })
+	if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("scalar schema drift error = %v", err)
+	}
+
+	_, err = contexture.NewToolWithSchema("nested", "Nested.", true, map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{
+			"nested": map[string]any{
+				"type": "object", "additionalProperties": true,
+				"properties": map[string]any{"name": map[string]any{"type": "string"}},
+				"required":   []any{"name"},
+			},
+		},
+		"required": []any{"nested"},
+	}, func(context.Context, nestedStrictInput) (string, error) { return "unexpected", nil })
+	if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("nested unknown-field drift error = %v", err)
+	}
+}
+
+func TestNewToolWithSchemaRejectsNestedUnknownFieldsBeforeTheHandler(t *testing.T) {
+	calls := 0
+	tool, err := contexture.NewToolWithSchema("nested", "Nested.", true, map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{
+			"nested": map[string]any{
+				"type": "object", "additionalProperties": false,
+				"properties": map[string]any{"name": map[string]any{"type": "string"}},
+				"required":   []any{"name"},
+			},
+		},
+		"required": []any{"nested"},
+	}, func(context.Context, nestedStrictInput) (string, error) {
+		calls++
+		return "unexpected", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := tool.Binding()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := binding.Call(context.Background(), json.RawMessage(`{"nested":{"name":"Ada","forged":true}}`)); !errors.Is(err, contexture.ErrInvalidInput) {
+		t.Fatalf("nested unknown field error = %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("nested unknown field reached handler %d times", calls)
 	}
 }
 
