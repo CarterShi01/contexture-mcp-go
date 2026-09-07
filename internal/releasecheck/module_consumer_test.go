@@ -93,9 +93,21 @@ func main() {
     }, func(_ context.Context, input strictInput) (int32, error) { return input.Count, nil })
     if strictErr != nil { panic(strictErr) }
     graphApplication, _ := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-consumer", Roots: []contexture.Factory{func() contexture.Node {
-        return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return tool }, func() contexture.Node { return strict }}}
+        return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Skills: []contexture.Factory{func() contexture.Node { return &contexture.Skill{Name: "check", Description: "Check.", Instructions: "Read graph facts first."} }}, Tools: []contexture.Factory{func() contexture.Node { return tool }, func() contexture.Node { return strict }}}
     }}})
     graphIndex, _ := contexture.Compile(graphApplication)
+    skillDisclosure, disclosureErr := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
+    if disclosureErr != nil { panic(disclosureErr) }
+    openedSkill, skillOpenErr := skillDisclosure.Open("graph/check", contexture.AllRoots())
+    if skillOpenErr != nil || openedSkill["instructions"] != "Read graph facts first." {
+        panic("public Skill did not compile and disclose its active procedure")
+    }
+    openedRole, roleOpenErr := skillDisclosure.Open("graph", contexture.AllRoots())
+    if roleOpenErr != nil { panic(roleOpenErr) }
+    skillCards, cardsOK := openedRole["skills"].([]map[string]any)
+    if !cardsOK || len(skillCards) != 1 || skillCards[0]["ref"] != "graph/check" || skillCards[0]["instructions"] != nil {
+        panic("public Role did not keep Skill as a route card")
+    }
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
     graphValue, graphErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{\"name\":\"Ada\"}"), contexture.AllRoots())
     if graphErr != nil {
