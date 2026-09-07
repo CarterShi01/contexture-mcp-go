@@ -60,6 +60,9 @@ func compile(application *Application, bindTools bool) (*Index, error) {
 			}
 		}
 		for _, target := range node.nodeUses() {
+			if target == ref {
+				return nil, errors.Join(ErrInvalidDeclaration, fmt.Errorf("%s %q names itself in Uses", node.nodeKind(), ref))
+			}
 			if _, ok := state.index.byRef[target]; !ok {
 				return nil, fmt.Errorf("%w: %q uses %q", ErrUnresolvedReference, ref, target)
 			}

@@ -250,6 +250,17 @@ are structural Index facts and do not disclose a node's member cards.
 `Find` and `Signpost` normalize repeated or leading/trailing `/` separators to
 the same canonical address before a successful lookup.
 
+`Role.Branches`, `Role.Members`, and `Role.Member` provide the corresponding
+Role-local structural queries on a compiled snapshot. Branches returns only
+direct child Roles; Members returns direct child Roles, Skills, and Tools in
+that declaration-group order; Member resolves one cross-kind direct child and
+returns a typed `NodeNotFoundError` with the Role's sorted known names when it
+is absent. They return defensive snapshots and never call lazy member factories.
+Calling them on an uncompiled Role returns an `ErrInvalidDeclaration`-typed
+error: Go declarations deliberately store factories, unlike Python's already
+constructed member lists. Every `Uses` ref is checked after the complete forest
+exists; it must resolve, be unique/non-blank, and must not name its own ref.
+
 ### Request root projections
 
 `RootSelection` is either `AllRoots()` or an exact complete-root allowlist

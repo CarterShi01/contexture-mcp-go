@@ -218,6 +218,14 @@ ordering，同时排除其他 root。跨 root 的 `uses` 与 dependent 会被过
 `HeaderRootSelector` 仅将 `Contexture-Roots` 当作 attenuation request：它会验证未知 name 而不列出其他 root，
 并与经过认证的 principal ceiling 求交。
 
+`Role.Branches`、`Role.Members` 与 `Role.Member` 为已编译 snapshot 提供相应的 Role-local
+结构查询。Branches 仅返回直接 child Role；Members 按 declaration group 顺序返回直接 child Role、Skill
+和 Tool；Member 在这三类直接成员之间按 name 查找，未找到时返回带 Role 已知 name（排序后）的
+typed `NodeNotFoundError`。这些 API 返回 defensive snapshot，且绝不调用 lazy member factory。对于未编译的
+Role，调用会返回 `ErrInvalidDeclaration`-typed error：这是一项有意的 Go 原生差异，因为 Go declaration
+保存的是 factory，而 Python 保存的是已经构造的 member list。完整 forest 建好后会检查每个 `Uses` ref：它必须
+可解析、唯一且非空，并且不得指向 node 自己的 ref。
+
 ### Telemetry
 
 `ApplicationDeclaration.Telemetry` 可选地提供一个 usage collector；
