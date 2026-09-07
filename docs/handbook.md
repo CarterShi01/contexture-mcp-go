@@ -190,6 +190,18 @@ and map `patternProperties` are checked recursively for the same reason.
 would reject every matching unknown name. Call failures remain `ErrInvalidInput`
 and never reach the handler.
 
+Both public Tool constructors reject a blank name, a `/` in the name, or a
+blank description immediately with `ErrInvalidDeclaration`; a handwritten
+`Tool` literal receives the same validation at registration or compilation.
+The constructor requires an explicit `readOnly` bool, while a raw Go `Tool`
+literal has Go's zero value (`false`, writing) until it is compiled. This is
+the native equivalent of Python's optional `read_only=False` field: it keeps
+the mutation classification explicit at the normal executable-constructor
+callsite. A Tool without a Binding is valid only in a disclosure-only Index;
+`Tool.Binding` and runtime compilation classify an attempt to execute it as
+`ErrInvalidDeclaration`. Binding schemas are defensive copies, so caller
+mutation cannot alter a later `Schema` result or a compiled Tool card.
+
 ### Imperative registration
 
 `ApplicationDeclaration` is the normal Go composition root: it keeps its

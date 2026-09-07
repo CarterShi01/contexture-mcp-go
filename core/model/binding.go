@@ -21,6 +21,9 @@ type Binding interface {
 
 // NewTool couples one tagged input struct, its JSON Schema, decoder, and handler.
 func NewTool[I any, O any](name, description string, readOnly bool, handler func(context.Context, I) (O, error)) (*Tool, error) {
+	if err := validateNode(&Tool{Name: name, Description: description, ReadOnly: readOnly}); err != nil {
+		return nil, err
+	}
 	if handler == nil {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("tool handler must not be nil"))
 	}
@@ -45,6 +48,9 @@ func NewTool[I any, O any](name, description string, readOnly bool, handler func
 // typed invocation Binding. It covers constraints that Go reflection cannot
 // express directly, such as a string enum.
 func NewToolWithSchema[I any, O any](name, description string, readOnly bool, inputSchema map[string]any, handler func(context.Context, I) (O, error)) (*Tool, error) {
+	if err := validateNode(&Tool{Name: name, Description: description, ReadOnly: readOnly}); err != nil {
+		return nil, err
+	}
 	if handler == nil {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("tool handler must not be nil"))
 	}
@@ -148,8 +154,8 @@ func normalizeSchemaValue(value any, preserveAdditionalProperties bool) {
 
 // Binding returns the compiled Tool Binding, if this Tool is executable.
 func (tool *Tool) Binding() (Binding, error) {
-	if tool.binding == nil {
-		return nil, errors.New("Tool has no execution Binding")
+	if tool == nil || tool.binding == nil {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("Tool has no execution Binding"))
 	}
 	return tool.binding, nil
 }

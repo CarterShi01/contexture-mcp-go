@@ -119,6 +119,13 @@ func main() {
         return contexture.CurrentGraph(ctx) != nil, nil
     })
     if toolErr != nil { panic(toolErr) }
+    if _, invalidToolErr := contexture.NewTool(" ", "Invalid.", true, func(context.Context, graphInput) (bool, error) { return false, nil }); !errors.Is(invalidToolErr, contexture.ErrInvalidDeclaration) {
+        panic("public NewTool did not reject an invalid declaration immediately")
+    }
+    structuralTool := &contexture.Tool{Name: "structural", Description: "Disclosure-only."}
+    if _, structuralBindingErr := structuralTool.Binding(); !errors.Is(structuralBindingErr, contexture.ErrInvalidDeclaration) {
+        panic("public unbound Tool Binding error was not classifiable")
+    }
     strict, strictErr := contexture.NewToolWithSchema("strict", "Accept one bounded count.", true, map[string]any{
         "type": "object", "additionalProperties": false,
         "properties": map[string]any{"count": map[string]any{"type": "integer", "minimum": -2147483648, "maximum": 2147483647}},

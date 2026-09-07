@@ -157,6 +157,14 @@ JSON tag option 会被完整扫描，而不是按位置解释，因此 `json:"va
 value schema 与 map `patternProperties` 也会递归检查。struct field 不可使用 `patternProperties`，因为 strict
 decoder 会拒绝每一个匹配的 unknown name。
 
+两个公开 Tool constructor 都会立即以 `ErrInvalidDeclaration` 拒绝空 name、name 中的 `/` 或空 description；
+手写的 `Tool` literal 会在 registration 或 compilation 时得到相同校验。constructor 要求明确给出 `readOnly`
+bool，而原始 Go `Tool` literal 在编译前采用 Go 的 zero value（`false`，即 writing）。这是 Python 可选
+`read_only=False` field 的原生等价物：正常 executable-constructor callsite 的 mutation classification 保持显式。
+没有 Binding 的 Tool 只可存在于 disclosure-only Index；`Tool.Binding` 以及 runtime compilation 会将试图执行它的
+行为分类为 `ErrInvalidDeclaration`。Binding schema 是 defensive copy，因此 caller mutation 不会改变之后的
+`Schema` 结果或已编译 Tool card。
+
 ### Imperative registration
 
 `ApplicationDeclaration` 是正常的 Go composition root：它会把 `Factory` 保持为惰性，直到
