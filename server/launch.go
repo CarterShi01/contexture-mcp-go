@@ -237,13 +237,14 @@ func sameBindHost(declared, actual string) bool {
 	// every supported platform, not the hostname the caller declared. Treat
 	// localhost and either canonical loopback address as the same safe bind;
 	// do not apply that equivalence to any public hostname or address.
-	if strings.EqualFold(declared, "localhost") && isLoopback(actual) {
-		return true
-	}
-	if strings.EqualFold(actual, "localhost") && isLoopback(declared) {
+	if isLoopbackSpelling(declared) && isLoopbackSpelling(actual) {
 		return true
 	}
 	return false
+}
+
+func isLoopbackSpelling(host string) bool {
+	return strings.EqualFold(host, "localhost") || isLoopback(host)
 }
 
 // resolveServeOptions retains the older explicit-identity entry points while

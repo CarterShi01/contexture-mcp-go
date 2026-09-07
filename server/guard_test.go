@@ -17,7 +17,7 @@ func TestAllowedHostAcceptsExactAndExplicitPortWildcardOnly(t *testing.T) {
 }
 
 func TestSameBindHostTreatsOnlyCanonicalLoopbackAddressesAsLocalhost(t *testing.T) {
-	for _, pair := range [][2]string{{"localhost", "127.0.0.1"}, {"localhost", "::1"}, {"[::1]", "localhost"}} {
+	for _, pair := range [][2]string{{"localhost", "127.0.0.1"}, {"127.0.0.1", "localhost"}, {"localhost", "::1"}, {"[::1]", "localhost"}, {"127.0.0.1", "::1"}, {"::1", "127.0.0.1"}} {
 		if !sameBindHost(pair[0], pair[1]) {
 			t.Fatalf("sameBindHost(%q, %q) = false, want true", pair[0], pair[1])
 		}
