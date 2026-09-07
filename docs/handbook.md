@@ -519,6 +519,9 @@ transport policy. Its zero value is stdio; streamable HTTP defaults to
 non-loopback HTTP bind must explicitly state Host/origin protection and either
 an `Auth` bearer policy or `AllowAnonymous: true`. `Auth` is copied into the
 validated options, so later caller mutation cannot change a running policy.
+When embedding with `ServeListener`, the listener's actual TCP bind host must
+match `Host` and is validated again; a pre-bound public listener cannot hide
+behind the loopback default. Its externally owned port may differ.
 
 `MaxRequestBodyBytes` is forwarded to the official streamable-MCP handler;
 zero selects its safe 4 MiB default and a negative value is refused. Contexture

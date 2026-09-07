@@ -145,6 +145,48 @@ func TestServeListenerUsesOptionAuthAndEnforcesConfiguredBodyLimit(t *testing.T)
 	}
 }
 
+func TestServeListenerValidatesActualPublicBindAndRejectsTwoAuthSources(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "options-listener", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "assistant", Description: "Answer requests.", Instructions: "Read first."}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assembly, err := server.BuildServer(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loopbackOptions, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicListener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer publicListener.Close()
+	if err := assembly.ServeListener(context.Background(), publicListener, loopbackOptions); err == nil {
+		t.Fatal("a public listener bypassed loopback options without Host/origin/auth policy")
+	} else if !errors.As(err, new(*server.ServeError)) {
+		t.Fatalf("public listener error = %T %v, want ServeError", err, err)
+	}
+
+	identity := &server.Auth{Verifier: tokenVerifier(func(context.Context, string) (*contexture.Principal, error) { return nil, nil }), Issuer: "https://issuer.example", Resource: "https://mcp.example/mcp"}
+	options, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport, Auth: identity})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	err = assembly.ServeListenerWithAuth(context.Background(), listener, options, identity)
+	if err == nil || !errors.As(err, new(*server.ServeError)) {
+		t.Fatalf("options and legacy Auth conflict = %v, want ServeError", err)
+	}
+}
+
 type tokenVerifier func(context.Context, string) (*contexture.Principal, error)
 
 func (verify tokenVerifier) Verify(ctx context.Context, token string) (*contexture.Principal, error) {

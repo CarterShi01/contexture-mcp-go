@@ -411,6 +411,9 @@ stdio；streamable HTTP 默认绑定到 `127.0.0.1:8000/mcp`。HTTP 专用字段
 绑定必须明确给出 Host/origin protection，并且要么给出 `Auth` bearer policy，要么显式
 设置 `AllowAnonymous: true`。`Auth` 会被复制到已验证的 options 中，因此调用方之后的
 修改不能改变运行中的 policy。
+使用 `ServeListener` 嵌入时，listener 的实际 TCP bind host 必须与 `Host` 匹配，并会再次
+验证；一个预先绑定的 public listener 不能借助 loopback 默认值逃避检查。其由外部拥有的 port
+可以不同。
 
 `MaxRequestBodyBytes` 会传给 official streamable-MCP handler；零值选择其安全的 4 MiB
 默认值，负值会被拒绝。Contexture 自身固定 stateless JSON HTTP。与 Python 动态的

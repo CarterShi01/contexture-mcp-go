@@ -120,7 +120,10 @@ func (server *ApplicationServer) StartWithAuthAndRootSelector(ctx context.Contex
 	if err != nil {
 		return err
 	}
-	return server.ServeListenerWithAuthAndRootSelector(ctx, listener, options, identity, selector)
+	// resolveServeOptions has already installed an explicit identity into the
+	// validated options. Do not pass it a second time through the embedding
+	// entry point, where two sources are intentionally rejected.
+	return server.ServeListenerWithAuthAndRootSelector(ctx, listener, options, nil, selector)
 }
 
 // ServeListener serves streamable HTTP through an existing listener; it is useful for embedding and tests.
@@ -144,6 +147,10 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 		return &ServeError{Message: "ServeListener requires transport='streamable-http'."}
 	}
 	options, identity, err := resolveServeOptions(options, identity)
+	if err != nil {
+		return err
+	}
+	options, err = validateListenerOptions(options, listener)
 	if err != nil {
 		return err
 	}
@@ -193,6 +200,35 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 		}
 		return err
 	})
+}
+
+// validateListenerOptions makes an embedding listener subject to the same
+// network policy as Start. A caller cannot declare a safe loopback Host and
+// then hand Contexture an already-bound public listener. The listener owns its
+// port, so only the bind host must agree with the declared endpoint.
+func validateListenerOptions(options *ContextureOptions, listener net.Listener) (*ContextureOptions, error) {
+	host, _, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil || host == "" {
+		return nil, &ServeError{Message: fmt.Sprintf("ServeListener needs a TCP listener with a host address: %v", err)}
+	}
+	host = strings.Trim(host, "[]")
+	actual := *options
+	actual.Host = host
+	// The listener did state a bind host even when the caller's options used a
+	// default. Re-run validation against that fact before accepting the server.
+	actual.hostSet = true
+	validated, err := NewContextureOptions(actual)
+	if err != nil {
+		return nil, err
+	}
+	if !sameBindHost(options.Host, host) {
+		return nil, &ServeError{Message: fmt.Sprintf("ContextureOptions Host %q does not match listener bind host %q.", options.Host, host)}
+	}
+	return validated, nil
+}
+
+func sameBindHost(declared, actual string) bool {
+	return strings.EqualFold(strings.Trim(declared, "[]"), strings.Trim(actual, "[]"))
 }
 
 // resolveServeOptions retains the older explicit-identity entry points while
