@@ -92,6 +92,10 @@ func main() {
 `errors.Is` 判断，而不是使用 Python exception class。`contexture.Version` 是 binding package version，
 与 `contexture.SpecificationVersion` 不同。
 
+`Principal` 是不可变的 request fact，而不是 authorization policy。它的 accessor 会为 scope 和 claim 返回
+defensive copy。普通 Go diagnostic formatting（`%v`、`%+v` 与 `%#v`）只包含 subject、client ID、issuer
+和排序后的 scope；claim 会被刻意脱敏，因为其中可能有 decoded token 或其他 sensitive value。
+
 `Prompt.ModelOpen` 使用一个对 Go zero value 安全的 policy，而不是会意外保留全部 Prompt target 的
 boolean。默认值 `contexture.ModelMayOpen` 同时允许 model navigation 与具名 person Prompt。设置
 `ModelOpen: contexture.ModelReservedForPerson` 后，target card 仍会在其 parent 中可见，但只拒绝 model

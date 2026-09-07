@@ -28,6 +28,8 @@ import (
     "context"
     "encoding/json"
     "errors"
+    "fmt"
+    "strings"
     contexture "github.com/CarterShi01/contexture-mcp-go"
     "github.com/CarterShi01/contexture-mcp-go/inspection"
     "github.com/CarterShi01/contexture-mcp-go/server"
@@ -69,6 +71,12 @@ var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
 
 func main() {
+    principal := contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "consumer", Claims: map[string]any{"secret": "do-not-log"}})
+    for _, verb := range []string{"%v", "%+v", "%#v"} {
+        if rendered := fmt.Sprintf(verb, principal); strings.Contains(rendered, "do-not-log") || !strings.Contains(rendered, "consumer") {
+            panic("public Principal formatting leaked claims or omitted identity")
+        }
+    }
     manager := contexture.NewControllerManager()
     _, _ = manager.RegisterRole(func() *contexture.Role {
         return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect."}

@@ -100,6 +100,12 @@ error sentinels such as `ErrInvalidDeclaration`, `ErrDuplicate`, and
 classes. `contexture.Version` is the binding package version; it is distinct
 from `contexture.SpecificationVersion`.
 
+`Principal` is an immutable request fact, not an authorization policy. Its
+accessors return defensive copies for scopes and claims. Normal Go diagnostic
+formatting (`%v`, `%+v`, and `%#v`) includes only subject, client ID, issuer,
+and sorted scopes; claims are deliberately redacted because they may contain a
+decoded token or other sensitive values.
+
 `Prompt.ModelOpen` uses a native zero-safe policy rather than a boolean whose
 zero value would accidentally reserve every Prompt target. Its default,
 `contexture.ModelMayOpen`, permits both model navigation and the named person

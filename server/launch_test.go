@@ -3,8 +3,10 @@ package server_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -238,6 +240,117 @@ func TestApplicationServerSelectsIndependentRootsPerAuthenticatedHTTPClient(t *t
 		}
 	case <-time.After(time.Second):
 		t.Fatal("streamable HTTP server did not stop after context cancellation")
+	}
+}
+
+func TestAuthenticatedStreamableMCPInvocationCarriesCompletePrincipal(t *testing.T) {
+	identityTool, err := contexture.NewTool("whoami", "Return verified identity facts.", true, func(ctx context.Context, _ struct{}) (map[string]any, error) {
+		principal := contexture.CurrentPrincipal(ctx)
+		if principal == nil {
+			return nil, errors.New("CurrentPrincipal was absent")
+		}
+		claims := principal.Claims()
+		return map[string]any{
+			"subject": principal.Subject(), "client_id": principal.ClientID(), "issuer": principal.Issuer(),
+			"scopes": principal.Scopes(), "tenant": claims["tenant"], "groups": claims["groups"],
+		}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "principal-launch", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "identity", Description: "Identity.", Instructions: "Read identity.", Tools: []contexture.Factory{func() contexture.Node { return identityTool }}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assembly, err := server.BuildServer(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	errs := make(chan error, 1)
+	valid := contexture.NewPrincipal(contexture.PrincipalOptions{
+		Subject: "alice", ClientID: "codex", Issuer: "https://issuer.example", Scopes: []string{"mcp", "tools.read"},
+		Claims: map[string]any{"exp": int64(2_000_000_000), "tenant": "acme", "groups": []string{"sre", "ops"}},
+	})
+	machine := contexture.NewPrincipal(contexture.PrincipalOptions{
+		ClientID: "machine-client", Issuer: "https://issuer.example", Scopes: []string{"mcp"},
+		Claims: map[string]any{"exp": int64(2_000_000_000), "tenant": "automation", "groups": []string{}},
+	})
+	authentication := &server.Auth{Verifier: tokenVerifier(func(_ context.Context, token string) (*contexture.Principal, error) {
+		switch token {
+		case "valid":
+			return valid, nil
+		case "machine":
+			return machine, nil
+		default:
+			return nil, nil
+		}
+	}), Issuer: "https://issuer.example", Resource: "https://mcp.example/mcp", RequiredScopes: []string{"mcp"}}
+	go func() { errs <- assembly.ServeListenerWithAuth(ctx, listener, options, authentication) }()
+	endpoint := "http://" + listener.Addr().String() + "/mcp"
+
+	invoke := func(token string) (map[string]any, error) {
+		client := mcp.NewClient(&mcp.Implementation{Name: "principal-client-" + token, Version: "0.0.0"}, nil)
+		session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: endpoint, HTTPClient: &http.Client{Transport: rootHeaderTransport{token: token}}, DisableStandaloneSSE: true}, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer session.Close()
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: string(contexture.InvokeReadOnlyGatewayName), Arguments: map[string]any{"ref": "identity/whoami", "arguments": map[string]any{}}})
+		if err != nil {
+			return nil, err
+		}
+		if result.IsError {
+			return nil, fmt.Errorf("MCP Tool result is an error: %#v", result.Content)
+		}
+		payload, ok := result.StructuredContent.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("identity Tool structured content = %#v", result.StructuredContent)
+		}
+		return payload, nil
+	}
+
+	observed, err := invoke("valid")
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	if observed["subject"] != "alice" || observed["client_id"] != "codex" || observed["issuer"] != "https://issuer.example" || observed["tenant"] != "acme" || !reflect.DeepEqual(observed["scopes"], []any{"mcp", "tools.read"}) || !reflect.DeepEqual(observed["groups"], []any{"sre", "ops"}) {
+		cancel()
+		t.Fatalf("verified Principal did not survive SDK/gateway/runtime round trip: %#v", observed)
+	}
+	machineObserved, err := invoke("machine")
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	if machineObserved["subject"] != "" || machineObserved["client_id"] != "machine-client" || machineObserved["tenant"] != "automation" {
+		cancel()
+		t.Fatalf("machine Principal lost its native absent-subject facts: %#v", machineObserved)
+	}
+	if _, err := invoke("rejected"); err == nil {
+		cancel()
+		t.Fatal("rejected bearer token established an MCP invocation")
+	}
+
+	cancel()
+	select {
+	case err := <-errs:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("authenticated streamable HTTP server did not stop after cancellation")
 	}
 }
 
