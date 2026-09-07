@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"strings"
 )
 
@@ -29,8 +30,16 @@ type ContextureOptions struct {
 	Path           string
 	AllowedHosts   []string
 	AllowedOrigins []string
+	// Auth is the HTTP bearer policy for this server. It is deliberately owned
+	// by the transport options so a public bind cannot be validated before the
+	// authentication decision is known.
+	Auth           *Auth
 	AllowAnonymous bool
 	LogLevel       LogLevel
+	// MaxRequestBodyBytes limits one streamable-MCP HTTP request. Zero selects
+	// the official SDK's safe 4 MiB default; a negative value is refused rather
+	// than silently disabling a network safety boundary.
+	MaxRequestBodyBytes int64
 
 	hostSet bool
 	portSet bool
@@ -41,6 +50,11 @@ type ContextureOptions struct {
 func NewContextureOptions(options ContextureOptions) (*ContextureOptions, error) {
 	options.AllowedHosts = append([]string(nil), options.AllowedHosts...)
 	options.AllowedOrigins = append([]string(nil), options.AllowedOrigins...)
+	if options.Auth != nil {
+		copied := *options.Auth
+		copied.RequiredScopes = append([]string(nil), options.Auth.RequiredScopes...)
+		options.Auth = &copied
+	}
 	options.hostSet = options.Host != ""
 	options.portSet = options.Port != 0
 	options.pathSet = options.Path != ""
@@ -82,6 +96,12 @@ func NewContextureOptions(options ContextureOptions) (*ContextureOptions, error)
 		if options.AllowAnonymous {
 			stated = append(stated, "allow_anonymous")
 		}
+		if options.Auth != nil {
+			stated = append(stated, "auth")
+		}
+		if options.MaxRequestBodyBytes != 0 {
+			stated = append(stated, "max_request_body_bytes")
+		}
 		if len(stated) > 0 {
 			return nil, &ServeError{Message: fmt.Sprintf("transport='stdio' cannot use %s: stdio has no address to bind or HTTP request to authenticate.", strings.Join(stated, ", "))}
 		}
@@ -96,14 +116,22 @@ func NewContextureOptions(options ContextureOptions) (*ContextureOptions, error)
 	if options.Port < 0 || options.Port > 65535 {
 		return nil, &ServeError{Message: "port must be an integer from 0 through 65535."}
 	}
-	if !strings.HasPrefix(options.Path, "/") {
+	if !strings.HasPrefix(options.Path, "/") || strings.ContainsAny(options.Path, "?#") {
 		return nil, &ServeError{Message: "path must begin with /."}
+	}
+	if options.MaxRequestBodyBytes < 0 {
+		return nil, &ServeError{Message: "max_request_body_bytes must be zero or a positive number of bytes."}
+	}
+	if options.Auth != nil {
+		if err := options.Auth.validate(); err != nil {
+			return nil, &ServeError{Message: fmt.Sprintf("invalid auth: %v", err)}
+		}
 	}
 	if !isLoopback(options.Host) {
 		if len(options.AllowedHosts) == 0 && len(options.AllowedOrigins) == 0 {
 			return nil, &ServeError{Message: fmt.Sprintf("host=%q is not loopback; state allowed_hosts and/or allowed_origins for DNS rebinding protection.", options.Host)}
 		}
-		if !options.AllowAnonymous {
+		if options.Auth == nil && !options.AllowAnonymous {
 			return nil, &ServeError{Message: fmt.Sprintf("host=%q is not loopback. State allow_anonymous=true only when unauthenticated access is intentional.", options.Host)}
 		}
 	}
@@ -119,6 +147,9 @@ func (options *ContextureOptions) URL() string {
 }
 
 func isLoopback(host string) bool {
+	if parsed := net.ParseIP(strings.Trim(host, "[]")); parsed != nil {
+		return parsed.IsLoopback()
+	}
 	switch host {
 	case "127.0.0.1", "localhost", "::1", "[::1]":
 		return true

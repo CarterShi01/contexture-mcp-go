@@ -1,12 +1,15 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 	"github.com/CarterShi01/contexture-mcp-go/server"
@@ -57,6 +60,88 @@ func TestContextureOptionsPreserveSafeDefaultsAndRejectPublicStartup(t *testing.
 	}
 	if _, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport, Host: "0.0.0.0", AllowedHosts: []string{"localhost"}, AllowAnonymous: true}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestContextureOptionsOwnHTTPAuthenticationAndBodyLimit(t *testing.T) {
+	identity := &server.Auth{Verifier: tokenVerifier(func(context.Context, string) (*contexture.Principal, error) { return nil, nil }), Issuer: "https://issuer.example", Resource: "https://mcp.example/mcp"}
+	options, err := server.NewContextureOptions(server.ContextureOptions{
+		Transport:           server.StreamableHTTPTransport,
+		Host:                "0.0.0.0",
+		AllowedHosts:        []string{"mcp.example:*"},
+		Auth:                identity,
+		MaxRequestBodyBytes: 31,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.Auth == identity || options.Auth == nil || options.MaxRequestBodyBytes != 31 {
+		t.Fatalf("options did not defensively retain auth/body policy: %#v", options)
+	}
+	identity.RequiredScopes = append(identity.RequiredScopes, "changed")
+	if len(options.Auth.RequiredScopes) != 0 {
+		t.Fatalf("auth scopes were aliased: %#v", options.Auth.RequiredScopes)
+	}
+	if _, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StdioTransport, Auth: identity, MaxRequestBodyBytes: 1}); err == nil {
+		t.Fatal("stdio accepted HTTP auth/body policy")
+	}
+	if _, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport, MaxRequestBodyBytes: -1}); err == nil {
+		t.Fatal("negative HTTP body limit unexpectedly disabled the safety boundary")
+	}
+}
+
+func TestServeListenerUsesOptionAuthAndEnforcesConfiguredBodyLimit(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "options-body", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "assistant", Description: "Answer requests.", Instructions: "Read first."}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assembly, err := server.BuildServer(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := &server.Auth{Verifier: tokenVerifier(func(_ context.Context, token string) (*contexture.Principal, error) {
+		if token == "accepted" {
+			return contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "operator", Claims: map[string]any{"exp": int64(2_000_000_000)}}), nil
+		}
+		return nil, nil
+	}), Issuer: "https://issuer.example", Resource: "https://mcp.example/mcp"}
+	options, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport, Auth: identity, MaxRequestBodyBytes: 32})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errs := make(chan error, 1)
+	go func() { errs <- assembly.ServeListener(ctx, listener, options) }()
+	request, err := http.NewRequest(http.MethodPost, "http://"+listener.Addr().String()+"/mcp", bytes.NewReader(bytes.Repeat([]byte("x"), 33)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "application/json, text/event-stream")
+	request.Header.Set("Authorization", "Bearer accepted")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("configured body limit status = %d, want %d", response.StatusCode, http.StatusRequestEntityTooLarge)
+	}
+	cancel()
+	select {
+	case err := <-errs:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("streamable HTTP server did not stop after body-limit test")
 	}
 }
 

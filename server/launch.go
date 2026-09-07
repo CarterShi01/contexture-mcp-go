@@ -97,14 +97,10 @@ func (server *ApplicationServer) Start(ctx context.Context, options *ContextureO
 // identity and request-local root attenuation. Those HTTP-only policies are
 // rejected for stdio rather than silently ignored.
 func (server *ApplicationServer) StartWithAuthAndRootSelector(ctx context.Context, options *ContextureOptions, identity *Auth, selector RootSelector) error {
-	if options == nil {
-		options = &ContextureOptions{}
-	}
-	validated, err := NewContextureOptions(*options)
+	options, identity, err := resolveServeOptions(options, identity)
 	if err != nil {
 		return err
 	}
-	options = validated
 	if err := ConfigureLogging(options.LogLevel); err != nil {
 		return err
 	}
@@ -147,11 +143,10 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 	if options == nil {
 		return &ServeError{Message: "ServeListener requires transport='streamable-http'."}
 	}
-	validated, err := NewContextureOptions(*options)
+	options, identity, err := resolveServeOptions(options, identity)
 	if err != nil {
 		return err
 	}
-	options = validated
 	if err := ConfigureLogging(options.LogLevel); err != nil {
 		return err
 	}
@@ -174,7 +169,7 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 			return NewMCPServer(server.identity)
 		}
 		return adapter.Server
-	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
+	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, MaxRequestBodyBytes: options.MaxRequestBodyBytes})
 	var protected http.Handler = guarded(handler, options)
 	if selector != nil {
 		protected = selectedRoots(protected, server.application.Index, selector)
@@ -198,6 +193,28 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 		}
 		return err
 	})
+}
+
+// resolveServeOptions retains the older explicit-identity entry points while
+// making ContextureOptions the canonical declaration of HTTP configuration.
+// Supplying both would make it unclear which bearer policy protects the same
+// listener, so it is a named startup error rather than a call-order decision.
+func resolveServeOptions(input *ContextureOptions, explicit *Auth) (*ContextureOptions, *Auth, error) {
+	if input == nil {
+		input = &ContextureOptions{}
+	}
+	options := *input
+	if explicit != nil {
+		if options.Auth != nil {
+			return nil, nil, &ServeError{Message: "state HTTP auth in ContextureOptions or the explicit StartWithAuth method, not both."}
+		}
+		options.Auth = explicit
+	}
+	validated, err := NewContextureOptions(options)
+	if err != nil {
+		return nil, nil, err
+	}
+	return validated, validated.Auth, nil
 }
 
 // selectedRoots resolves request facts once before MCP dispatch and retains the
@@ -227,7 +244,7 @@ func guarded(next http.Handler, options *ContextureOptions) http.Handler {
 			http.NotFound(writer, request)
 			return
 		}
-		if len(options.AllowedHosts) > 0 && !contains(options.AllowedHosts, hostName(request.Host)) {
+		if len(options.AllowedHosts) > 0 && !allowedHost(options.AllowedHosts, request.Host) {
 			http.Error(writer, "Forbidden: invalid Host header", http.StatusForbidden)
 			return
 		}
@@ -237,6 +254,19 @@ func guarded(next http.Handler, options *ContextureOptions) http.Handler {
 		}
 		next.ServeHTTP(writer, request)
 	})
+}
+
+func allowedHost(values []string, requestHost string) bool {
+	name := hostName(requestHost)
+	for _, value := range values {
+		if value == requestHost || value == name {
+			return true
+		}
+		if strings.HasSuffix(value, ":*") && strings.TrimSuffix(value, ":*") == name {
+			return true
+		}
+	}
+	return false
 }
 
 func hostName(host string) string {

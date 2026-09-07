@@ -404,9 +404,20 @@ stdio 是默认 transport。只有在明确配置 Host 与网络时才使用 `--
 非 loopback 启动需要对应的 Host、origin 和 anonymous-access 决策；应处理 server option error，
 而不是放宽这些限制。
 
-程序化启动时，`server.ContextureOptions{LogLevel: server.WarnLogLevel}` 控制
-Contexture 生命周期日志。`server.ConfigureLogging` 会把同一结构化 logger 安装到 stderr，
-所以 MCP stdio 始终独占 stdout。
+程序化启动时，`server.ContextureOptions` 是唯一经过验证的 transport policy。其零值是
+stdio；streamable HTTP 默认绑定到 `127.0.0.1:8000/mcp`。HTTP 专用字段（`Host`、
+`Port`、`Path`、`Auth`、`AllowedHosts`、`AllowedOrigins`、`AllowAnonymous` 和
+`MaxRequestBodyBytes`）用于 stdio 时会被拒绝，而不会被悄悄忽略。非 loopback 的 HTTP
+绑定必须明确给出 Host/origin protection，并且要么给出 `Auth` bearer policy，要么显式
+设置 `AllowAnonymous: true`。`Auth` 会被复制到已验证的 options 中，因此调用方之后的
+修改不能改变运行中的 policy。
+
+`MaxRequestBodyBytes` 会传给 official streamable-MCP handler；零值选择其安全的 4 MiB
+默认值，负值会被拒绝。Contexture 自身固定 stateless JSON HTTP。与 Python 动态的
+`sdk_overrides` map 不同，Go binding 有意不提供原始 SDK-options escape hatch：official
+SDK 使用的 typed struct 包含会与该 server contract 冲突的 session 和 security switches。
+`LogLevel: server.WarnLogLevel` 控制 Contexture 生命周期日志。`server.ConfigureLogging`
+会把同一结构化 logger 安装到 stderr，所以 MCP stdio 始终独占 stdout。
 
 除非设置 `ApplicationServerOptions.Instructions`，Contexture 会在 MCP 初始化响应中返回紧凑的
 广度优先能力清单及固定导航合同。HTTP root selection 时，该清单按每个请求的 selected root

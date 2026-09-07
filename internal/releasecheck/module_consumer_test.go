@@ -75,6 +75,7 @@ var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: cont
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
 var _ = server.NewMCPServer
+var _ = server.NewContextureOptions
 var _ = server.Auth{}
 var _ = server.HeaderRootSelector{}
 var _ = server.Launch{}
@@ -87,6 +88,13 @@ func main() {
     }
     if contexture.DiscoverGatewayName != "contexture_discover" || contexture.OpenGatewayName != "contexture_open" || contexture.InvokeReadOnlyGatewayName != "contexture_invoke_read_only" || contexture.InvokeGatewayName != "contexture_invoke" {
         panic("public fixed gateway vocabulary has an unexpected spelling")
+    }
+    optionsAuth := &server.Auth{Verifier: consumerVerifier{}, Issuer: "https://issuer.example", Resource: "https://mcp.example/mcp"}
+    publicOptions, publicOptionsErr := server.NewContextureOptions(server.ContextureOptions{
+        Transport: server.StreamableHTTPTransport, Host: "0.0.0.0", AllowedHosts: []string{"mcp.example:*"}, Auth: optionsAuth, MaxRequestBodyBytes: 4096,
+    })
+    if publicOptionsErr != nil || publicOptions.URL() != "http://0.0.0.0:8000/mcp" || publicOptions.Auth == optionsAuth || publicOptions.MaxRequestBodyBytes != 4096 {
+        panic("public server options did not validate and own HTTP auth/body policy")
     }
     if !errors.Is(contexture.ErrInvalidDeclaration, contexture.ErrDeclaration) || !errors.Is(contexture.ErrInvalidDeclaration, contexture.ErrModelValidation) || !errors.Is(contexture.ErrInvalidDeclaration, contexture.ErrContexture) || !errors.Is(contexture.ErrDuplicate, contexture.ErrDuplicateName) {
         panic("public Contexture error categories are not composable")
@@ -233,6 +241,10 @@ func main() {
         panic("public WrongDoorError did not retain a direct Runtime error's facts")
     }
 }
+
+type consumerVerifier struct{}
+
+func (consumerVerifier) Verify(context.Context, string) (*contexture.Principal, error) { return nil, nil }
 
 `
 	if err := os.WriteFile(filepath.Join(temporaryRoot, "go.mod"), []byte(goMod), 0o600); err != nil {

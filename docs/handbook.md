@@ -511,7 +511,21 @@ Host and network configuration. Non-loopback startup requires corresponding
 Host, origin, and anonymous-access decisions; handle server option errors
 rather than weakening them.
 
-For programmatic startup, `server.ContextureOptions{LogLevel: server.WarnLogLevel}`
+For programmatic startup, `server.ContextureOptions` is the one validated
+transport policy. Its zero value is stdio; streamable HTTP defaults to
+`127.0.0.1:8000/mcp`. HTTP-only fields (`Host`, `Port`, `Path`, `Auth`,
+`AllowedHosts`, `AllowedOrigins`, `AllowAnonymous`, and
+`MaxRequestBodyBytes`) are rejected for stdio rather than ignored. A
+non-loopback HTTP bind must explicitly state Host/origin protection and either
+an `Auth` bearer policy or `AllowAnonymous: true`. `Auth` is copied into the
+validated options, so later caller mutation cannot change a running policy.
+
+`MaxRequestBodyBytes` is forwarded to the official streamable-MCP handler;
+zero selects its safe 4 MiB default and a negative value is refused. Contexture
+pins stateless JSON HTTP itself. Unlike Python's dynamic `sdk_overrides` map,
+the Go binding deliberately exposes no raw SDK-options escape hatch: the
+official SDK uses a typed struct containing session and security switches that
+would contradict this server contract. `LogLevel: server.WarnLogLevel`
 controls Contexture lifecycle records. `server.ConfigureLogging` installs the
 same structured logger on stderr, so MCP stdio retains exclusive ownership of
 stdout.
