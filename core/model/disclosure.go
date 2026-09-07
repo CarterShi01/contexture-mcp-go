@@ -2,7 +2,6 @@ package model
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
@@ -106,8 +105,8 @@ func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]an
 	if err := selection.RequireRef(ref); err != nil {
 		return nil, err
 	}
-	if _, prompt := view.promptRoots[strings.Split(ref, foundation.ReferenceSeparator)[0]]; prompt {
-		return nil, fmt.Errorf("%s is opened by a person, not by an agent", ref)
+	if _, prompt := view.promptRoots[strings.Split(canonicalRef(ref), foundation.ReferenceSeparator)[0]]; prompt {
+		return nil, &RefusedError{Message: TakenByPersonMessage(ref)}
 	}
 	node, err := view.resolve(ref, selection, view.index.ModelRoots())
 	if err != nil {

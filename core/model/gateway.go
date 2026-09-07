@@ -69,7 +69,7 @@ func ExecutionGatewayTools() []GatewayTool { return append([]GatewayTool(nil), g
 // Gateway is the transport-neutral fixed Contexture model plane.
 type Gateway struct {
 	disclosure *Disclosure
-	runtime    *Runtime
+	execution  *ExecutionAPI
 }
 
 // NewGateway connects navigation to an optional executable Runtime.
@@ -77,13 +77,21 @@ func NewGateway(disclosure *Disclosure, runtime *Runtime) (*Gateway, error) {
 	if disclosure == nil {
 		return nil, errors.New("Contexture Disclosure must not be nil")
 	}
-	return &Gateway{disclosure: disclosure, runtime: runtime}, nil
+	gateway := &Gateway{disclosure: disclosure}
+	if runtime != nil {
+		execution, err := NewExecutionAPI(runtime)
+		if err != nil {
+			return nil, err
+		}
+		gateway.execution = execution
+	}
+	return gateway, nil
 }
 
 // Tools returns the fixed navigation gateway, plus invoke doors when executable.
 func (gateway *Gateway) Tools() []GatewayTool {
 	limit := 2
-	if gateway.runtime != nil {
+	if gateway.execution != nil {
 		limit = len(gatewayTools)
 	}
 	return append([]GatewayTool(nil), gatewayTools[:limit]...)
@@ -103,41 +111,22 @@ func (gateway *Gateway) Open(ref string, selection RootSelection) (map[string]an
 
 // InvokeReadOnly runs a read-only Tool through the fixed read-only door.
 func (gateway *Gateway) InvokeReadOnly(ctx context.Context, ref string, arguments json.RawMessage, selection RootSelection) (any, error) {
-	if gateway.runtime == nil {
+	if gateway.execution == nil {
 		return nil, &RefusedError{Message: fmt.Sprintf("This Contexture server is disclosure-only. Call %s or %s instead.", DiscoverGatewayName, OpenGatewayName)}
 	}
-	result, err := gateway.runtime.InvokeReadOnly(ctx, ref, arguments, selection)
-	return result, gateway.recover(err)
+	return gateway.execution.InvokeReadOnly(ctx, ref, arguments, selection)
 }
 
 // Invoke runs a writing Tool through the fixed writing door.
 func (gateway *Gateway) Invoke(ctx context.Context, ref string, arguments json.RawMessage, selection RootSelection) (any, error) {
-	if gateway.runtime == nil {
+	if gateway.execution == nil {
 		return nil, &RefusedError{Message: fmt.Sprintf("This Contexture server is disclosure-only. Call %s or %s instead.", DiscoverGatewayName, OpenGatewayName)}
 	}
-	result, err := gateway.runtime.Invoke(ctx, ref, arguments, selection)
-	return result, gateway.recover(err)
+	return gateway.execution.Invoke(ctx, ref, arguments, selection)
 }
 
 func (gateway *Gateway) recover(err error) error {
-	if err == nil {
-		return nil
-	}
-	// A root ceiling is an authorization boundary. It must remain distinguishable
-	// and must not disclose an alternative root or recovery route.
-	var outside *RootOutsideSelectionError
-	if errors.As(err, &outside) {
-		return err
-	}
-	var wrong *WrongDoorError
-	if errors.As(err, &wrong) {
-		return &RefusedError{Message: WrongDoorMessage(wrong.Ref, wrong.ReadOnly), Cause: err}
-	}
-	var failure *NodeNotFoundError
-	if errors.As(err, &failure) {
-		return &RefusedError{Message: UnresolvedMessage(failure), Cause: err}
-	}
-	return err
+	return recoverExecutionError(err)
 }
 
 // UnresolvedMessage renders a typed lookup failure as a fixed gateway next

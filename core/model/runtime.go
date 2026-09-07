@@ -152,15 +152,7 @@ func (runtime *Runtime) Invoke(ctx context.Context, ref string, arguments json.R
 }
 
 func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.RawMessage, readOnly bool, requested RootSelection) (any, error) {
-	selection, err := runtime.ceiling.Intersect(runtime.selection)
-	if err != nil {
-		return nil, err
-	}
-	selection, err = selection.Intersect(requested)
-	if err != nil {
-		return nil, err
-	}
-	selection, err = selection.Resolve(runtime.index)
+	selection, err := runtime.effectiveSelection(requested)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +186,20 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	value, callErr := binding.Call(ctx, arguments)
 	reportTelemetry(runtime.telemetry, CallEvent{Ref: ref, Failed: callErr != nil})
 	return value, callErr
+}
+
+// effectiveSelection is the single runtime authorization calculation shared
+// by direct Runtime calls and the model-facing ExecutionAPI facade.
+func (runtime *Runtime) effectiveSelection(requested RootSelection) (RootSelection, error) {
+	selection, err := runtime.ceiling.Intersect(runtime.selection)
+	if err != nil {
+		return RootSelection{}, err
+	}
+	selection, err = selection.Intersect(requested)
+	if err != nil {
+		return RootSelection{}, err
+	}
+	return selection.Resolve(runtime.index)
 }
 
 // Telemetry returns the collector shared by this Runtime's invocation path.

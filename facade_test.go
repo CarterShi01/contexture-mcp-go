@@ -37,6 +37,7 @@ func TestDeclarationFacadeInventory(t *testing.T) {
 		"NodeRef":                   reflect.TypeFor[contexture.NodeRef](),
 		"NodeUsage":                 reflect.TypeFor[contexture.NodeUsage](),
 		"Telemetry":                 reflect.TypeFor[contexture.Telemetry](),
+		"ExecutionAPI":              reflect.TypeFor[contexture.ExecutionAPI](),
 		"Prompt":                    reflect.TypeFor[contexture.Prompt](),
 		"PromptDeclaration":         reflect.TypeFor[contexture.PromptDeclaration](),
 		"Resource":                  reflect.TypeFor[contexture.Resource](),
@@ -79,6 +80,7 @@ func TestDeclarationFacadeInventory(t *testing.T) {
 		"NewControllerManagerWithChannels": contexture.NewControllerManagerWithChannels,
 		"RegisterRoot":                     contexture.RegisterRoot,
 		"NewSelectedGraph":                 contexture.NewSelectedGraph,
+		"NewExecutionAPI":                  contexture.NewExecutionAPI,
 	}
 	for name, value := range values {
 		if value == nil {

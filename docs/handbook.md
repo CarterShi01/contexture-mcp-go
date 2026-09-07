@@ -455,6 +455,26 @@ does not reveal excluded roots. A Prompt reserved for a person is checked only
 after that same ceiling, then tells the agent to ask the user to run the Host
 command rather than attempting a workaround.
 
+`NewExecutionAPI(runtime)` exposes the independently installable execution
+half without a discovery surface or any transport dependency. Its two methods,
+`InvokeReadOnly` and `Invoke`, take the native typed request facts
+(`context.Context`, ref, `json.RawMessage` arguments, and `RootSelection`) and
+return the Tool value or error; the Contexture request accessors such as
+`CurrentPrincipal`, `CurrentGraph`, `CurrentSelection`, and
+`CurrentTelemetry` remain available inside the Tool handler. Ordinary lookup
+and wrong-door errors become agent-facing `RefusedError` values with their
+typed causes preserved; `RootOutsideSelectionError` is left unchanged. Model
+calls to a `PromptRoots` entry are likewise refused only after the root ceiling
+check. `ReadForHost` (and retained `ReadForAHost`) is the separate no-argument,
+read-only host resource path: it shares Runtime validation and request context,
+but intentionally does not apply that model-only Prompt-root refusal. A
+stale host resource address is rendered as the same lookup `RefusedError`; an
+unexpected non-lookup Runtime error remains typed for the Host. A
+published `Prompt.ModelOpen` reservation for an otherwise ordinary node stays
+a `server/surface` Host policy and is checked by the server adapter before both
+model open and invoke calls; the SDK-neutral execution facade does not import
+that Host layer.
+
 ```bash
 go run ./cmd/assistant serve
 go run ./cmd/contexture demo --transport streamable-http

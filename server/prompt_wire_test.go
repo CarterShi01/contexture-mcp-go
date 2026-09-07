@@ -92,3 +92,51 @@ func TestOfficialSDKReservesPromptTargetFromModelOpenButNotPersonPrompt(t *testi
 		t.Fatalf("person prompt = %#v, %v", prompt, err)
 	}
 }
+
+func TestOfficialSDKRefusesPublicationReservedToolInvocation(t *testing.T) {
+	called := false
+	change, err := contexture.NewTool("change", "Run an approved change.", true, func(context.Context, struct{}) (string, error) {
+		called = true
+		return "changed", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "prompt-invocation-reservation",
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return change }}}
+		}},
+		Prompts: []contexture.Prompt{{Name: "run-change", Opens: "operations/change", Description: "Run the approved change.", ModelOpen: contexture.ModelReservedForPerson}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := server.CompileApplication(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway, err := compiled.Gateway()
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter := server.NewContextureMCPServer(server.Identity{Name: "prompt-invocation-reservation", Version: "0.0.0"}, gateway, compiled.Publications)
+	ctx := context.Background()
+	client := mcp.NewClient(&mcp.Implementation{Name: "prompt-invocation-client", Version: "0.0.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := adapter.Server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: string(contexture.InvokeReadOnlyGatewayName), Arguments: map[string]any{"ref": "operations/change", "arguments": map[string]any{}}})
+	if err != nil || !result.IsError || len(result.Content) != 1 || !strings.Contains(textOf(result.Content[0]), "opened by a person") || called {
+		t.Fatalf("reserved model invocation = %#v, %v; called=%t", result, err, called)
+	}
+}

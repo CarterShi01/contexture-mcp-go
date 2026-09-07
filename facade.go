@@ -40,6 +40,7 @@ type (
 	GatewayName               = model.GatewayName
 	GatewayTool               = model.GatewayTool
 	Gateway                   = model.Gateway
+	ExecutionAPI              = model.ExecutionAPI
 	RefusedError              = model.RefusedError
 	WrongDoorError            = model.WrongDoorError
 	Telemetry                 = model.Telemetry
@@ -144,6 +145,12 @@ func NewRuntime(index *Index, selection, ceiling RootSelection, telemetry Teleme
 // NewGateway connects progressive disclosure to an optional Runtime.
 func NewGateway(disclosure *Disclosure, runtime *Runtime) (*Gateway, error) {
 	return model.NewGateway(disclosure, runtime)
+}
+
+// NewExecutionAPI exposes the independently installable invocation half over
+// a bound Runtime. It owns neither discovery nor a Host transport.
+func NewExecutionAPI(runtime *Runtime) (*ExecutionAPI, error) {
+	return model.NewExecutionAPI(runtime)
 }
 
 // GatewayTools returns the complete fixed system-tool inventory.

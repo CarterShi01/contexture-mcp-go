@@ -59,6 +59,7 @@ var _ = contexture.RegisterRoot
 var _ = contexture.BranchesOf
 var _ = contexture.MembersOf
 var _ = contexture.NewSelectedGraph
+var _ = contexture.NewExecutionAPI
 var _ = contexture.WithChannels[struct{}]
 var _ contexture.NodeUsage
 var _ contexture.ControllerManager
@@ -179,14 +180,18 @@ func main() {
         panic("public Node containment facade did not retain compiled facts")
     }
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
-    graphValue, graphErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{\"name\":\"Ada\"}"), contexture.AllRoots())
+    execution, executionErr := contexture.NewExecutionAPI(runtime)
+    if executionErr != nil || len(execution.Tools()) != 2 || execution.Tools()[0].Name != contexture.InvokeReadOnlyGatewayName {
+        panic("public ExecutionAPI did not expose the fixed invocation surface")
+    }
+    graphValue, graphErr := execution.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{\"name\":\"Ada\"}"), contexture.AllRoots())
     if graphErr != nil {
         panic(graphErr)
     }
     if present, ok := graphValue.(bool); !ok || !present {
         panic("CurrentGraph was not available inside the external consumer Tool handler")
     }
-    _, rejectedErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{}"), contexture.AllRoots())
+    _, rejectedErr := execution.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{}"), contexture.AllRoots())
     if !errors.Is(rejectedErr, contexture.ErrInvalidInput) {
         panic("public tagged Tool did not reject a missing required input field")
     }

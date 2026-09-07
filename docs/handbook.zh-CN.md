@@ -363,6 +363,20 @@ application, err := contexture.DeclareApplication(contexture.ApplicationDeclarat
 `RootOutsideSelectionError`，不会被改写成恢复建议，也不会透露被排除的 root。为 person 保留的
 Prompt target 也会先检查同一 ceiling；随后只提示 agent 请用户运行 Host command，而不要绕过它。
 
+`NewExecutionAPI(runtime)` 暴露可独立安装的执行半边，但不带 discovery surface 或任何 transport
+dependency。它的两个方法 `InvokeReadOnly` 和 `Invoke` 接收 Go 原生的 typed request facts：
+`context.Context`、ref、`json.RawMessage` arguments 与 `RootSelection`，并返回 Tool value 或 error；
+Tool handler 内仍可使用 `CurrentPrincipal`、`CurrentGraph`、`CurrentSelection` 与
+`CurrentTelemetry` 等 Contexture request accessor。普通 lookup 与 wrong-door error 会转换为面向
+agent 的 `RefusedError`，同时保留其 typed cause；`RootOutsideSelectionError` 保持不变。对
+`PromptRoots` entry 的 model 调用同样会被拒绝，但只在 root ceiling 检查之后。`ReadForHost`
+（保留的 `ReadForAHost` 亦可）是独立的无参数、read-only host resource path：它共享 Runtime 的
+validation 与 request context，但有意不应用只针对 model 的 Prompt-root refusal。过期的 host
+resource address 会被渲染为同样的 lookup `RefusedError`；意外的非 lookup Runtime error 则保持
+typed，供 Host 诊断。普通 node 上已发布 `Prompt.ModelOpen` 的 reservation 仍是
+`server/surface` 的 Host policy；server adapter 会在 model open 与 invoke 前检查它，SDK-neutral
+execution facade 不导入该 Host layer。
+
 ```bash
 go run ./cmd/assistant serve
 go run ./cmd/contexture demo --transport streamable-http
