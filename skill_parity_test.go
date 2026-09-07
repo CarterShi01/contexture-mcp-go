@@ -22,6 +22,9 @@ func TestSkillDeclarationValidationRunsBeforeACompiledSurfaceExists(t *testing.T
 		{"blank instructions", func() *contexture.Skill {
 			return &contexture.Skill{Name: "check", Description: "Describe.", Instructions: " "}
 		}},
+		{"blank use", func() *contexture.Skill {
+			return &contexture.Skill{Name: "check", Description: "Describe.", Instructions: "Do.", Uses: []string{" "}}
+		}},
 		{"duplicate uses", func() *contexture.Skill {
 			return &contexture.Skill{Name: "check", Description: "Describe.", Instructions: "Do.", Uses: []string{"check", "check"}}
 		}},
