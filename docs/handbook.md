@@ -100,6 +100,17 @@ error sentinels such as `ErrInvalidDeclaration`, `ErrDuplicate`, and
 classes. `contexture.Version` is the binding package version; it is distinct
 from `contexture.SpecificationVersion`.
 
+Go does not emulate Python exception inheritance. Instead, `errors.Is` gives
+the same useful categories: `ErrContexture` is the package-wide equivalent of
+`ContextureError`; `ErrModelValidation`, `ErrDeclaration`, and
+`ErrDuplicateName` map the corresponding validation subclasses. The established
+`ErrInvalidDeclaration` and `ErrDuplicate` remain the precise Go spellings and
+also classify under those parents. `NodeNotFoundError` retains typed lookup
+facts and offers `Within`, `KnownRefs`, and `DeveloperSummary`; its summary is
+for developers and deliberately contains no agent recovery prose. A direct
+`WrongDoorError` likewise states only the Tool facts; `Gateway` turns it into
+the agent-facing next-action sentence.
+
 `contexture.PackageName` is framework metadata (`"contexture"`), never an
 application's MCP identity: the Host continues to publish the declared
 application name. `contexture.ReferenceSeparator` is the canonical `"/"`

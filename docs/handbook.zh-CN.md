@@ -92,6 +92,14 @@ func main() {
 `errors.Is` 判断，而不是使用 Python exception class。`contexture.Version` 是 binding package version，
 与 `contexture.SpecificationVersion` 不同。
 
+Go 不模拟 Python exception inheritance，而是通过 `errors.Is` 提供同样有用的 category：
+`ErrContexture` 是 package-wide 的 `ContextureError` 等价物；`ErrModelValidation`、
+`ErrDeclaration` 与 `ErrDuplicateName` 对应各个 validation subclass。既有的
+`ErrInvalidDeclaration` 与 `ErrDuplicate` 仍是精确的 Go spelling，同时也能归类到这些 parent。
+`NodeNotFoundError` 保留有类型的 lookup fact，并提供 `Within`、`KnownRefs` 与
+`DeveloperSummary`；其 summary 面向 developer，刻意不包含 agent recovery prose。直接的
+`WrongDoorError` 同样只陈述 Tool fact；由 `Gateway` 将它转换为面向 agent 的下一步操作语句。
+
 `contexture.PackageName` 是 framework metadata（`"contexture"`），绝不是 application 的 MCP identity：
 Host 仍发布所声明的 application name。`contexture.ReferenceSeparator` 是 reference segment 之间规范的
 `"/"`。四个面向 model 的固定名称是有类型的 `GatewayName` value：`DiscoverGatewayName`、

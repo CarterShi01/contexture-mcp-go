@@ -239,8 +239,17 @@ type WrongDoorError struct {
 	ReadOnly bool
 }
 
-func (err *WrongDoorError) Error() string { return WrongDoorMessage(err.Ref, err.ReadOnly) }
-func (*WrongDoorError) Unwrap() error     { return ErrWrongDoor }
+func (err *WrongDoorError) Error() string {
+	if err == nil {
+		return ErrWrongDoor.Error()
+	}
+	stated := "writing"
+	if err.ReadOnly {
+		stated = "read-only"
+	}
+	return fmt.Sprintf("%q is a %s Tool", err.Ref, stated)
+}
+func (*WrongDoorError) Unwrap() error { return ErrWrongDoor }
 
 // runtimeWrongKindError retains the established agent-facing invocation text
 // while unwrapping to the typed lookup facts exposed by Index.Tool.

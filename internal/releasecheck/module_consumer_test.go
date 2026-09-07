@@ -44,6 +44,10 @@ var _ = contexture.Version
 var _ = contexture.PackageName
 var _ = contexture.ReferenceSeparator
 var _ = contexture.ErrInvalidDeclaration
+var _ = contexture.ErrContexture
+var _ = contexture.ErrModelValidation
+var _ = contexture.ErrDeclaration
+var _ = contexture.ErrDuplicateName
 var _ = contexture.ErrNodeNotFound
 var _ = contexture.ErrRootOutsideSelection
 var _ = contexture.NewMemoryTelemetry
@@ -79,6 +83,9 @@ func main() {
     if contexture.DiscoverGatewayName != "contexture_discover" || contexture.OpenGatewayName != "contexture_open" || contexture.InvokeReadOnlyGatewayName != "contexture_invoke_read_only" || contexture.InvokeGatewayName != "contexture_invoke" {
         panic("public fixed gateway vocabulary has an unexpected spelling")
     }
+    if !errors.Is(contexture.ErrInvalidDeclaration, contexture.ErrDeclaration) || !errors.Is(contexture.ErrInvalidDeclaration, contexture.ErrModelValidation) || !errors.Is(contexture.ErrInvalidDeclaration, contexture.ErrContexture) || !errors.Is(contexture.ErrDuplicate, contexture.ErrDuplicateName) {
+        panic("public Contexture error categories are not composable")
+    }
     principal := contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "consumer", Claims: map[string]any{"secret": "do-not-log"}})
     copiedPrincipal := *principal
     for _, receiver := range []any{principal, copiedPrincipal} {
@@ -94,6 +101,11 @@ func main() {
     })
     application, _ := manager.Application("consumer")
     index, _ := contexture.Compile(application)
+    _, missingErr := index.Find("missing")
+    var missing *contexture.NodeNotFoundError
+    if !errors.As(missingErr, &missing) || !errors.Is(missingErr, contexture.ErrNodeNotFound) || !errors.Is(missingErr, contexture.ErrContexture) || missing.Within("other") != missing {
+        panic("public NodeNotFoundError facts are not classifiable")
+    }
     _, _ = contexture.NewSelectedGraph(index, contexture.AllRoots())
     _ = index.Count()
     _ = index.Has("operations")

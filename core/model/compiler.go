@@ -258,7 +258,7 @@ func (index *Index) lookupFailure(ref string) *NodeNotFoundError {
 		}
 	}
 	if len(segments) == 0 {
-		return &NodeNotFoundError{Reason: EmptyRef, Ref: ref}
+		return &NodeNotFoundError{Reason: EmptyRef, Ref: ref, HasRef: true}
 	}
 	rootRef := segments[0]
 	current, exists := index.byRef[rootRef]
@@ -268,12 +268,12 @@ func (index *Index) lookupFailure(ref string) *NodeNotFoundError {
 			known = append(known, root.nodeName())
 		}
 		sort.Strings(known)
-		return &NodeNotFoundError{Reason: NoSuchRoot, Ref: ref, Segment: rootRef, Scope: rootRef, Known: known}
+		return &NodeNotFoundError{Reason: NoSuchRoot, Ref: ref, HasRef: true, Segment: rootRef, Scope: rootRef, Known: known}
 	}
 	for depth := 1; depth < len(segments); depth++ {
 		role, ok := current.(*Role)
 		if !ok {
-			return &NodeNotFoundError{Reason: NotAContainer, Ref: ref, Segment: segments[depth], Scope: current.nodeName(), Kind: string(current.nodeKind())}
+			return &NodeNotFoundError{Reason: NotAContainer, Ref: ref, HasRef: true, Segment: segments[depth], Scope: current.nodeName(), Kind: string(current.nodeKind())}
 		}
 		known := []string{}
 		var next Node
@@ -289,11 +289,11 @@ func (index *Index) lookupFailure(ref string) *NodeNotFoundError {
 		}
 		if next == nil {
 			sort.Strings(known)
-			return &NodeNotFoundError{Reason: NoSuchMember, Ref: ref, Segment: segments[depth], Scope: role.Name, Kind: string(role.nodeKind()), Known: known}
+			return &NodeNotFoundError{Reason: NoSuchMember, Ref: ref, HasRef: true, Segment: segments[depth], Scope: role.Name, Kind: string(role.nodeKind()), Known: known}
 		}
 		current = next
 	}
-	return &NodeNotFoundError{Reason: NoSuchMember, Ref: ref, Segment: segments[len(segments)-1]}
+	return &NodeNotFoundError{Reason: NoSuchMember, Ref: ref, HasRef: true, Segment: segments[len(segments)-1]}
 }
 
 // Tool resolves one canonical ref that must name a Tool.
@@ -304,7 +304,7 @@ func (index *Index) Tool(ref string) (*Tool, error) {
 	}
 	tool, ok := node.(*Tool)
 	if !ok {
-		return nil, &NodeNotFoundError{Reason: WrongKind, Ref: ref, Kind: string(node.nodeKind()), Wanted: string(ToolKind)}
+		return nil, &NodeNotFoundError{Reason: WrongKind, Ref: ref, HasRef: true, Kind: string(node.nodeKind()), Wanted: string(ToolKind)}
 	}
 	return tool, nil
 }

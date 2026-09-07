@@ -23,6 +23,14 @@ const (
 )
 
 var (
+	// ErrContexture is the umbrella category for a framework-domain error.
+	ErrContexture = foundation.ErrContexture
+	// ErrModelValidation identifies invalid Contexture model facts.
+	ErrModelValidation = foundation.ErrModelValidation
+	// ErrDeclaration identifies a declaration the model cannot accept.
+	ErrDeclaration = foundation.ErrDeclaration
+	// ErrDuplicateName identifies a duplicate declaration identity.
+	ErrDuplicateName = foundation.ErrDuplicateName
 	// ErrInvalidDeclaration identifies an invalid application declaration.
 	ErrInvalidDeclaration = foundation.ErrInvalidDeclaration
 	// ErrInvalidInput identifies arguments that do not satisfy a Tool Binding.
