@@ -266,6 +266,75 @@ func TestOfficialSDKProjectsRoleUsesCards(t *testing.T) {
 	}
 }
 
+func TestOfficialSDKDisclosureOnlyNavigationKeepsToolCardsStructural(t *testing.T) {
+	status, err := contexture.NewTool("status", "Read status.", true, func(context.Context, struct{}) (string, error) {
+		return "healthy", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "disclosure-only-wire", Roots: []contexture.Factory{
+		func() contexture.Node {
+			return &contexture.Role{
+				Name: "operations", Description: "Operate.", Instructions: "Inspect.",
+				Tools: []contexture.Factory{func() contexture.Node { return status }},
+			}
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.CompileDisclosure(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	disclosure, err := contexture.NewDisclosureOnly(index, contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway, err := contexture.NewGateway(disclosure, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter := server.NewContextureMCPServer(server.Identity{Name: "disclosure-only-wire", Version: "0.0.0"}, gateway)
+	ctx := context.Background()
+	client := mcp.NewClient(&mcp.Implementation{Name: "disclosure-only-client", Version: "0.0.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := adapter.Server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	opened, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_open", Arguments: map[string]any{"ref": "operations"}})
+	if err != nil || opened.IsError {
+		t.Fatalf("open = %#v, %v", opened, err)
+	}
+	payload, ok := opened.StructuredContent.(map[string]any)
+	if !ok {
+		t.Fatalf("open structured content = %#v", opened.StructuredContent)
+	}
+	tools, ok := payload["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("disclosure-only tools = %#v", payload["tools"])
+	}
+	card, ok := tools[0].(map[string]any)
+	if !ok || card["ref"] != "operations/status" || card["kind"] != "tool" {
+		t.Fatalf("disclosure-only Tool card = %#v", tools[0])
+	}
+	if _, exists := card["read_only"]; exists {
+		t.Fatalf("wire card leaked read_only: %#v", card)
+	}
+	if _, exists := card["input_schema"]; exists {
+		t.Fatalf("wire card leaked input_schema: %#v", card)
+	}
+}
+
 func textOf(content mcp.Content) string {
 	if text, ok := content.(*mcp.TextContent); ok {
 		return text.Text

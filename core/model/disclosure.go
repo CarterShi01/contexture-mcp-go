@@ -147,12 +147,13 @@ func (view *Disclosure) reportOpen(ref string, node Node) {
 func (view *Disclosure) card(node Node, bound bool) map[string]any {
 	ref, _ := view.index.RefOf(node)
 	card := map[string]any{"kind": string(node.nodeKind()), "name": node.nodeName(), "description": node.nodeDescription(), "ref": ref}
-	if tool, ok := node.(*Tool); ok {
+	// Execution facts are meaningful only when this disclosure is backed by a
+	// bound Index. A disclosure-only Host intentionally gives agents structural
+	// routing cards, not a claim that a Tool can be invoked or is read-only.
+	if tool, ok := node.(*Tool); ok && bound && view.bound {
 		card["read_only"] = tool.ReadOnly
-		if bound && view.bound {
-			if binding, err := tool.Binding(); err == nil {
-				card["input_schema"] = binding.Schema()
-			}
+		if binding, err := tool.Binding(); err == nil {
+			card["input_schema"] = binding.Schema()
 		}
 	}
 	return card
@@ -179,13 +180,16 @@ func (view *Disclosure) active(node Node, selection RootSelection) map[string]an
 	case *Skill:
 		card["instructions"] = typed.Instructions
 		view.addUses(card, typed.Uses, selection)
+	case *Tool:
+		view.addUses(card, typed.Uses, selection)
 	}
 	return card
 }
 
 // addUses projects declared dependency targets in declaration order. A
 // selection can only attenuate this view: excluded targets are omitted rather
-// than exposing another root through a Role or Skill that happens to use it.
+// than exposing another root through a Role, Skill, or Tool that happens to
+// use it. Targets are route cards, so Uses never recursively disclose a cycle.
 func (view *Disclosure) addUses(card map[string]any, refs []string, selection RootSelection) {
 	if len(refs) == 0 {
 		return
