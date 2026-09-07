@@ -522,6 +522,8 @@ validated options, so later caller mutation cannot change a running policy.
 When embedding with `ServeListener`, the listener's actual TCP bind host must
 match `Host` and is validated again; a pre-bound public listener cannot hide
 behind the loopback default. Its externally owned port may differ.
+`localhost`, `127.0.0.1`, and `::1` are treated as equivalent loopback bind
+spellings because TCP resolution reports a concrete address.
 
 `MaxRequestBodyBytes` is forwarded to the official streamable-MCP handler;
 zero selects its safe 4 MiB default and a negative value is refused. Contexture

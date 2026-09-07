@@ -15,3 +15,16 @@ func TestAllowedHostAcceptsExactAndExplicitPortWildcardOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestSameBindHostTreatsOnlyCanonicalLoopbackAddressesAsLocalhost(t *testing.T) {
+	for _, pair := range [][2]string{{"localhost", "127.0.0.1"}, {"localhost", "::1"}, {"[::1]", "localhost"}} {
+		if !sameBindHost(pair[0], pair[1]) {
+			t.Fatalf("sameBindHost(%q, %q) = false, want true", pair[0], pair[1])
+		}
+	}
+	for _, pair := range [][2]string{{"localhost", "0.0.0.0"}, {"localhost", "192.0.2.1"}, {"mcp.example", "192.0.2.1"}} {
+		if sameBindHost(pair[0], pair[1]) {
+			t.Fatalf("sameBindHost(%q, %q) = true, want false", pair[0], pair[1])
+		}
+	}
+}

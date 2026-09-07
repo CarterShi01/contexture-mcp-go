@@ -414,6 +414,8 @@ stdio；streamable HTTP 默认绑定到 `127.0.0.1:8000/mcp`。HTTP 专用字段
 使用 `ServeListener` 嵌入时，listener 的实际 TCP bind host 必须与 `Host` 匹配，并会再次
 验证；一个预先绑定的 public listener 不能借助 loopback 默认值逃避检查。其由外部拥有的 port
 可以不同。
+TCP resolution 会报告具体地址，因此 `localhost`、`127.0.0.1` 和 `::1` 被视为等价的
+loopback bind 拼写。
 
 `MaxRequestBodyBytes` 会传给 official streamable-MCP handler；零值选择其安全的 4 MiB
 默认值，负值会被拒绝。Contexture 自身固定 stateless JSON HTTP。与 Python 动态的

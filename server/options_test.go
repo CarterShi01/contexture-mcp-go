@@ -187,6 +187,28 @@ func TestServeListenerValidatesActualPublicBindAndRejectsTwoAuthSources(t *testi
 	}
 }
 
+func TestStartAcceptsLocalhostWhenTheTCPListenerResolvesToLoopback(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "localhost-options", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "assistant", Description: "Answer requests.", Instructions: "Read first."}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assembly, err := server.BuildServer(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport, Host: "localhost", Port: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := assembly.Start(ctx, options); err != nil {
+		t.Fatalf("Start with Host localhost and a resolved loopback listener = %v", err)
+	}
+}
+
 type tokenVerifier func(context.Context, string) (*contexture.Principal, error)
 
 func (verify tokenVerifier) Verify(ctx context.Context, token string) (*contexture.Principal, error) {

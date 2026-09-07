@@ -228,7 +228,22 @@ func validateListenerOptions(options *ContextureOptions, listener net.Listener) 
 }
 
 func sameBindHost(declared, actual string) bool {
-	return strings.EqualFold(strings.Trim(declared, "[]"), strings.Trim(actual, "[]"))
+	declared = strings.Trim(declared, "[]")
+	actual = strings.Trim(actual, "[]")
+	if strings.EqualFold(declared, actual) {
+		return true
+	}
+	// net.Listen("tcp", "localhost:...") reports a concrete loopback IP on
+	// every supported platform, not the hostname the caller declared. Treat
+	// localhost and either canonical loopback address as the same safe bind;
+	// do not apply that equivalence to any public hostname or address.
+	if strings.EqualFold(declared, "localhost") && isLoopback(actual) {
+		return true
+	}
+	if strings.EqualFold(actual, "localhost") && isLoopback(declared) {
+		return true
+	}
+	return false
 }
 
 // resolveServeOptions retains the older explicit-identity entry points while
