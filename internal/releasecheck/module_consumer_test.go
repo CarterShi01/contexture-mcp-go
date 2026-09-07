@@ -52,6 +52,7 @@ var _ = contexture.ErrNodeNotFound
 var _ = contexture.ErrRootOutsideSelection
 var _ = contexture.NewMemoryTelemetry
 var _ = contexture.NewDisclosureWithTelemetry
+var _ = contexture.NewDisclosureAPI
 var _ = contexture.ReportTelemetry
 var _ = contexture.NewControllerManager
 var _ = contexture.NewControllerManagerWithChannels
@@ -146,12 +147,29 @@ func main() {
     graphIndex, _ := contexture.Compile(graphApplication)
     skillDisclosure, disclosureErr := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
     if disclosureErr != nil { panic(disclosureErr) }
-    checkRef := "graph" + contexture.ReferenceSeparator + "check"
-    openedSkill, skillOpenErr := skillDisclosure.Open(checkRef, contexture.AllRoots())
-    if skillOpenErr != nil || openedSkill["instructions"] != "Read graph facts first." {
-        panic("public Skill did not compile and disclose its active procedure")
+    navigation, navigationErr := contexture.NewDisclosureAPI(skillDisclosure, "graph/check")
+    if navigationErr != nil || len(navigation.Tools()) != 2 || navigation.Tools()[0].Name != contexture.DiscoverGatewayName {
+        panic("public DisclosureAPI did not expose the fixed navigation surface")
     }
-    openedRole, roleOpenErr := skillDisclosure.Open("graph", contexture.AllRoots())
+    navigationRoots, navigationRootsErr := navigation.Discover(contexture.AllRoots())
+    if navigationRootsErr != nil || len(navigationRoots["roles"]) != 1 || navigationRoots["roles"][0]["ref"] != "graph" {
+        panic("public DisclosureAPI did not project root routing cards")
+    }
+    selectedGraph, selectedGraphErr := navigation.SelectedGraph(contexture.AllRoots())
+    if selectedGraphErr != nil || len(selectedGraph.Walk()) != 5 {
+        panic("public DisclosureAPI did not retain selected graph facts")
+    }
+    checkRef := "graph" + contexture.ReferenceSeparator + "check"
+    _, reservedOpenErr := navigation.Open(checkRef, contexture.AllRoots())
+    var reservedOpen *contexture.RefusedError
+    if !errors.As(reservedOpenErr, &reservedOpen) {
+        panic("public DisclosureAPI did not reserve the model open door")
+    }
+    openedSkill, skillOpenErr := navigation.OpenForPerson(checkRef, contexture.AllRoots())
+    if skillOpenErr != nil || openedSkill["instructions"] != "Read graph facts first." {
+        panic("public DisclosureAPI person door did not disclose the active procedure")
+    }
+    openedRole, roleOpenErr := navigation.Open("graph", contexture.AllRoots())
     if roleOpenErr != nil { panic(roleOpenErr) }
     skillCards, cardsOK := openedRole["skills"].([]map[string]any)
     if !cardsOK || len(skillCards) != 1 || skillCards[0]["ref"] != checkRef || skillCards[0]["instructions"] != nil {

@@ -457,6 +457,24 @@ does not reveal excluded roots. A Prompt reserved for a person is checked only
 after that same ceiling, then tells the agent to ask the user to run the Host
 command rather than attempting a workaround.
 
+`NewDisclosureAPI(disclosure, reservedRefs...)` exposes the independently
+installable discovery half without a Runtime or transport dependency. Its
+`Discover` and `Open` methods take an explicit `RootSelection`; `Tools()` is
+always the ordered discover/open pair. `Open` returns progressive routing or
+active cards, turns ordinary typed lookup failure into a `RefusedError` with
+its `NodeNotFoundError` cause retained, and leaves
+`RootOutsideSelectionError` unchanged. `OpenForPerson` (and retained
+`OpenForAPerson`) bypasses only the supplied model reservations and Prompt-root
+visibility; it never widens the selected roots. `SelectedGraph` returns the
+same request-selected, read-only graph projection used by navigation. The raw
+`Disclosure` remains available to native Hosts that deliberately need typed
+lookup facts instead of agent recovery prose.
+
+The optional `reservedRefs` are a core-only way to express a caller's
+person-controlled model-open policy. An application publication's
+`Prompt.ModelOpen` policy remains assembled and enforced by `server/surface`,
+so the declaration facade and Disclosure API stay SDK-neutral.
+
 `NewExecutionAPI(runtime)` exposes the independently installable execution
 half without a discovery surface or any transport dependency. Its two methods,
 `InvokeReadOnly` and `Invoke`, take the native typed request facts

@@ -37,6 +37,7 @@ type (
 	RootSelectionError        = model.RootSelectionError
 	RootOutsideSelectionError = model.RootOutsideSelectionError
 	Disclosure                = model.Disclosure
+	DisclosureAPI             = model.DisclosureAPI
 	GatewayName               = model.GatewayName
 	GatewayTool               = model.GatewayTool
 	Gateway                   = model.Gateway
@@ -135,6 +136,13 @@ func NewDisclosureWithTelemetry(index *Index, selection RootSelection, telemetry
 // NewDisclosureOnly creates an unbound navigation-only view.
 func NewDisclosureOnly(index *Index, selection RootSelection) (*Disclosure, error) {
 	return model.NewDisclosureOnly(index, selection)
+}
+
+// NewDisclosureAPI exposes the independently installable navigation half over
+// one compiled Disclosure. Optional refs reserve model opening for a person;
+// they remain available through OpenForPerson.
+func NewDisclosureAPI(disclosure *Disclosure, reserved ...string) (*DisclosureAPI, error) {
+	return model.NewDisclosureAPI(disclosure, reserved...)
 }
 
 // NewRuntime creates executable Tool dispatch over one bound Index.

@@ -365,6 +365,19 @@ application, err := contexture.DeclareApplication(contexture.ApplicationDeclarat
 `RootOutsideSelectionError`，不会被改写成恢复建议，也不会透露被排除的 root。为 person 保留的
 Prompt target 也会先检查同一 ceiling；随后只提示 agent 请用户运行 Host command，而不要绕过它。
 
+`NewDisclosureAPI(disclosure, reservedRefs...)` 暴露可独立安装的 discovery 半边，不依赖 Runtime
+或 transport。它的 `Discover` 与 `Open` 接收显式 `RootSelection`；`Tools()` 始终返回有序的
+discover/open pair。`Open` 返回渐进式 routing 或 active card，把普通 typed lookup failure 转换为
+`RefusedError`，同时保留其 `NodeNotFoundError` cause；`RootOutsideSelectionError` 则保持不变。
+`OpenForPerson`（保留的 `OpenForAPerson` 亦可）只绕过提供的 model reservation 与 Prompt-root
+visibility，绝不会扩大 selected root。`SelectedGraph` 返回与 navigation 相同的、request-selected 的
+read-only graph projection。原始 `Disclosure` 仍对刻意需要 typed lookup facts 而非 agent recovery prose
+的 native Host 可用。
+
+可选的 `reservedRefs` 是表达 caller person-controlled model-open policy 的 core-only 方式。application
+publication 的 `Prompt.ModelOpen` policy 仍由 `server/surface` 组装并执行，因此 declaration facade 与
+Disclosure API 保持 SDK-neutral。
+
 `NewExecutionAPI(runtime)` 暴露可独立安装的执行半边，但不带 discovery surface 或任何 transport
 dependency。它的两个方法 `InvokeReadOnly` 和 `Invoke` 接收 Go 原生的 typed request facts：
 `context.Context`、ref、`json.RawMessage` arguments 与 `RootSelection`，并返回 Tool value 或 error；

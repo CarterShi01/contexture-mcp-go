@@ -68,7 +68,7 @@ func ExecutionGatewayTools() []GatewayTool { return append([]GatewayTool(nil), g
 
 // Gateway is the transport-neutral fixed Contexture model plane.
 type Gateway struct {
-	disclosure *Disclosure
+	disclosure *DisclosureAPI
 	execution  *ExecutionAPI
 }
 
@@ -77,7 +77,11 @@ func NewGateway(disclosure *Disclosure, runtime *Runtime) (*Gateway, error) {
 	if disclosure == nil {
 		return nil, errors.New("Contexture Disclosure must not be nil")
 	}
-	gateway := &Gateway{disclosure: disclosure}
+	navigation, err := NewDisclosureAPI(disclosure)
+	if err != nil {
+		return nil, err
+	}
+	gateway := &Gateway{disclosure: navigation}
 	if runtime != nil {
 		execution, err := NewExecutionAPI(runtime)
 		if err != nil {
