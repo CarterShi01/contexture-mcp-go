@@ -103,6 +103,14 @@ func RegisterRoot(manager *ControllerManager, factory Factory) (Node, error) {
 	return manager.RegisterRoot(factory)
 }
 
+// BranchesOf returns one compiled Node's direct Role branches. Leaf Nodes have
+// no branches and return an empty defensive result.
+func BranchesOf(node Node) ([]Node, error) { return model.BranchesOf(node) }
+
+// MembersOf returns one compiled Node's direct containment members. Leaf Nodes
+// have no members and return an empty defensive result.
+func MembersOf(node Node) ([]Node, error) { return model.MembersOf(node) }
+
 // Compile builds one fresh canonical forest from a lazy Application.
 func Compile(application *Application) (*Index, error) {
 	return model.Compile(application)

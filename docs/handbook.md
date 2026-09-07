@@ -262,6 +262,18 @@ are structural Index facts and do not disclose a node's member cards.
 `Find` and `Signpost` normalize repeated or leading/trailing `/` separators to
 the same canonical address before a successful lookup.
 
+Every compiled `Node` also exposes `Ref()`: it returns that node's canonical
+address without reconstructing it from mutable display fields. `BranchesOf`
+and `MembersOf` are the Go-native common-node equivalents of Python's base
+node traversal methods. A Role returns direct child Role branches, and direct
+members in Roles → Skills → Tools declaration-group order; Skill and Tool
+return empty defensive results without needing a snapshot because they hold no
+factories. Role containment queries, like `Role.Members`, require a compiled
+Index snapshot and never evaluate factories. `Ref()` on an uncompiled or
+typed-nil node returns an `ErrInvalidDeclaration`-typed error instead. This maps
+Python's constructed object members to Go's deliberate lazy factories while
+keeping canonical ref identity and compiled snapshots immutable.
+
 `Role.Branches`, `Role.Members`, and `Role.Member` provide the corresponding
 Role-local structural queries on a compiled snapshot. Branches returns only
 direct child Roles; Members returns direct child Roles, Skills, and Tools in

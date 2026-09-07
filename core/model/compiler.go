@@ -571,10 +571,19 @@ func cloneNode(node Node, owner *Index, ref string) Node {
 func nodeLocation(node Node) (*Index, string) {
 	switch typed := node.(type) {
 	case *Role:
+		if typed == nil {
+			return nil, ""
+		}
 		return typed.owner, typed.ref
 	case *Skill:
+		if typed == nil {
+			return nil, ""
+		}
 		return typed.owner, typed.ref
 	case *Tool:
+		if typed == nil {
+			return nil, ""
+		}
 		return typed.owner, typed.ref
 	default:
 		return nil, ""

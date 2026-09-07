@@ -56,6 +56,8 @@ var _ = contexture.ReportTelemetry
 var _ = contexture.NewControllerManager
 var _ = contexture.NewControllerManagerWithChannels
 var _ = contexture.RegisterRoot
+var _ = contexture.BranchesOf
+var _ = contexture.MembersOf
 var _ = contexture.NewSelectedGraph
 var _ = contexture.WithChannels[struct{}]
 var _ contexture.NodeUsage
@@ -158,6 +160,9 @@ func main() {
     if roleNodeErr != nil { panic(roleNodeErr) }
     compiledRole, roleOK := roleNode.(*contexture.Role)
     if !roleOK { panic("public Role lookup returned the wrong node kind") }
+    if roleRef, roleRefErr := compiledRole.Ref(); roleRefErr != nil || roleRef != "graph" {
+        panic("public Node canonical reference was not retained")
+    }
     members, membersErr := compiledRole.Members()
     if membersErr != nil || len(members) != 4 || members[0].NodeName() != "check" {
         panic("public compiled Role membership was not available")
@@ -168,6 +173,11 @@ func main() {
     }
     branches, branchesErr := compiledRole.Branches()
     if branchesErr != nil || len(branches) != 0 { panic("public Role branches were not stable") }
+    facadeMembers, facadeMembersErr := contexture.MembersOf(compiledRole)
+    facadeBranches, facadeBranchesErr := contexture.BranchesOf(compiledRole)
+    if facadeMembersErr != nil || len(facadeMembers) != 4 || facadeBranchesErr != nil || len(facadeBranches) != 0 {
+        panic("public Node containment facade did not retain compiled facts")
+    }
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
     graphValue, graphErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{\"name\":\"Ada\"}"), contexture.AllRoots())
     if graphErr != nil {

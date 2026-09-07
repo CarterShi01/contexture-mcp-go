@@ -226,6 +226,14 @@ ordering，同时排除其他 root。跨 root 的 `uses` 与 dependent 会被过
 `HeaderRootSelector` 仅将 `Contexture-Roots` 当作 attenuation request：它会验证未知 name 而不列出其他 root，
 并与经过认证的 principal ceiling 求交。
 
+每个已编译 `Node` 还公开 `Ref()`：它返回该 node 的 canonical address，而不从可变的 display field 重新拼接。
+`BranchesOf` 与 `MembersOf` 是 Python base node traversal method 的 Go 原生等价物。Role 返回直接 child Role branch，
+并按 Roles → Skills → Tools 的 declaration-group 顺序返回直接 member；Skill 与 Tool 因不持有 factory，未编译时也返回
+空的 defensive result。Role containment query 和 `Role.Members` 一样都要求 compiled Index snapshot，且绝不会执行 factory。
+未编译或 typed-nil node 上调用 `Ref()` 则返回 `ErrInvalidDeclaration`-typed error。这把 Python 已构造的 object member 映射到 Go
+有意采用的 lazy factory，同时保持
+canonical ref identity 与 compiled snapshot 的不可变性。
+
 `Role.Branches`、`Role.Members` 与 `Role.Member` 为已编译 snapshot 提供相应的 Role-local
 结构查询。Branches 仅返回直接 child Role；Members 按 declaration group 顺序返回直接 child Role、Skill
 和 Tool；Member 在这三类直接成员之间按 name 查找，未找到时返回带 Role 已知 name（排序后）的

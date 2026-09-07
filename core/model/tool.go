@@ -19,3 +19,4 @@ func (node *Tool) Kind() Kind              { return node.nodeKind() }
 func (node *Tool) NodeName() string        { return node.nodeName() }
 func (node *Tool) NodeDescription() string { return node.nodeDescription() }
 func (node *Tool) NodeUses() []string      { return node.nodeUses() }
+func (node *Tool) Ref() (string, error)    { return nodeRef(node) }

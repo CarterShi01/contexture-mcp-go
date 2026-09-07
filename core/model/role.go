@@ -26,6 +26,7 @@ func (node *Role) Kind() Kind              { return node.nodeKind() }
 func (node *Role) NodeName() string        { return node.nodeName() }
 func (node *Role) NodeDescription() string { return node.nodeDescription() }
 func (node *Role) NodeUses() []string      { return node.nodeUses() }
+func (node *Role) Ref() (string, error)    { return nodeRef(node) }
 
 // Branches returns this compiled Role's direct child Roles in declaration
 // order. It is a structural query over the immutable compiled snapshot, so it
