@@ -125,7 +125,10 @@ unknown field，应选择 `NewToolWithSchema`；此时 explicit 的 `additionalP
 JSON tag option 会被完整扫描，而不是按位置解释，因此 `json:"value,omitempty,string"` 与
 `json:"value,string,omitempty"` 都会让 `value` 成为 optional。property-level JSON Schema constraint 可以
 收窄可接受的 value，但不能重塑 top-level object 或削弱 unknown-field policy。调用失败仍是
-`ErrInvalidInput`，且绝不会进入 handler。
+`ErrInvalidInput`，且绝不会进入 handler。explicit numeric field 必须声明位于目标 Go type width 内的有限
+`minimum` 与 `maximum`；无界 JSON number 可能承诺 `encoding/json` 无法存储的 value。array item schema、map
+value schema 与 map `patternProperties` 也会递归检查。struct field 不可使用 `patternProperties`，因为 strict
+decoder 会拒绝每一个匹配的 unknown name。
 
 ### Imperative registration
 

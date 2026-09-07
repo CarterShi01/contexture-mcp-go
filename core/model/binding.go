@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 
@@ -282,6 +283,9 @@ func validateObjectSchema(schema map[string]any, input reflect.Type, nullable bo
 	if additional, ok := schema["additionalProperties"].(bool); !ok || additional {
 		return fmt.Errorf("%w: %s must set additionalProperties to false because Tool decoding rejects unknown fields", ErrInvalidDeclaration, location)
 	}
+	if _, exists := schema["patternProperties"]; exists {
+		return fmt.Errorf("%w: %s cannot use patternProperties because Tool decoding rejects unknown struct fields", ErrInvalidDeclaration, location)
+	}
 	fields, err := inputJSONFields(input)
 	if err != nil {
 		return err
@@ -352,17 +356,20 @@ func validateSchemaForType(schema map[string]any, typeOf reflect.Type, stringEnc
 	case reflect.String:
 		return validateScalarSchema(schema, []string{"string"}, nullable, location)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return validateScalarSchema(schema, []string{"integer"}, nullable, location)
+		if err := validateScalarSchema(schema, []string{"integer"}, nullable, location); err != nil {
+			return err
+		}
+		return validateNumericBounds(schema, signedIntegerBounds(typeOf.Bits()), location)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		if err := validateScalarSchema(schema, []string{"integer"}, nullable, location); err != nil {
 			return err
 		}
-		if minimum, ok := schema["minimum"].(float64); !ok || minimum < 0 {
-			return fmt.Errorf("%w: %s for an unsigned Go integer must set minimum to 0", ErrInvalidDeclaration, location)
-		}
-		return nil
+		return validateNumericBounds(schema, unsignedIntegerBounds(typeOf.Bits()), location)
 	case reflect.Float32, reflect.Float64:
-		return validateScalarSchema(schema, []string{"integer", "number"}, nullable, location)
+		if err := validateScalarSchema(schema, []string{"integer", "number"}, nullable, location); err != nil {
+			return err
+		}
+		return validateNumericBounds(schema, floatBounds(typeOf.Bits()), location)
 	case reflect.Slice:
 		if typeOf.Elem().Kind() == reflect.Uint8 {
 			return validateScalarSchema(schema, []string{"string"}, nullable, location)
@@ -431,6 +438,21 @@ func validateMapSchema(schema map[string]any, element reflect.Type, nullable boo
 				return fmt.Errorf("%w: %s property %q must be a JSON Schema object", ErrInvalidDeclaration, location, name)
 			}
 			if err := validateSchemaForType(propertySchema, element, false, location+" property "+fmt.Sprintf("%q", name)); err != nil {
+				return err
+			}
+		}
+	}
+	if patterns, exists := schema["patternProperties"]; exists {
+		items, ok := patterns.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%w: %s patternProperties must be an object", ErrInvalidDeclaration, location)
+		}
+		for pattern, property := range items {
+			propertySchema, ok := property.(map[string]any)
+			if !ok {
+				return fmt.Errorf("%w: %s patternProperties %q must be a JSON Schema object", ErrInvalidDeclaration, location, pattern)
+			}
+			if err := validateSchemaForType(propertySchema, element, false, location+" pattern property "+fmt.Sprintf("%q", pattern)); err != nil {
 				return err
 			}
 		}
@@ -517,6 +539,44 @@ func acceptsAnyJSON(typeOf reflect.Type) bool {
 func implementsJSONUnmarshaler(typeOf reflect.Type) bool {
 	unmarshaler := reflect.TypeFor[json.Unmarshaler]()
 	return typeOf.Implements(unmarshaler) || reflect.PointerTo(typeOf).Implements(unmarshaler)
+}
+
+type numericBounds struct {
+	minimum float64
+	maximum float64
+}
+
+func signedIntegerBounds(bits int) numericBounds {
+	limit := math.Ldexp(1, bits-1)
+	return numericBounds{minimum: -limit, maximum: math.Nextafter(limit, math.Inf(-1))}
+}
+
+func unsignedIntegerBounds(bits int) numericBounds {
+	limit := math.Ldexp(1, bits)
+	return numericBounds{minimum: 0, maximum: math.Nextafter(limit, math.Inf(-1))}
+}
+
+func floatBounds(bits int) numericBounds {
+	maximum := math.MaxFloat64
+	if bits == 32 {
+		maximum = math.MaxFloat32
+	}
+	return numericBounds{minimum: -maximum, maximum: maximum}
+}
+
+// validateNumericBounds requires an explicit closed range. Without it a JSON
+// Schema integer or number accepts values outside a fixed-width Go field,
+// which lets a disclosed card promise an invocation encoding/json will reject.
+func validateNumericBounds(schema map[string]any, allowed numericBounds, location string) error {
+	minimum, minimumOK := schema["minimum"].(float64)
+	maximum, maximumOK := schema["maximum"].(float64)
+	if !minimumOK || !maximumOK || math.IsNaN(minimum) || math.IsNaN(maximum) || math.IsInf(minimum, 0) || math.IsInf(maximum, 0) {
+		return fmt.Errorf("%w: %s must set finite minimum and maximum within its Go numeric width", ErrInvalidDeclaration, location)
+	}
+	if minimum > maximum || minimum < allowed.minimum || maximum > allowed.maximum {
+		return fmt.Errorf("%w: %s numeric range [%g, %g] exceeds its Go numeric width [%g, %g]", ErrInvalidDeclaration, location, minimum, maximum, allowed.minimum, allowed.maximum)
+	}
+	return nil
 }
 
 func requiredSchemaFields(value any) ([]string, error) {

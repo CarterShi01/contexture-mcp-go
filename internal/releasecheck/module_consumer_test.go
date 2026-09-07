@@ -81,12 +81,19 @@ func main() {
     _, _ = index.MatchingRefs("operations", 10)
 
     type graphInput struct { Name string ` + "`json:\"name\"`" + ` }
+    type strictInput struct { Count int32 ` + "`json:\"count\"`" + ` }
     tool, toolErr := contexture.NewTool("graph", "Read the request graph.", true, func(ctx context.Context, _ graphInput) (bool, error) {
         return contexture.CurrentGraph(ctx) != nil, nil
     })
     if toolErr != nil { panic(toolErr) }
+    strict, strictErr := contexture.NewToolWithSchema("strict", "Accept one bounded count.", true, map[string]any{
+        "type": "object", "additionalProperties": false,
+        "properties": map[string]any{"count": map[string]any{"type": "integer", "minimum": -2147483648, "maximum": 2147483647}},
+        "required": []any{"count"},
+    }, func(_ context.Context, input strictInput) (int32, error) { return input.Count, nil })
+    if strictErr != nil { panic(strictErr) }
     graphApplication, _ := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-consumer", Roots: []contexture.Factory{func() contexture.Node {
-        return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return tool }}}
+        return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return tool }, func() contexture.Node { return strict }}}
     }}})
     graphIndex, _ := contexture.Compile(graphApplication)
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
@@ -100,6 +107,14 @@ func main() {
     _, rejectedErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{}"), contexture.AllRoots())
     if !errors.Is(rejectedErr, contexture.ErrInvalidInput) {
         panic("public tagged Tool did not reject a missing required input field")
+    }
+    strictValue, strictCallErr := runtime.InvokeReadOnly(context.Background(), "graph/strict", json.RawMessage("{\"count\":7}"), contexture.AllRoots())
+    if strictCallErr != nil || strictValue != int32(7) {
+        panic("public NewToolWithSchema did not execute accepted input")
+    }
+    _, strictRejectedErr := runtime.InvokeReadOnly(context.Background(), "graph/strict", json.RawMessage("{\"count\":\"seven\"}"), contexture.AllRoots())
+    if !errors.Is(strictRejectedErr, contexture.ErrInvalidInput) {
+        panic("public NewToolWithSchema did not reject schema-invalid input")
     }
 }
 `

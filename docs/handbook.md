@@ -145,7 +145,13 @@ JSON tag options are scanned rather than positionally interpreted, so both
 `json:"value,omitempty,string"` and `json:"value,string,omitempty"` make
 `value` optional. Property-level JSON Schema constraints may narrow accepted
 values, but cannot reshape the top-level object or weaken its unknown-field
-policy. Call failures remain `ErrInvalidInput` and never reach the handler.
+policy. Explicit numeric fields must state finite `minimum` and `maximum`
+bounds inside the target Go type width; an unbounded JSON number could promise
+a value `encoding/json` cannot store. Array item schemas, map value schemas,
+and map `patternProperties` are checked recursively for the same reason.
+`patternProperties` is not valid for a struct field because strict decoding
+would reject every matching unknown name. Call failures remain `ErrInvalidInput`
+and never reach the handler.
 
 ### Imperative registration
 

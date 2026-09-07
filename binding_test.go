@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
@@ -21,7 +22,7 @@ type nestedInput struct {
 
 type corpusInput struct {
 	Mode    string            `json:"mode"`
-	Count   int               `json:"count"`
+	Count   int32             `json:"count"`
 	Ratio   float64           `json:"ratio"`
 	Enabled *bool             `json:"enabled,omitempty"`
 	Nested  nestedInput       `json:"nested"`
@@ -42,11 +43,16 @@ type strictInput struct {
 }
 
 type scalarInput struct {
-	Count int `json:"count"`
+	Count int32 `json:"count"`
 }
 
 type nestedStrictInput struct {
 	Nested nestedInput `json:"nested"`
+}
+
+type collectionInput struct {
+	Items  []int32          `json:"items"`
+	Labels map[string]int32 `json:"labels"`
 }
 
 func strictInputSchema() map[string]any {
@@ -141,8 +147,8 @@ func TestToolBindingSchemaCorpusValidatesBeforeTheHandler(t *testing.T) {
 		"type": "object", "additionalProperties": false,
 		"properties": map[string]any{
 			"mode":    map[string]any{"type": "string", "enum": []any{"safe", "force"}},
-			"count":   map[string]any{"type": "integer"},
-			"ratio":   map[string]any{"type": "number"},
+			"count":   map[string]any{"type": "integer", "minimum": float64(math.MinInt32), "maximum": float64(math.MaxInt32)},
+			"ratio":   map[string]any{"type": "number", "minimum": -math.MaxFloat64, "maximum": math.MaxFloat64},
 			"enabled": map[string]any{"type": []any{"boolean", "null"}},
 			"nested":  map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}}, "required": []any{"name"}, "additionalProperties": false},
 			"values":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
@@ -225,6 +231,72 @@ func TestNewToolWithSchemaRejectsScalarAndNestedDecodeDriftAtDeclaration(t *test
 	}, func(context.Context, nestedStrictInput) (string, error) { return "unexpected", nil })
 	if !errors.Is(err, contexture.ErrInvalidDeclaration) {
 		t.Fatalf("nested unknown-field drift error = %v", err)
+	}
+}
+
+func TestNewToolWithSchemaRejectsUnsafeNumericArrayAndMapContractsAtDeclaration(t *testing.T) {
+	base := func(items, labels map[string]any) map[string]any {
+		return map[string]any{
+			"type": "object", "additionalProperties": false,
+			"properties": map[string]any{"items": items, "labels": labels},
+			"required":   []any{"items", "labels"},
+		}
+	}
+	validInteger := map[string]any{"type": "integer", "minimum": float64(math.MinInt32), "maximum": float64(math.MaxInt32)}
+	cases := []struct {
+		name       string
+		schema     map[string]any
+		collection bool
+	}{
+		{"unbounded integer", map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{"count": map[string]any{"type": "integer"}}, "required": []any{"count"}}, false},
+		{"wider integer", map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{"count": map[string]any{"type": "integer", "minimum": float64(math.MinInt32) - 1, "maximum": float64(math.MaxInt32)}}, "required": []any{"count"}}, false},
+		{"array item scalar mismatch", base(map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, map[string]any{"type": "object", "additionalProperties": validInteger}), true},
+		{"array missing items", base(map[string]any{"type": "array"}, map[string]any{"type": "object", "additionalProperties": validInteger}), true},
+		{"map untyped extras", base(map[string]any{"type": "array", "items": validInteger}, map[string]any{"type": "object", "additionalProperties": true}), true},
+		{"map pattern scalar mismatch", base(map[string]any{"type": "array", "items": validInteger}, map[string]any{"type": "object", "additionalProperties": false, "patternProperties": map[string]any{".*": map[string]any{"type": "string"}}}), true},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			if test.collection {
+				_, err := contexture.NewToolWithSchema("collection", "Collection.", true, test.schema, func(context.Context, collectionInput) (string, error) { return "unexpected", nil })
+				if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+					t.Fatalf("collection schema error = %v", err)
+				}
+				return
+			}
+			_, err := contexture.NewToolWithSchema("scalar", "Scalar.", true, test.schema, func(context.Context, scalarInput) (scalarInput, error) { return scalarInput{}, nil })
+			if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+				t.Fatalf("numeric schema error = %v", err)
+			}
+		})
+	}
+}
+
+func TestNewToolWithSchemaValidatesCollectionAcceptanceAtInvocation(t *testing.T) {
+	integer := map[string]any{"type": "integer", "minimum": float64(math.MinInt32), "maximum": float64(math.MaxInt32)}
+	tool, err := contexture.NewToolWithSchema("collection", "Collection.", true, map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{
+			"items":  map[string]any{"type": "array", "items": integer},
+			"labels": map[string]any{"type": "object", "additionalProperties": integer, "patternProperties": map[string]any{"^safe-": integer}},
+		},
+		"required": []any{"items", "labels"},
+	}, func(_ context.Context, input collectionInput) (int, error) {
+		return len(input.Items) + len(input.Labels), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := tool.Binding()
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := binding.Call(context.Background(), json.RawMessage(`{"items":[1],"labels":{"safe-count":2}}`))
+	if err != nil || value != 2 {
+		t.Fatalf("valid collection invocation = %#v, %v", value, err)
+	}
+	if _, err := binding.Call(context.Background(), json.RawMessage(`{"items":["one"],"labels":{"safe-count":"two"}}`)); !errors.Is(err, contexture.ErrInvalidInput) {
+		t.Fatalf("invalid collection invocation error = %v", err)
 	}
 }
 
