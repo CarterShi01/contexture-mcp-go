@@ -13,6 +13,12 @@ type runtimeInput struct {
 	Value string `json:"value"`
 }
 
+func TestCurrentGraphIsAbsentOutsideAnInvocation(t *testing.T) {
+	if graph := contexture.CurrentGraph(context.Background()); graph != nil {
+		t.Fatalf("CurrentGraph outside invocation = %#v, want nil", graph)
+	}
+}
+
 func TestRuntimeUsesBindingDoorsAndRequestContext(t *testing.T) {
 	read, err := contexture.NewTool("status", "Status.", true, func(ctx context.Context, input runtimeInput) (string, error) {
 		if principal := contexture.CurrentPrincipal(ctx); principal == nil || principal.Subject() != "alice" {

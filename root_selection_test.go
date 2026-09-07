@@ -201,6 +201,79 @@ func TestRuntimeCurrentGraphAndSelectionAreConcurrentRequestLocalProjections(t *
 	}
 }
 
+func TestRuntimeRetainsOneSelectedGraphAcrossOverlappingRootCalls(t *testing.T) {
+	arrived := make(chan string, 2)
+	release := make(chan struct{})
+	probe := func(root, excluded string) contexture.Factory {
+		tool, err := contexture.NewTool("probe", "Probe the selected graph.", true, func(ctx context.Context, _ selectionInput) (string, error) {
+			graph := contexture.CurrentGraph(ctx)
+			if graph == nil {
+				return "", errors.New("CurrentGraph was absent")
+			}
+			arrived <- root
+			<-release
+			if contexture.CurrentGraph(ctx) != graph {
+				return "", errors.New("CurrentGraph changed during invocation")
+			}
+			if _, err := graph.Find(root + "/probe"); err != nil {
+				return "", err
+			}
+			if _, err := graph.Find(excluded + "/probe"); !errors.Is(err, contexture.ErrRootOutsideSelection) {
+				return "", errors.New("selected graph revealed an excluded root")
+			}
+			return root, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return func() contexture.Node { return tool }
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-barrier", Roots: []contexture.Factory{
+		func() contexture.Node {
+			return &contexture.Role{Name: "alpha", Description: "Alpha.", Instructions: "Inspect.", Tools: []contexture.Factory{probe("alpha", "beta")}}
+		},
+		func() contexture.Node {
+			return &contexture.Role{Name: "beta", Description: "Beta.", Instructions: "Inspect.", Tools: []contexture.Factory{probe("beta", "alpha")}}
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type result struct {
+		root  string
+		value any
+		err   error
+	}
+	results := make(chan result, 2)
+	for _, root := range []string{"alpha", "beta"} {
+		root := root
+		go func() {
+			selection := mustOnlyRoot(t, root)
+			value, callErr := runtime.InvokeReadOnly(context.Background(), root+"/probe", json.RawMessage("{}"), selection)
+			results <- result{root: root, value: value, err: callErr}
+		}()
+	}
+	seen := map[string]bool{<-arrived: true, <-arrived: true}
+	if !seen["alpha"] || !seen["beta"] {
+		t.Fatalf("barrier arrivals = %#v", seen)
+	}
+	close(release)
+	for range 2 {
+		outcome := <-results
+		if outcome.err != nil || outcome.value != outcome.root {
+			t.Fatalf("%s result = %#v, %v", outcome.root, outcome.value, outcome.err)
+		}
+	}
+}
+
 func mustOnlyRoot(t *testing.T, name string) contexture.RootSelection {
 	t.Helper()
 	selection, err := contexture.OnlyRoots(name)

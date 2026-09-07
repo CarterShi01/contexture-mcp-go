@@ -163,7 +163,9 @@ ref 与 sub-role count；`Crossings` 列出跨越 root 的声明 `Uses` edge。�
 `NewSelectedGraph(index, selection)` 提供 request-safe graph view：`Roots`、`Walk`、`NodesWithRefs`、
 `Find`、`RefOf`、`ParentOf`、`ChildrenOf`、`UsesOf`、`DependentsOf` 和 `MatchingRefs` 都会保留 canonical
 ordering，同时排除其他 root。跨 root 的 `uses` 与 dependent 会被过滤而不是披露。`CurrentGraph(ctx)` 与
-`CurrentSelection(ctx)` 仅在 Tool invocation 内有效；在 invocation 外 selection 会安全地默认为 all roots。
+`CurrentSelection(ctx)` 仅在 Tool invocation 内有效。Go 有意让 invocation 外的 `CurrentGraph` 返回 `nil`
+（不存在 ambient graph），而 `CurrentSelection` 会安全地默认为 all roots。Tool handler 可在整个 invocation
+内保留并查询其唯一的 `CurrentGraph`；并发 call 会得到彼此独立的 root-projected graph。
 `HeaderRootSelector` 仅将 `Contexture-Roots` 当作 attenuation request：它会验证未知 name 而不列出其他 root，
 并与经过认证的 principal ceiling 求交。
 

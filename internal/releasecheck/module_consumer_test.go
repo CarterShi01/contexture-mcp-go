@@ -24,6 +24,8 @@ func TestExternalModuleConsumerCompilesPublicEntrypoints(t *testing.T) {
 	main := `package main
 
 import (
+    "context"
+    "encoding/json"
     contexture "github.com/CarterShi01/contexture-mcp-go"
     "github.com/CarterShi01/contexture-mcp-go/inspection"
     "github.com/CarterShi01/contexture-mcp-go/server"
@@ -75,6 +77,16 @@ func main() {
     _ = index.NodesWithRefs()
     _ = index.RolesByLevel()
     _, _ = index.MatchingRefs("operations", 10)
+
+    tool, _ := contexture.NewTool("graph", "Read the request graph.", true, func(ctx context.Context, _ struct{}) (bool, error) {
+        return contexture.CurrentGraph(ctx) != nil, nil
+    })
+    graphApplication, _ := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-consumer", Roots: []contexture.Factory{func() contexture.Node {
+        return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return tool }}}
+    }}})
+    graphIndex, _ := contexture.Compile(graphApplication)
+    runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
+    _, _ = runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{}"), contexture.AllRoots())
 }
 `
 	if err := os.WriteFile(filepath.Join(temporaryRoot, "go.mod"), []byte(goMod), 0o600); err != nil {

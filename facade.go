@@ -199,7 +199,7 @@ func CurrentPrincipal(ctx context.Context) *Principal {
 	return model.CurrentPrincipal(ctx)
 }
 
-// CurrentGraph returns the request-local selected graph.
+// CurrentGraph returns the request-local selected graph, or nil outside a Tool invocation.
 func CurrentGraph(ctx context.Context) *SelectedGraph {
 	return model.CurrentGraph(ctx)
 }

@@ -197,7 +197,10 @@ unwraps to `ErrRootOutsideSelection` and retains `Ref`.
 `UsesOf`, `DependentsOf`, and `MatchingRefs` all retain canonical ordering while
 excluding other roots. Cross-root `uses` and dependents are filtered rather
 than disclosed. `CurrentGraph(ctx)` and `CurrentSelection(ctx)` are scoped to a
-Tool invocation; outside an invocation selection safely defaults to all roots.
+Tool invocation. Go deliberately returns `nil` from `CurrentGraph` outside an
+invocation (there is no ambient graph), while `CurrentSelection` safely defaults
+to all roots. A Tool handler may retain and query its one `CurrentGraph` for its
+whole invocation; concurrent calls receive distinct root-projected graphs.
 `HeaderRootSelector` treats `Contexture-Roots` solely as an attenuation request:
 it validates unknown names without listing other roots and intersects it with
 the authenticated principal's ceiling.

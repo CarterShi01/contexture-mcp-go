@@ -261,6 +261,8 @@ func CurrentPrincipal(ctx context.Context) *foundation.Principal {
 }
 
 // CurrentGraph returns the graph constrained to the exact current selection.
+// It is nil outside a Runtime Tool invocation; callers must not treat a
+// background context as an all-roots graph.
 func CurrentGraph(ctx context.Context) *SelectedGraph {
 	graph, _ := ctx.Value(graphKey).(*SelectedGraph)
 	return graph
