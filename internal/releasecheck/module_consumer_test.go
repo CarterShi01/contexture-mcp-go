@@ -53,6 +53,7 @@ var _ contexture.NodeUsage
 var _ contexture.ControllerManager
 var _ contexture.RootSelectionError
 var _ contexture.RootOutsideSelectionError
+var _ contexture.WrongDoorError
 var _ contexture.NodeRef
 var _ contexture.SignpostLevel
 var _ contexture.ReferenceCrossing
@@ -92,8 +93,10 @@ func main() {
         "required": []any{"count"},
     }, func(_ context.Context, input strictInput) (int32, error) { return input.Count, nil })
     if strictErr != nil { panic(strictErr) }
+    write, writeErr := contexture.NewTool("write", "Change one value.", false, func(_ context.Context, _ graphInput) (string, error) { return "changed", nil })
+    if writeErr != nil { panic(writeErr) }
     graphApplication, _ := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-consumer", Roots: []contexture.Factory{func() contexture.Node {
-        return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Skills: []contexture.Factory{func() contexture.Node { return &contexture.Skill{Name: "check", Description: "Check.", Instructions: "Read graph facts first."} }}, Tools: []contexture.Factory{func() contexture.Node { return tool }, func() contexture.Node { return strict }}}
+        return &contexture.Role{Name: "graph", Description: "Graph.", Instructions: "Inspect.", Skills: []contexture.Factory{func() contexture.Node { return &contexture.Skill{Name: "check", Description: "Check.", Instructions: "Read graph facts first."} }}, Tools: []contexture.Factory{func() contexture.Node { return tool }, func() contexture.Node { return strict }, func() contexture.Node { return write }}}
     }}})
     graphIndex, _ := contexture.Compile(graphApplication)
     skillDisclosure, disclosureErr := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
@@ -127,6 +130,11 @@ func main() {
     _, strictRejectedErr := runtime.InvokeReadOnly(context.Background(), "graph/strict", json.RawMessage("{\"count\":\"seven\"}"), contexture.AllRoots())
     if !errors.Is(strictRejectedErr, contexture.ErrInvalidInput) {
         panic("public NewToolWithSchema did not reject schema-invalid input")
+    }
+    _, wrongDoorErr := runtime.InvokeReadOnly(context.Background(), "graph/write", json.RawMessage("{}"), contexture.AllRoots())
+    var wrongDoor *contexture.WrongDoorError
+    if !errors.As(wrongDoorErr, &wrongDoor) || wrongDoor.Ref != "graph/write" || wrongDoor.ReadOnly || !errors.Is(wrongDoorErr, contexture.ErrWrongDoor) {
+        panic("public WrongDoorError did not retain a direct Runtime error's facts")
     }
 }
 `

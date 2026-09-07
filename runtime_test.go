@@ -66,6 +66,44 @@ func TestRuntimeUsesBindingDoorsAndRequestContext(t *testing.T) {
 	}
 }
 
+func TestRuntimeWrongDoorErrorRetainsFactsWithoutCallingToolOrTelemetry(t *testing.T) {
+	called := false
+	write, err := contexture.NewTool("change", "Change.", false, func(context.Context, runtimeInput) (string, error) {
+		called = true
+		return "changed", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "wrong-door", Roots: []contexture.Factory{func() contexture.Node {
+		return write
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	telemetry := contexture.NewMemoryTelemetry()
+	runtime, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), telemetry)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = runtime.InvokeReadOnly(context.Background(), "change", json.RawMessage(`{"value":"x"}`), contexture.AllRoots())
+	var wrong *contexture.WrongDoorError
+	if !errors.As(err, &wrong) || !errors.Is(err, contexture.ErrWrongDoor) {
+		t.Fatalf("wrong-door error = %T %v", err, err)
+	}
+	if wrong.Ref != "change" || wrong.ReadOnly {
+		t.Fatalf("wrong-door facts = %#v", wrong)
+	}
+	if called || len(telemetry.Events()) != 0 {
+		t.Fatalf("wrong-door call reached business or telemetry: called=%t events=%#v", called, telemetry.Events())
+	}
+}
+
 type failingTelemetry struct{}
 
 func (failingTelemetry) Record(contexture.CallEvent) error {

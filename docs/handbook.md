@@ -117,6 +117,10 @@ and `errors.As` to read its `Reason`, `Ref`, segment, scope, kind, wanted kind,
 and known alternatives. This is the Go equivalent of Python's
 `NodeNotFoundError`; `LookupFailure` constants such as `NoSuchMember` and
 `WrongKind` make the facts machine-checkable without attaching Host prose.
+For a direct `Runtime` call through the wrong mutation door, `errors.As` can
+also read `*contexture.WrongDoorError`'s `Ref` and `ReadOnly` facts; it still
+unwraps to `ErrWrongDoor`. Gateway callers receive their usual `RefusedError`
+next action with that typed cause preserved.
 
 The facade intentionally does not import the MCP SDK, `server`, or `web`.
 Import `server` or `web` only when the declaration is ready to be compiled for

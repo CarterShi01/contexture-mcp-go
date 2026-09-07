@@ -102,6 +102,10 @@ func TestGatewayHasFixedOrderedSurfaceAndActionableLookupRecoveries(t *testing.T
 	if got := refused(t, err).Error(); !strings.Contains(got, "contexture_invoke_read_only") || calls.Load() != 0 {
 		t.Fatalf("wrong door = %q, calls = %d", got, calls.Load())
 	}
+	var wrong *contexture.WrongDoorError
+	if !errors.As(err, &wrong) || wrong.Ref != "beta/read" || !wrong.ReadOnly || !errors.Is(err, contexture.ErrWrongDoor) {
+		t.Fatalf("gateway wrong-door chain = %T %#v", err, wrong)
+	}
 }
 
 func TestGatewayDoesNotRecoverRootCeilingAsAnAgentLookup(t *testing.T) {

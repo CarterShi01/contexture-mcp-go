@@ -104,6 +104,9 @@ boolean。默认值 `contexture.ModelMayOpen` 同时允许 model navigation 与�
 读取其 `Reason`、`Ref`、segment、scope、kind、wanted kind 与已知替代项。它是 Python
 `NodeNotFoundError` 的 Go 等价物；`NoSuchMember`、`WrongKind` 等 `LookupFailure` constant 使这些
 事实可由程序检查，而不附带 Host 专属 prose。
+如果直接 `Runtime` 调用走错 mutation door，`errors.As` 也可读取
+`*contexture.WrongDoorError` 的 `Ref` 与 `ReadOnly` facts；它仍会 unwrap 到 `ErrWrongDoor`。
+Gateway caller 仍会收到原有的、带 agent 下一步操作说明的 `RefusedError`，并保留该 typed cause。
 
 该 facade 有意不导入 MCP SDK、`server` 或 `web`。只有在 declaration 准备好被编译到某个 Host
 surface 时，才导入 `server` 或 `web`。

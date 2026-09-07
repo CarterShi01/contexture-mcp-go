@@ -129,7 +129,7 @@ func (gateway *Gateway) recover(err error) error {
 	if errors.As(err, &outside) {
 		return err
 	}
-	var wrong *wrongDoorError
+	var wrong *WrongDoorError
 	if errors.As(err, &wrong) {
 		return &RefusedError{Message: WrongDoorMessage(wrong.Ref, wrong.ReadOnly), Cause: err}
 	}

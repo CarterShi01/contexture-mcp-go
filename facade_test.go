@@ -30,6 +30,7 @@ func TestDeclarationFacadeInventory(t *testing.T) {
 		"PrincipalOptions":          reflect.TypeFor[contexture.PrincipalOptions](),
 		"ModelOpenPolicy":           reflect.TypeFor[contexture.ModelOpenPolicy](),
 		"NodeNotFoundError":         reflect.TypeFor[contexture.NodeNotFoundError](),
+		"WrongDoorError":            reflect.TypeFor[contexture.WrongDoorError](),
 		"RootSelectionError":        reflect.TypeFor[contexture.RootSelectionError](),
 		"RootOutsideSelectionError": reflect.TypeFor[contexture.RootOutsideSelectionError](),
 		"NodeRef":                   reflect.TypeFor[contexture.NodeRef](),

@@ -176,7 +176,7 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 		return nil, err
 	}
 	if tool.ReadOnly != readOnly {
-		return nil, &wrongDoorError{Ref: ref, ReadOnly: tool.ReadOnly}
+		return nil, &WrongDoorError{Ref: ref, ReadOnly: tool.ReadOnly}
 	}
 	binding, err := tool.Binding()
 	if err != nil {
@@ -231,13 +231,16 @@ func (runtime *Runtime) Serve(ctx context.Context, serve func(context.Context) e
 	return err
 }
 
-type wrongDoorError struct {
+// WrongDoorError reports a direct Runtime call made through the Tool's other
+// mutation-semantics door. It retains the canonical Tool facts for a native
+// Host while still unwrapping to ErrWrongDoor for category checks.
+type WrongDoorError struct {
 	Ref      string
 	ReadOnly bool
 }
 
-func (err *wrongDoorError) Error() string { return WrongDoorMessage(err.Ref, err.ReadOnly) }
-func (*wrongDoorError) Unwrap() error     { return ErrWrongDoor }
+func (err *WrongDoorError) Error() string { return WrongDoorMessage(err.Ref, err.ReadOnly) }
+func (*WrongDoorError) Unwrap() error     { return ErrWrongDoor }
 
 // runtimeWrongKindError retains the established agent-facing invocation text
 // while unwrapping to the typed lookup facts exposed by Index.Tool.

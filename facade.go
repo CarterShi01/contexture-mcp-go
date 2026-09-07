@@ -41,6 +41,7 @@ type (
 	GatewayTool               = model.GatewayTool
 	Gateway                   = model.Gateway
 	RefusedError              = model.RefusedError
+	WrongDoorError            = model.WrongDoorError
 	Telemetry                 = model.Telemetry
 	CallEvent                 = model.CallEvent
 	NodeUsage                 = model.NodeUsage
