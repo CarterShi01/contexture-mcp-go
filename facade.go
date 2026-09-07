@@ -228,6 +228,12 @@ func CurrentGraph(ctx context.Context) *SelectedGraph {
 	return model.CurrentGraph(ctx)
 }
 
+// WithGraph derives a nested request context carrying one selected graph.
+// Runtime replaces it with the authoritative graph when invoking a Tool.
+func WithGraph(ctx context.Context, graph *SelectedGraph) context.Context {
+	return model.WithGraph(ctx, graph)
+}
+
 // CurrentSelection returns the effective request root selection.
 func CurrentSelection(ctx context.Context) RootSelection {
 	return model.CurrentSelection(ctx)

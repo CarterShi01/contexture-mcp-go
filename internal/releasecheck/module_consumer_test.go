@@ -60,6 +60,7 @@ var _ = contexture.RegisterRoot
 var _ = contexture.BranchesOf
 var _ = contexture.MembersOf
 var _ = contexture.NewSelectedGraph
+var _ = contexture.WithGraph
 var _ = contexture.NewExecutionAPI
 var _ = contexture.WithChannels[struct{}]
 var _ contexture.NodeUsage
@@ -145,6 +146,11 @@ func main() {
         panic("public Prompt/Resource declarations did not retain foundation facts")
     }
     graphIndex, _ := contexture.Compile(graphApplication)
+    consumerGraph, consumerGraphErr := contexture.NewSelectedGraph(graphIndex, contexture.AllRoots())
+    consumerGraphContext := contexture.WithGraph(context.Background(), consumerGraph)
+    if consumerGraphErr != nil || contexture.CurrentGraph(context.Background()) != nil || contexture.CurrentGraph(consumerGraphContext) != consumerGraph {
+        panic("public graph context did not derive or isolate the selected graph")
+    }
     skillDisclosure, disclosureErr := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
     if disclosureErr != nil { panic(disclosureErr) }
     navigation, navigationErr := contexture.NewDisclosureAPI(skillDisclosure, "graph/check")

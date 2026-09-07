@@ -82,6 +82,7 @@ func TestDeclarationFacadeInventory(t *testing.T) {
 		"NewControllerManagerWithChannels": contexture.NewControllerManagerWithChannels,
 		"RegisterRoot":                     contexture.RegisterRoot,
 		"NewSelectedGraph":                 contexture.NewSelectedGraph,
+		"WithGraph":                        contexture.WithGraph,
 		"NewExecutionAPI":                  contexture.NewExecutionAPI,
 	}
 	for name, value := range values {

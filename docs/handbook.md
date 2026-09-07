@@ -302,8 +302,14 @@ excluding other roots. Cross-root `uses` and dependents are filtered rather
 than disclosed. `CurrentGraph(ctx)` and `CurrentSelection(ctx)` are scoped to a
 Tool invocation. Go deliberately returns `nil` from `CurrentGraph` outside an
 invocation (there is no ambient graph), while `CurrentSelection` safely defaults
-to all roots. A Tool handler may retain and query its one `CurrentGraph` for its
-whole invocation; concurrent calls receive distinct root-projected graphs.
+to all roots. `WithGraph(ctx, graph)` is the native equivalent of Python's
+scoped `bound_graph`: it derives an immutable child context, so nested scopes
+restore the parent graph simply by retaining the parent context. Runtime always
+installs its own selected graph, root selection, and telemetry for a Tool call;
+it preserves the Host's immutable principal but cannot be widened by a
+caller-supplied graph. A Tool handler may retain and query its one
+`CurrentGraph` for its whole invocation; concurrent calls receive distinct
+root-projected graphs.
 `HeaderRootSelector` treats `Contexture-Roots` solely as an attenuation request:
 it validates unknown names without listing other roots and intersects it with
 the authenticated principal's ceiling.

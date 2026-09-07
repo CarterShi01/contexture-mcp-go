@@ -7,17 +7,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
-)
-
-type contextKey int
-
-const (
-	principalKey contextKey = iota
-	graphKey
-	selectionKey
-	telemetryKey
 )
 
 // NodeUsage is the framework-owned aggregate for one compiled node.
@@ -178,11 +167,7 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	if err != nil {
 		return nil, err
 	}
-	principal := CurrentPrincipal(ctx)
-	ctx = context.WithValue(ctx, graphKey, graph)
-	ctx = context.WithValue(ctx, selectionKey, selection)
-	ctx = context.WithValue(ctx, telemetryKey, runtime.telemetry)
-	ctx = context.WithValue(ctx, principalKey, principal)
+	ctx = withInvocationFacts(ctx, graph, selection, runtime.telemetry)
 	value, callErr := binding.Call(ctx, arguments)
 	reportTelemetry(runtime.telemetry, CallEvent{Ref: ref, Failed: callErr != nil})
 	return value, callErr
@@ -266,37 +251,3 @@ func (err runtimeWrongKindError) Error() string {
 }
 
 func (err runtimeWrongKindError) Unwrap() error { return err.failure }
-
-// WithPrincipal derives a request context carrying framework identity.
-func WithPrincipal(ctx context.Context, principal *foundation.Principal) context.Context {
-	return context.WithValue(ctx, principalKey, principal)
-}
-
-// CurrentPrincipal returns framework identity for the exact current invocation.
-func CurrentPrincipal(ctx context.Context) *foundation.Principal {
-	principal, _ := ctx.Value(principalKey).(*foundation.Principal)
-	return principal
-}
-
-// CurrentGraph returns the graph constrained to the exact current selection.
-// It is nil outside a Runtime Tool invocation; callers must not treat a
-// background context as an all-roots graph.
-func CurrentGraph(ctx context.Context) *SelectedGraph {
-	graph, _ := ctx.Value(graphKey).(*SelectedGraph)
-	return graph
-}
-
-// CurrentSelection returns the current effective root selection.
-func CurrentSelection(ctx context.Context) RootSelection {
-	selection, ok := ctx.Value(selectionKey).(RootSelection)
-	if !ok {
-		return AllRoots()
-	}
-	return selection
-}
-
-// CurrentTelemetry returns the current request telemetry exporter.
-func CurrentTelemetry(ctx context.Context) Telemetry {
-	telemetry, _ := ctx.Value(telemetryKey).(Telemetry)
-	return telemetry
-}
