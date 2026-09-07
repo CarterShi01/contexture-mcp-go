@@ -73,6 +73,51 @@ func TestDisclosureOnlyToolCardsAreStructuralAtRootAndNestedLevels(t *testing.T)
 	assertStructuralToolCard(t, openedNested)
 }
 
+func TestDisclosureOnlyToolUsesCardsAreStructural(t *testing.T) {
+	entry, err := contexture.NewTool("entry", "Read entry.", false, func(context.Context, struct{}) (string, error) {
+		return "entry", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := contexture.NewTool("target", "Read target.", true, func(context.Context, struct{}) (string, error) {
+		return "target", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry.Uses = []string{"target"}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "structural-tool-uses",
+		Roots: []contexture.Factory{
+			func() contexture.Node { return entry },
+			func() contexture.Node { return target },
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.CompileDisclosure(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := contexture.NewDisclosureOnly(index, contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opened, err := view.Open("entry", contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertStructuralToolCard(t, opened)
+	uses, ok := opened["uses"].([]map[string]any)
+	if !ok || len(uses) != 1 || uses[0]["ref"] != "target" {
+		t.Fatalf("disclosure-only Tool uses = %#v", opened["uses"])
+	}
+	assertStructuralToolCard(t, uses[0])
+}
+
 func TestBoundToolDisclosureProjectsUsesInOrderWithoutCyclesOrLeaks(t *testing.T) {
 	left, err := contexture.NewTool("alpha", "Read alpha.", true, func(context.Context, struct{}) (string, error) { return "alpha", nil })
 	if err != nil {
