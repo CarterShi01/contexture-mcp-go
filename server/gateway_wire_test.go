@@ -209,6 +209,63 @@ func TestOfficialSDKCarriesExplicitToolSchemaIntoDisclosureAndRuntime(t *testing
 	}
 }
 
+func TestOfficialSDKProjectsRoleUsesCards(t *testing.T) {
+	status, err := contexture.NewTool("status", "Read status.", true, func(context.Context, struct{}) (string, error) { return "ok", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "role-uses-wire", Roots: []contexture.Factory{
+		func() contexture.Node {
+			return &contexture.Role{Name: "operations", Description: "Coordinate.", Instructions: "Open the declared dependency.", Uses: []string{"status/status"}}
+		},
+		func() contexture.Node {
+			return &contexture.Role{Name: "status", Description: "Status.", Instructions: "Read status.", Tools: []contexture.Factory{func() contexture.Node { return status }}}
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := server.CompileApplication(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway, err := compiled.Gateway()
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter := server.NewContextureMCPServer(server.Identity{Name: "role-uses-wire", Version: "0.0.0"}, gateway, compiled.Publications)
+	ctx := context.Background()
+	client := mcp.NewClient(&mcp.Implementation{Name: "role-uses-wire-client", Version: "0.0.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := adapter.Server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	opened, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_open", Arguments: map[string]any{"ref": "operations"}})
+	if err != nil || opened.IsError {
+		t.Fatalf("open role = %#v, %v", opened, err)
+	}
+	payload, ok := opened.StructuredContent.(map[string]any)
+	if !ok {
+		t.Fatalf("role structured content = %#v", opened.StructuredContent)
+	}
+	uses, ok := payload["uses"].([]any)
+	if !ok || len(uses) != 1 {
+		t.Fatalf("role uses wire payload = %#v", payload["uses"])
+	}
+	card, ok := uses[0].(map[string]any)
+	if !ok || card["ref"] != "status/status" || card["kind"] != "tool" {
+		t.Fatalf("role uses wire card = %#v", uses[0])
+	}
+}
+
 func textOf(content mcp.Content) string {
 	if text, ok := content.(*mcp.TextContent); ok {
 		return text.Text

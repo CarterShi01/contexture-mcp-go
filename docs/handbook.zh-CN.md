@@ -216,8 +216,10 @@ invocation 会自动记录，无需调用者手动使用该函数。
 | Tool | Contexture 校验并调用的确定性 application code。 |
 
 不要只为整理文件而增加 child Role。模型打开一个 Role 时会同时得到其全部直接成员，所以同一职责
-所需的 Skill 与 Tool 通常应该留在同一个 Role 下。`Uses` ref 用于声明 Skill 需要的 Tool；应从
-`list` 或已披露的卡片取得规范 ref，而不是凭记忆拼接。
+所需的 Skill 与 Tool 通常应该留在同一个 Role 下。`Uses` ref 用于声明 dependency 而不是 containment，
+并且可跨 root。打开 Role 或 Skill 时，会按 declaration order 将其 `Uses` target 投影为 route card；root
+selection 会过滤被排除的 target，而不会泄漏它们。应从 `list` 或已披露的卡片取得 canonical ref，而不是凭
+记忆拼接。
 
 ## 4. 启动 Host 前先在本地工作
 

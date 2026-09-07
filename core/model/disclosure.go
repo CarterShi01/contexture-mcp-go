@@ -175,20 +175,30 @@ func (view *Disclosure) active(node Node, selection RootSelection) map[string]an
 			key := string(child.nodeKind()) + "s"
 			card[key] = append(card[key].([]map[string]any), view.card(child, true))
 		}
+		view.addUses(card, typed.Uses, selection)
 	case *Skill:
 		card["instructions"] = typed.Instructions
-		if len(typed.Uses) > 0 {
-			uses := []map[string]any{}
-			for _, ref := range typed.Uses {
-				if selection.ContainsRef(ref) {
-					target, _ := view.index.Find(ref)
-					uses = append(uses, view.card(target, true))
-				}
-			}
-			card["uses"] = uses
-		}
+		view.addUses(card, typed.Uses, selection)
 	}
 	return card
+}
+
+// addUses projects declared dependency targets in declaration order. A
+// selection can only attenuate this view: excluded targets are omitted rather
+// than exposing another root through a Role or Skill that happens to use it.
+func (view *Disclosure) addUses(card map[string]any, refs []string, selection RootSelection) {
+	if len(refs) == 0 {
+		return
+	}
+	uses := []map[string]any{}
+	for _, ref := range refs {
+		if !selection.ContainsRef(ref) {
+			continue
+		}
+		target, _ := view.index.Find(ref)
+		uses = append(uses, view.card(target, true))
+	}
+	card["uses"] = uses
 }
 
 func (view *Disclosure) resolve(ref string, selection RootSelection, roots []Node) (Node, error) {

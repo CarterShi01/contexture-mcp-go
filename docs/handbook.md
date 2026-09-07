@@ -266,9 +266,12 @@ navigation and invocation do not need callers to invoke it manually.
 
 Do not add a child Role just to organize files. A model opens every direct
 member of a Role together, so Skills and Tools needed for one responsibility
-usually belong under the same Role. A `Uses` reference names the Tool a Skill
-needs; take the canonical ref from `list` or a disclosed card rather than
-constructing it from memory.
+usually belong under the same Role. A `Uses` reference names a declared
+dependency without making it containment, and it can cross roots. Opening a
+Role or Skill projects its `Uses` targets as route cards in declaration order;
+a root selection filters excluded targets rather than leaking them. Take the
+canonical ref from `list` or a disclosed card rather than constructing it from
+memory.
 
 ## 4. Work locally before starting a Host
 
