@@ -14,6 +14,11 @@ type gatewayWireInput struct {
 	Service string `json:"service"`
 }
 
+type explicitWireInput struct {
+	Name   string `json:"name"`
+	Filter string `json:"filter,omitempty"`
+}
+
 func TestOfficialSDKExposesOnlyFixedGatewayAndPreservesInvocationDoors(t *testing.T) {
 	read, err := contexture.NewTool("read-status", "Read status.", true, func(context.Context, struct{}) (string, error) {
 		return "healthy", nil
@@ -125,6 +130,82 @@ func TestOfficialSDKExposesOnlyFixedGatewayAndPreservesInvocationDoors(t *testin
 	missing, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_open", Arguments: map[string]any{"ref": "missing"}})
 	if err != nil || !missing.IsError || len(missing.Content) != 1 || !strings.Contains(textOf(missing.Content[0]), "contexture_discover") {
 		t.Fatalf("missing-ref recovery = %#v, %v", missing, err)
+	}
+}
+
+func TestOfficialSDKCarriesExplicitToolSchemaIntoDisclosureAndRuntime(t *testing.T) {
+	calls := 0
+	tool, err := contexture.NewToolWithSchema("lookup", "Look up one item.", true, map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{
+			"name":   map[string]any{"type": "string"},
+			"filter": map[string]any{"type": "string"},
+		},
+		"required": []any{"name"},
+	}, func(_ context.Context, input explicitWireInput) (string, error) {
+		calls++
+		return input.Name + ":" + input.Filter, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "explicit-wire", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return tool }}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := server.CompileApplication(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway, err := compiled.Gateway()
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter := server.NewContextureMCPServer(server.Identity{Name: "explicit-wire", Version: "0.0.0"}, gateway, compiled.Publications)
+	ctx := context.Background()
+	client := mcp.NewClient(&mcp.Implementation{Name: "explicit-wire-client", Version: "0.0.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := adapter.Server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+
+	opened, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_open", Arguments: map[string]any{"ref": "operations"}})
+	if err != nil || opened.IsError {
+		t.Fatalf("open = %#v, %v", opened, err)
+	}
+	openCard, ok := opened.StructuredContent.(map[string]any)
+	if !ok {
+		t.Fatalf("open structured content = %#v", opened.StructuredContent)
+	}
+	tools, ok := openCard["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("open tools = %#v", openCard["tools"])
+	}
+	toolCard, ok := tools[0].(map[string]any)
+	if !ok {
+		t.Fatalf("tool card = %#v", tools[0])
+	}
+	schema, ok := toolCard["input_schema"].(map[string]any)
+	if !ok || schema["additionalProperties"] != false {
+		t.Fatalf("wire input schema = %#v", toolCard["input_schema"])
+	}
+
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_invoke_read_only", Arguments: map[string]any{"ref": "operations/lookup", "arguments": map[string]any{"name": "Ada"}}})
+	if err != nil || result.IsError || result.StructuredContent != "Ada:" {
+		t.Fatalf("valid invocation = %#v, %v", result, err)
+	}
+	invalid, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_invoke_read_only", Arguments: map[string]any{"ref": "operations/lookup", "arguments": map[string]any{"name": "Ada", "unknown": true}}})
+	if err != nil || !invalid.IsError || calls != 1 {
+		t.Fatalf("invalid invocation = %#v, %v; calls = %d", invalid, err, calls)
 	}
 }
 

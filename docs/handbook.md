@@ -122,6 +122,24 @@ The facade intentionally does not import the MCP SDK, `server`, or `web`.
 Import `server` or `web` only when the declaration is ready to be compiled for
 one of those Host surfaces.
 
+### Typed Tool bindings and explicit schemas
+
+`NewTool` derives a schema from a tagged input struct. `NewToolWithSchema` is
+the public escape hatch for constraints such as enums, but it does not let a
+published card promise inputs that Go will reject. At construction its explicit
+root schema must be an object whose properties exactly match the input struct's
+exported JSON-tagged fields; required names must exactly match fields without
+`omitempty` or `omitzero`; and it must set `additionalProperties: false`.
+This matches the binding's strict `encoding/json` decoder, preserves that
+unknown-field policy in the disclosed explicit schema, and rejects drift with
+`ErrInvalidDeclaration` before an Application is compiled.
+
+JSON tag options are scanned rather than positionally interpreted, so both
+`json:"value,omitempty,string"` and `json:"value,string,omitempty"` make
+`value` optional. Property-level JSON Schema constraints may narrow accepted
+values, but cannot reshape the top-level object or weaken its unknown-field
+policy. Call failures remain `ErrInvalidInput` and never reach the handler.
+
 ### Imperative registration
 
 `ApplicationDeclaration` is the normal Go composition root: it keeps its

@@ -29,6 +29,29 @@ type corpusInput struct {
 	Labels  map[string]string `json:"labels"`
 }
 
+// optionOrderedInput keeps omitempty after another standard encoding/json
+// option. The transport contract must not assume optionality is option #1.
+type optionOrderedInput struct {
+	Value string `json:"value,string,omitempty"`
+	Other string `json:"other,string,omitzero"`
+}
+
+type strictInput struct {
+	Name   string `json:"name"`
+	Filter string `json:"filter,omitempty"`
+}
+
+func strictInputSchema() map[string]any {
+	return map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{
+			"name":   map[string]any{"type": "string"},
+			"filter": map[string]any{"type": "string"},
+		},
+		"required": []any{"name"},
+	}
+}
+
 func TestToolBindingSharesSchemaValidationAndHandler(t *testing.T) {
 	calls := 0
 	tool, err := contexture.NewTool("inspect", "Inspect one service.", true, func(_ context.Context, input toolInput) (toolInput, error) {
@@ -113,4 +136,108 @@ func TestToolBindingSchemaCorpusValidatesBeforeTheHandler(t *testing.T) {
 	if err != nil || value != "ok" || calls != 1 {
 		t.Fatalf("valid corpus = %#v, %v, calls %d", value, err, calls)
 	}
+}
+
+func TestNewToolWithSchemaRejectsTransportContractDriftAtDeclaration(t *testing.T) {
+	cases := []struct {
+		name   string
+		schema map[string]any
+	}{
+		{"non-object root", map[string]any{"type": "array", "properties": map[string]any{}, "required": []any{}, "additionalProperties": false}},
+		{"missing property", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}}, "required": []any{"name"}, "additionalProperties": false}},
+		{"extra property", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}, "extra": map[string]any{"type": "string"}}, "required": []any{"name"}, "additionalProperties": false}},
+		{"optional marked required", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}}, "required": []any{"name", "filter"}, "additionalProperties": false}},
+		{"required omitted", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}}, "required": []any{}, "additionalProperties": false}},
+		{"unknown fields permitted", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}}, "required": []any{"name"}, "additionalProperties": true}},
+		{"unknown field policy omitted", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}}, "required": []any{"name"}}},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := contexture.NewToolWithSchema("strict", "Strict.", true, test.schema, func(context.Context, strictInput) (string, error) { return "unexpected", nil })
+			if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+				t.Fatalf("NewToolWithSchema error = %v, want invalid declaration", err)
+			}
+		})
+	}
+}
+
+func TestNewToolWithSchemaKeepsDisclosureAndInvocationAcceptanceSetsAligned(t *testing.T) {
+	calls := 0
+	tool, err := contexture.NewToolWithSchema("strict", "Strict.", true, strictInputSchema(), func(_ context.Context, input strictInput) (string, error) {
+		calls++
+		return input.Name + ":" + input.Filter, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "strict-binding", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return tool }}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	disclosure, err := contexture.NewDisclosure(index, contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := disclosure.Open("operations", contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	card := opened["tools"].([]map[string]any)[0]
+	schema := card["input_schema"].(map[string]any)
+	if schema["additionalProperties"] != false || len(schema["properties"].(map[string]any)) != 2 || !containsString(schema["required"].([]any), "name") {
+		t.Fatalf("disclosed schema = %#v", schema)
+	}
+	runtime, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := runtime.InvokeReadOnly(context.Background(), "operations/strict", json.RawMessage(`{"name":"Ada"}`), contexture.AllRoots())
+	if err != nil || result != "Ada:" || calls != 1 {
+		t.Fatalf("valid invocation = %#v, %v; calls = %d", result, err, calls)
+	}
+	for _, arguments := range []json.RawMessage{json.RawMessage(`{}`), json.RawMessage(`{"name":"Ada","unknown":true}`)} {
+		if _, err := runtime.InvokeReadOnly(context.Background(), "operations/strict", arguments, contexture.AllRoots()); !errors.Is(err, contexture.ErrInvalidInput) {
+			t.Fatalf("invalid invocation %s = %v", arguments, err)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("invalid input reached handler %d times", calls)
+	}
+}
+
+func TestJSONTagOptionalityScansEveryOption(t *testing.T) {
+	tool, err := contexture.NewToolWithSchema("ordered", "Ordered.", true, map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{
+			"value": map[string]any{"type": "string"},
+			"other": map[string]any{"type": "string"},
+		},
+		"required": []any{},
+	}, func(_ context.Context, input optionOrderedInput) (string, error) { return input.Value, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := tool.Binding()
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := binding.Call(context.Background(), json.RawMessage(`{}`))
+	if err != nil || value != "" {
+		t.Fatalf("optional field invocation = %#v, %v", value, err)
+	}
+}
+
+func containsString(items []any, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
 }

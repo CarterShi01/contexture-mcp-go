@@ -33,6 +33,7 @@ import (
 )
 
 var _ = contexture.NewPrincipal
+var _ = contexture.NewToolWithSchema[struct{}, bool]
 var _ = contexture.Contexture
 var _ = contexture.DeclareApplication
 var _ = contexture.Version
@@ -78,7 +79,7 @@ func main() {
     _ = index.RolesByLevel()
     _, _ = index.MatchingRefs("operations", 10)
 
-    tool, _ := contexture.NewTool("graph", "Read the request graph.", true, func(ctx context.Context, _ struct{}) (bool, error) {
+    tool, _ := contexture.NewToolWithSchema("graph", "Read the request graph.", true, map[string]any{"type": "object", "properties": map[string]any{}, "required": []any{}, "additionalProperties": false}, func(ctx context.Context, _ struct{}) (bool, error) {
         return contexture.CurrentGraph(ctx) != nil, nil
     })
     graphApplication, _ := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "graph-consumer", Roots: []contexture.Factory{func() contexture.Node {

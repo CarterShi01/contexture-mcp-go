@@ -108,6 +108,20 @@ boolean。默认值 `contexture.ModelMayOpen` 同时允许 model navigation 与�
 该 facade 有意不导入 MCP SDK、`server` 或 `web`。只有在 declaration 准备好被编译到某个 Host
 surface 时，才导入 `server` 或 `web`。
 
+### Typed Tool binding 与 explicit schema
+
+`NewTool` 从带 tag 的 input struct 推导 schema。`NewToolWithSchema` 是用于 enum 等 reflection
+无法直接表达约束的公开 escape hatch，但它不能让已发布的 card 承诺 Go 会拒绝的输入。构造时，其 explicit
+root schema 必须是 object；properties 必须与 input struct 中 exported 且带 JSON tag 的 field 精确一致；
+required name 必须与未使用 `omitempty` 或 `omitzero` 的 field 精确一致；并且必须设置
+`additionalProperties: false`。这与 binding 的严格 `encoding/json` decoder 一致，在披露的 explicit schema
+中保留该 unknown-field policy，并会在 Application compile 前以 `ErrInvalidDeclaration` 拒绝 drift。
+
+JSON tag option 会被完整扫描，而不是按位置解释，因此 `json:"value,omitempty,string"` 与
+`json:"value,string,omitempty"` 都会让 `value` 成为 optional。property-level JSON Schema constraint 可以
+收窄可接受的 value，但不能重塑 top-level object 或削弱 unknown-field policy。调用失败仍是
+`ErrInvalidInput`，且绝不会进入 handler。
+
 ### Imperative registration
 
 `ApplicationDeclaration` 是正常的 Go composition root：它会把 `Factory` 保持为惰性，直到

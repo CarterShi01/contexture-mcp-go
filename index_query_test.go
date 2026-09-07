@@ -16,7 +16,7 @@ func (indexChannels) Close(context.Context) error                             { 
 
 func queryIndex(t *testing.T, channels contexture.Channels) *contexture.Index {
 	t.Helper()
-	read, err := contexture.NewToolWithSchema("read", "Read.", true, map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}}, func(context.Context, struct{}) (string, error) { return "ok", nil })
+	read, err := contexture.NewTool("read", "Read.", true, func(context.Context, struct{}) (string, error) { return "ok", nil })
 	if err != nil {
 		t.Fatal(err)
 	}
