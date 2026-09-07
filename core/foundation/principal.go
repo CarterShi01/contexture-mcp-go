@@ -99,13 +99,10 @@ func (principal *Principal) Claims() map[string]any {
 // String renders the identity facts that are safe to include in ordinary logs.
 // Claims can contain decoded tokens or other sensitive data, so they are never
 // represented here.
-func (principal *Principal) String() string {
-	if principal == nil {
-		return "Principal(<nil>)"
-	}
+func (principal Principal) String() string {
 	return fmt.Sprintf("Principal{Subject:%q ClientID:%q Issuer:%q Scopes:%q}", principal.subject, principal.clientID, principal.issuer, principal.Scopes())
 }
 
 // GoString keeps %#v diagnostic formatting subject to the same claim-redaction
 // rule as String.
-func (principal *Principal) GoString() string { return principal.String() }
+func (principal Principal) GoString() string { return principal.String() }

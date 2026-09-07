@@ -27,17 +27,22 @@ func TestPrincipalSnapshotsFactsAndRedactsClaimsFromFmt(t *testing.T) {
 		t.Fatalf("Principal did not defend returned facts: scopes=%#v claims=%#v", got, principal.Claims())
 	}
 
-	for _, verb := range []string{"%v", "%+v", "%#v"} {
-		rendered := fmt.Sprintf(verb, principal)
-		if strings.Contains(rendered, "000-00-0000") || strings.Contains(rendered, "tenant") || strings.Contains(rendered, "acme") {
-			t.Fatalf("fmt %s leaked claims: %q", verb, rendered)
-		}
-		if !strings.Contains(rendered, "alice") || !strings.Contains(rendered, "codex") || !strings.Contains(rendered, "https://issuer.example") || !strings.Contains(rendered, "read") || !strings.Contains(rendered, "write") {
-			t.Fatalf("fmt %s omitted safe identity facts: %q", verb, rendered)
+	copied := *principal
+	for receiver, value := range map[string]any{"pointer": principal, "value": copied} {
+		for _, verb := range []string{"%v", "%+v", "%#v"} {
+			rendered := fmt.Sprintf(verb, value)
+			if strings.Contains(rendered, "000-00-0000") || strings.Contains(rendered, "tenant") || strings.Contains(rendered, "acme") {
+				t.Fatalf("%s fmt %s leaked claims: %q", receiver, verb, rendered)
+			}
+			if !strings.Contains(rendered, "alice") || !strings.Contains(rendered, "codex") || !strings.Contains(rendered, "https://issuer.example") || !strings.Contains(rendered, "read") || !strings.Contains(rendered, "write") {
+				t.Fatalf("%s fmt %s omitted safe identity facts: %q", receiver, verb, rendered)
+			}
 		}
 	}
 	var absent *contexture.Principal
-	if got := fmt.Sprintf("%v", absent); got != "Principal(<nil>)" {
-		t.Fatalf("nil Principal format = %q", got)
+	for _, verb := range []string{"%v", "%+v", "%#v"} {
+		if got := fmt.Sprintf(verb, absent); got != "<nil>" {
+			t.Fatalf("nil Principal fmt %s = %q, want <nil>", verb, got)
+		}
 	}
 }

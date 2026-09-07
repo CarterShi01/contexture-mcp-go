@@ -72,9 +72,12 @@ var _ = web.NewRestRouter
 
 func main() {
     principal := contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "consumer", Claims: map[string]any{"secret": "do-not-log"}})
-    for _, verb := range []string{"%v", "%+v", "%#v"} {
-        if rendered := fmt.Sprintf(verb, principal); strings.Contains(rendered, "do-not-log") || !strings.Contains(rendered, "consumer") {
-            panic("public Principal formatting leaked claims or omitted identity")
+    copiedPrincipal := *principal
+    for _, receiver := range []any{principal, copiedPrincipal} {
+        for _, verb := range []string{"%v", "%+v", "%#v"} {
+            if rendered := fmt.Sprintf(verb, receiver); strings.Contains(rendered, "do-not-log") || !strings.Contains(rendered, "consumer") {
+                panic("public Principal formatting leaked claims or omitted identity")
+            }
         }
     }
     manager := contexture.NewControllerManager()
