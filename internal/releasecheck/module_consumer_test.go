@@ -86,7 +86,13 @@ func main() {
     }}})
     graphIndex, _ := contexture.Compile(graphApplication)
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
-    _, _ = runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{}"), contexture.AllRoots())
+    graphValue, graphErr := runtime.InvokeReadOnly(context.Background(), "graph/graph", json.RawMessage("{}"), contexture.AllRoots())
+    if graphErr != nil {
+        panic(graphErr)
+    }
+    if present, ok := graphValue.(bool); !ok || !present {
+        panic("CurrentGraph was not available inside the external consumer Tool handler")
+    }
 }
 `
 	if err := os.WriteFile(filepath.Join(temporaryRoot, "go.mod"), []byte(goMod), 0o600); err != nil {
