@@ -347,7 +347,9 @@ application, err := contexture.DeclareApplication(contexture.ApplicationDeclarat
 ```
 
 位于 Host selected root surface 外的 Resource 既不会被列出，也不可读取。不要用 Resource 实现带参数的
-查询、写操作，或再实现一次 Tool；这类能力应当通过 Contexture gateway 使用已声明的 Tool。
+查询、写操作，或再实现一次 Tool；Resource reader 会委派给 `ExecutionAPI.ReadForHost`，因此会共享
+直接 host read 的 validated binding、request context 与 stale-lookup `RefusedError` boundary。这类能力应当
+通过 Contexture gateway 使用已声明的 Tool。
 
 ## 8. 通过 MCP Host 提供服务
 

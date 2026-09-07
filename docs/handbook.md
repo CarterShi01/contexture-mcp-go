@@ -432,7 +432,9 @@ application, err := contexture.DeclareApplication(contexture.ApplicationDeclarat
 ```
 
 Resources outside the Host's selected root surface are neither listed nor
-readable. Do not use a Resource for a parameterized lookup, a write, or a
+readable. A Resource reader delegates to `ExecutionAPI.ReadForHost`, so it
+shares the validated binding, request context, and stale-lookup `RefusedError`
+boundary of a direct host read. Do not use a Resource for a parameterized lookup, a write, or a
 second implementation of a Tool; use the declared Tool through Contexture's
 gateway instead.
 

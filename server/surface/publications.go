@@ -37,7 +37,7 @@ type ResourceCard struct {
 // Publications validates and projects prompts, resources, completion, and instructions.
 type Publications struct {
 	disclosure *contexture.Disclosure
-	runtime    *contexture.Runtime
+	execution  *contexture.ExecutionAPI
 	prompts    []contexture.PromptDeclaration
 	resources  []contexture.ResourceDeclaration
 	reserved   map[string]struct{}
@@ -48,7 +48,14 @@ func NewPublications(application *contexture.Application, disclosure *contexture
 	if application == nil || disclosure == nil {
 		return nil, errors.New("Contexture application and Disclosure must not be nil")
 	}
-	publications := &Publications{disclosure: disclosure, runtime: runtime, prompts: application.Prompts(), resources: application.Resources(), reserved: map[string]struct{}{}}
+	publications := &Publications{disclosure: disclosure, prompts: application.Prompts(), resources: application.Resources(), reserved: map[string]struct{}{}}
+	if runtime != nil {
+		execution, err := contexture.NewExecutionAPI(runtime)
+		if err != nil {
+			return nil, err
+		}
+		publications.execution = execution
+	}
 	if err := publications.validate(); err != nil {
 		return nil, err
 	}
@@ -201,14 +208,17 @@ func anyRefPartStartsWith(ref, wanted string) bool {
 	return false
 }
 
-// Read invokes the exact published Resource Tool through the same Binding.
+// Read invokes the exact published Resource Tool through ExecutionAPI's host
+// read boundary. This preserves Runtime's validated binding and request facts,
+// while a stale publication lookup receives the same typed RefusedError as the
+// native host-read API rather than bypassing its recovery boundary.
 func (publications *Publications) Read(ctx context.Context, uri string, selection contexture.RootSelection) (any, error) {
-	if publications.runtime == nil {
+	if publications.execution == nil {
 		return nil, errors.New("A disclosure-only application has no Resources.")
 	}
 	for _, entry := range publications.resources {
 		if entry.URI == uri {
-			return publications.runtime.InvokeReadOnly(ctx, entry.Opens, json.RawMessage("{}"), selection)
+			return publications.execution.ReadForHost(ctx, entry.Opens, selection)
 		}
 	}
 	return nil, fmt.Errorf("No Contexture Resource at %q.", uri)
@@ -413,7 +423,7 @@ func (publications *Publications) validate() error {
 	}
 	resourceNames, resourceURIs := map[string]bool{}, map[string]bool{}
 	for _, entry := range publications.resources {
-		if publications.runtime == nil {
+		if publications.execution == nil {
 			return errors.New("A disclosure-only application cannot declare Resources.")
 		}
 		if strings.TrimSpace(entry.Opens) == "" || strings.TrimSpace(entry.URI) == "" || strings.TrimSpace(entry.Description) == "" {
