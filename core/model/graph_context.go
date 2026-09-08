@@ -16,6 +16,7 @@ const (
 	graphKey
 	selectionKey
 	telemetryKey
+	channelsKey
 )
 
 // WithGraph derives a context carrying one request-selected immutable graph.
@@ -38,15 +39,20 @@ func withTelemetry(ctx context.Context, telemetry Telemetry) context.Context {
 	return context.WithValue(ctx, telemetryKey, telemetry)
 }
 
-func withInvocationFacts(ctx context.Context, graph *SelectedGraph, selection RootSelection, telemetry Telemetry) context.Context {
+func withInvocationFacts(ctx context.Context, graph *SelectedGraph, selection RootSelection, telemetry Telemetry, channels ChannelHandle) context.Context {
 	ctx = WithGraph(ctx, graph)
 	ctx = withSelection(ctx, selection)
 	ctx = withTelemetry(ctx, telemetry)
+	ctx = context.WithValue(ctx, channelsKey, channels)
 	// Keep the request identity from the Host context explicit in the derived
 	// invocation scope. Principal is immutable; this does not grant a Tool an
 	// authority-changing handle.
 	return context.WithValue(ctx, principalKey, CurrentPrincipal(ctx))
 }
+
+// CurrentChannels returns the exact deployment dependency captured by the
+// compiled Application, or nil outside a Tool invocation.
+func CurrentChannels(ctx context.Context) ChannelHandle { return ctx.Value(channelsKey) }
 
 // WithPrincipal derives a request context carrying framework identity.
 func WithPrincipal(ctx context.Context, principal *foundation.Principal) context.Context {

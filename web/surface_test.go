@@ -570,6 +570,7 @@ func assertProblem(t *testing.T, response *httptest.ResponseRecorder, status int
 }
 
 type surfaceChannels struct {
+	contexture.ChannelsLifecycle
 	mu             sync.Mutex
 	opened, closed int
 	generation     int

@@ -34,6 +34,8 @@ type (
 	ResourceDeclaration       = model.ResourceDeclaration
 	Binding                   = model.Binding
 	CleanupRegistrar          = model.CleanupRegistrar
+	ChannelHandle             = model.ChannelHandle
+	ChannelsLifecycle         = model.ChannelsLifecycle
 	Channels                  = model.Channels
 	Index                     = model.Index
 	RootSelection             = model.RootSelection
@@ -104,6 +106,12 @@ func NewControllerManager() *ControllerManager { return model.NewControllerManag
 // that share one lifecycle-scoped Channels implementation.
 func NewControllerManagerWithChannels(channels Channels) *ControllerManager {
 	return model.NewControllerManagerWithChannels(channels)
+}
+
+// NewControllerManagerWithChannelHandle creates a manager for an ordinary
+// dependency with no Contexture-owned lifecycle.
+func NewControllerManagerWithChannelHandle(handle ChannelHandle) *ControllerManager {
+	return model.NewControllerManagerWithChannelHandle(handle)
 }
 
 // RegisterRoot dispatches a generic root Factory by its concrete node kind.
@@ -249,6 +257,9 @@ func CurrentPrincipal(ctx context.Context) *Principal {
 func CurrentGraph(ctx context.Context) *SelectedGraph {
 	return model.CurrentGraph(ctx)
 }
+
+// CurrentChannels returns the ordinary or lifecycle dependency captured by the Application.
+func CurrentChannels(ctx context.Context) ChannelHandle { return model.CurrentChannels(ctx) }
 
 // WithGraph derives a nested request context carrying one selected graph.
 // Runtime replaces it with the authoritative graph when invoking a Tool.

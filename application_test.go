@@ -90,6 +90,20 @@ func TestApplicationRejectsBlankName(t *testing.T) {
 	}
 }
 
+func TestApplicationRejectsTypedNilChannelsLifecycle(t *testing.T) {
+	var channels *noOpChannels
+	_, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name:     "typed-nil-channels",
+		Channels: channels,
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect."}
+		}},
+	})
+	if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("typed-nil application Channels = %v", err)
+	}
+}
+
 func TestRuntimeAndDisclosureOnlyCompilationStaySeparate(t *testing.T) {
 	unbound := &contexture.Tool{Name: "status", Description: "Status.", ReadOnly: true}
 	runtimeDeclaration, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
@@ -152,7 +166,7 @@ func TestRuntimeAndDisclosureOnlyCompilationStaySeparate(t *testing.T) {
 	}
 }
 
-type noOpChannels struct{}
+type noOpChannels struct{ contexture.ChannelsLifecycle }
 
 func (noOpChannels) Open(context.Context, contexture.CleanupRegistrar) error { return nil }
 func (noOpChannels) Close(context.Context) error                             { return nil }

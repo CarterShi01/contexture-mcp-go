@@ -37,7 +37,7 @@ type Application struct {
 	name        string
 	roots       []Factory
 	promptRoots []Factory
-	channels    Channels
+	channels    ChannelHandle
 	telemetry   Telemetry
 	prompts     []PromptDeclaration
 	resources   []ResourceDeclaration
@@ -50,6 +50,9 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 	}
 	if len(declaration.Roots) == 0 {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("application must declare at least one model-visible root"))
+	}
+	if nilChannels(declaration.Channels) {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("application Channels lifecycle must not be typed nil"))
 	}
 	for _, factory := range append(append([]Factory(nil), declaration.Roots...), declaration.PromptRoots...) {
 		if factory == nil {

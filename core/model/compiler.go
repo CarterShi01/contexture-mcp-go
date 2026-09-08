@@ -16,7 +16,7 @@ type Index struct {
 	roots       []Node
 	modelRoots  []Node
 	promptRoots []Node
-	channels    Channels
+	channels    ChannelHandle
 	bound       bool
 	byRef       map[string]Node
 	refByNode   map[Node]string
@@ -206,7 +206,7 @@ func (index *Index) Bound() bool { return index != nil && index.bound }
 
 // Channels returns the lifecycle owner captured at compilation time. It is a
 // snapshot fact; rebinding a manager later cannot change it.
-func (index *Index) Channels() Channels {
+func (index *Index) Channels() ChannelHandle {
 	if index == nil {
 		return nil
 	}

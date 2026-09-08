@@ -9,7 +9,7 @@ import (
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 )
 
-type indexChannels struct{}
+type indexChannels struct{ contexture.ChannelsLifecycle }
 
 func (indexChannels) Open(context.Context, contexture.CleanupRegistrar) error { return nil }
 func (indexChannels) Close(context.Context) error                             { return nil }

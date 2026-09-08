@@ -355,6 +355,7 @@ func TestAuthenticatedStreamableMCPInvocationCarriesCompletePrincipal(t *testing
 }
 
 type launchChannels struct {
+	contexture.ChannelsLifecycle
 	mu             sync.Mutex
 	opened, closed int
 	live           bool

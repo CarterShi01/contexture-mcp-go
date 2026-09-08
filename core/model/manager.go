@@ -30,7 +30,7 @@ type ToolFactory func() *Tool
 // cannot change an Application or Index already produced by this manager.
 type ControllerManager struct {
 	mu       sync.RWMutex
-	channels Channels
+	channels ChannelHandle
 	roles    []Node
 	skills   []Node
 	tools    []Node
@@ -49,6 +49,15 @@ func NewControllerManager() *ControllerManager {
 func NewControllerManagerWithChannels(channels Channels) *ControllerManager {
 	manager := NewControllerManager()
 	manager.channels = channels
+	return manager
+}
+
+// NewControllerManagerWithChannelHandle creates a manager that passes one
+// ordinary dependency through to future Tool invocations without treating
+// Open/Close lookalike methods as lifecycle ownership.
+func NewControllerManagerWithChannelHandle(handle ChannelHandle) *ControllerManager {
+	manager := NewControllerManager()
+	manager.channels = handle
 	return manager
 }
 
@@ -299,9 +308,20 @@ func (manager *ControllerManager) RebindChannels(channels Channels) {
 	manager.channels = channels
 }
 
+// RebindChannelHandle changes the ordinary dependency captured by future
+// Applications without affecting already-created snapshots.
+func (manager *ControllerManager) RebindChannelHandle(handle ChannelHandle) {
+	if manager == nil {
+		return
+	}
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	manager.channels = handle
+}
+
 // Channels returns the serving dependency owner configured for future
 // Applications. The value is an application-owned lifecycle object.
-func (manager *ControllerManager) Channels() Channels {
+func (manager *ControllerManager) Channels() ChannelHandle {
 	if manager == nil {
 		return nil
 	}
@@ -325,7 +345,18 @@ func (manager *ControllerManager) Application(name string) (*Application, error)
 		root := root
 		factories = append(factories, func() Node { return snapshotNode(root) })
 	}
-	return DeclareApplication(ApplicationDeclaration{Name: name, Roots: factories, Channels: channels})
+	declaration := ApplicationDeclaration{Name: name, Roots: factories}
+	if channels != nil {
+		if lifecycle, ok := channels.(Channels); ok {
+			declaration.Channels = lifecycle
+		}
+	}
+	application, err := DeclareApplication(declaration)
+	if err != nil {
+		return nil, err
+	}
+	application.channels = channels
+	return application, nil
 }
 
 // Compile produces one immutable Index from the roots registered so far.

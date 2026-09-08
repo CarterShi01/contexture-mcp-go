@@ -167,7 +167,7 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 	if err != nil {
 		return nil, err
 	}
-	ctx = withInvocationFacts(ctx, graph, selection, runtime.telemetry)
+	ctx = withInvocationFacts(ctx, graph, selection, runtime.telemetry, runtime.index.channels)
 	value, callErr := binding.Call(ctx, arguments)
 	reportTelemetry(runtime.telemetry, CallEvent{Ref: ref, Failed: callErr != nil})
 	return value, callErr
@@ -216,7 +216,11 @@ func (runtime *Runtime) Serve(ctx context.Context, serve func(context.Context) e
 	if serve == nil {
 		return errors.New("Contexture serving function must not be nil")
 	}
-	_, err := WithChannels(ctx, runtime.index.channels, func(ctx context.Context) (struct{}, error) {
+	channels, lifecycle := runtime.index.channels.(Channels)
+	if !lifecycle {
+		return serve(ctx)
+	}
+	_, err := WithChannels(ctx, channels, func(ctx context.Context) (struct{}, error) {
 		return struct{}{}, serve(ctx)
 	})
 	return err

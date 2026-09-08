@@ -270,6 +270,13 @@ context 内非 nil。exporter 的 error 或 panic 会被忽略，因此 telemetr
 原生 Python `telemetry.report` 等价物；它同样隔离 exporter 的 error 与 panic。框架 navigation 和
 invocation 会自动记录，无需调用者手动使用该函数。
 
+需要由 Contexture 管理生命周期的 owner 应嵌入 `contexture.ChannelsLifecycle` 并实现
+`Open`/`Close`；这个 marker 是显式 opt-in，避免一个仅仅碰巧具有同名 method 的 deployment
+handle 被误判为 lifecycle。普通 dependency 应通过 `NewControllerManagerWithChannelHandle` 与
+`RebindChannelHandle` 提供。Runtime 会通过 `CurrentChannels(ctx)` 把完全相同的 identity 交给
+Tool，且不会调用它的方法。既有 Application 与 Index snapshot 会保留创建时捕获的 handle；rebind
+只影响未来 snapshot。
+
 ## 3. 选择正确的节点
 
 | 使用 | 适用情形 |

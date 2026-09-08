@@ -17,6 +17,7 @@ var errClose = errors.New("close failed")
 var errCleanup = errors.New("cleanup failed")
 
 type testChannels struct {
+	contexture.ChannelsLifecycle
 	events []string
 	open   error
 	close  error
@@ -112,6 +113,7 @@ func TestRuntimeServesWithApplicationChannels(t *testing.T) {
 }
 
 type panicChannels struct {
+	contexture.ChannelsLifecycle
 	events       []string
 	openPanic    any
 	closePanic   any
@@ -192,7 +194,10 @@ func TestWithChannelsServePanicClosesThenUnwindsAndPreservesOriginal(t *testing.
 	}
 }
 
-type retainedRegistrarChannels struct{ registrar contexture.CleanupRegistrar }
+type retainedRegistrarChannels struct {
+	contexture.ChannelsLifecycle
+	registrar contexture.CleanupRegistrar
+}
 
 func (channels *retainedRegistrarChannels) Open(_ context.Context, registrar contexture.CleanupRegistrar) error {
 	channels.registrar = registrar
@@ -211,7 +216,10 @@ func TestWithChannelsRejectsCleanupRegistrationOutsideOpen(t *testing.T) {
 	}
 }
 
-type concurrentRegistrarChannels struct{ cleaned atomic.Int32 }
+type concurrentRegistrarChannels struct {
+	contexture.ChannelsLifecycle
+	cleaned atomic.Int32
+}
 
 func (channels *concurrentRegistrarChannels) Open(_ context.Context, registrar contexture.CleanupRegistrar) error {
 	var group sync.WaitGroup
@@ -234,5 +242,15 @@ func TestWithChannelsConcurrentOpenRegistrationsAreRaceSafe(t *testing.T) {
 	}
 	if channels.cleaned.Load() != 32 {
 		t.Fatalf("cleanup count = %d", channels.cleaned.Load())
+	}
+}
+
+func TestWithChannelsRejectsTypedNilLifecycle(t *testing.T) {
+	var channels *testChannels
+	if _, err := contexture.WithChannels(context.Background(), channels, func(context.Context) (struct{}, error) {
+		t.Fatal("serve ran with typed-nil Channels")
+		return struct{}{}, nil
+	}); !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("typed-nil Channels = %v", err)
 	}
 }

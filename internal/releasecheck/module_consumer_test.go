@@ -56,6 +56,7 @@ var _ = contexture.NewDisclosureAPI
 var _ = contexture.ReportTelemetry
 var _ = contexture.NewControllerManager
 var _ = contexture.NewControllerManagerWithChannels
+var _ = contexture.NewControllerManagerWithChannelHandle
 var _ = contexture.RegisterRoot
 var _ = contexture.BranchesOf
 var _ = contexture.MembersOf
@@ -67,10 +68,13 @@ var _ contexture.View
 var _ contexture.CompileLevel = contexture.ActiveCompileLevel
 var _ = contexture.NewSelectedGraph
 var _ = contexture.WithGraph
+var _ = contexture.CurrentChannels
 var _ = contexture.NewExecutionAPI
 var _ = contexture.WithChannels[struct{}]
 var _ contexture.NodeUsage
 var _ contexture.ControllerManager
+var _ contexture.ChannelHandle
+var _ contexture.ChannelsLifecycle
 var _ contexture.RootSelectionError
 var _ contexture.RootOutsideSelectionError
 var _ contexture.WrongDoorError

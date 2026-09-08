@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 )
 
@@ -14,9 +15,25 @@ type CleanupRegistrar interface {
 	Defer(func(context.Context) error)
 }
 
+// ChannelHandle is any application-owned deployment dependency captured by an
+// imperative ControllerManager. Only a value implementing Channels participates
+// in lifecycle; every other value is passed to Tool invocations unchanged.
+type ChannelHandle = any
+
+// ChannelsLifecycle is an explicit marker embedded by lifecycle-owning channel
+// implementations. A structural Open/Close lookalike without this marker stays
+// an ordinary ChannelHandle.
+type ChannelsLifecycle struct{}
+
+// contextureChannelsLifecycle seals explicit lifecycle ownership to types that
+// embed ChannelsLifecycle. External structural lookalikes cannot declare this
+// package-private method themselves.
+func (ChannelsLifecycle) contextureChannelsLifecycle() {}
+
 // Channels owns application dependencies that must live around one serving scope.
 // Open must not retain the registrar beyond the call.
 type Channels interface {
+	contextureChannelsLifecycle()
 	Open(context.Context, CleanupRegistrar) error
 	Close(context.Context) error
 }
@@ -38,6 +55,9 @@ func WithChannels[T any](ctx context.Context, channels Channels, serve func(cont
 	}
 	if channels == nil {
 		return serve(ctx)
+	}
+	if nilChannels(channels) {
+		return zero, errors.Join(ErrInvalidDeclaration, errors.New("Contexture Channels lifecycle must not be typed nil"))
 	}
 
 	registrar := &cleanupRegistrar{active: true}
@@ -86,6 +106,19 @@ func WithChannels[T any](ctx context.Context, channels Channels, serve func(cont
 	}
 	opened = true
 	return serve(ctx)
+}
+
+func nilChannels(channels Channels) bool {
+	if channels == nil {
+		return false
+	}
+	value := reflect.ValueOf(channels)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
 
 // callLifecycle executes one teardown step without allowing its panic to skip

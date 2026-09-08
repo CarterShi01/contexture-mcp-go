@@ -208,6 +208,84 @@ func TestControllerManagerRebindsOnlyFutureApplicationLifetimes(t *testing.T) {
 	}
 }
 
+type ordinaryChannelHandle struct {
+	name       string
+	openCalls  int
+	closeCalls int
+}
+
+func (handle *ordinaryChannelHandle) Open(context.Context, contexture.CleanupRegistrar) error {
+	handle.openCalls++
+	return nil
+}
+
+func (handle *ordinaryChannelHandle) Close(context.Context) error {
+	handle.closeCalls++
+	return nil
+}
+
+func TestControllerManagerPassesOrdinaryChannelHandlesWithoutLifecycle(t *testing.T) {
+	first := &ordinaryChannelHandle{name: "first"}
+	second := &ordinaryChannelHandle{name: "second"}
+	manager := contexture.NewControllerManagerWithChannelHandle(first)
+	tool, err := contexture.NewTool("status", "Read.", true, func(ctx context.Context, _ managerInput) (string, error) {
+		return contexture.CurrentChannels(ctx).(*ordinaryChannelHandle).name, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.RegisterTool(func() *contexture.Tool { return tool }); err != nil {
+		t.Fatal(err)
+	}
+	oldApplication, err := manager.Application("ordinary-old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.RebindChannelHandle(second)
+	oldIndex, err := contexture.Compile(oldApplication)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newIndex, err := manager.Compile("ordinary-new")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		index *contexture.Index
+		want  string
+	}{{oldIndex, "first"}, {newIndex, "second"}} {
+		runtime, err := contexture.NewRuntime(test.index, contexture.AllRoots(), contexture.AllRoots(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := runtime.Serve(context.Background(), func(ctx context.Context) error {
+			value, callErr := runtime.InvokeReadOnly(ctx, "status", nil, contexture.AllRoots())
+			if callErr != nil || value != test.want {
+				t.Fatalf("ordinary handle invocation = %#v, %v; want %q", value, callErr, test.want)
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if first.openCalls != 0 || first.closeCalls != 0 || second.openCalls != 0 || second.closeCalls != 0 {
+		t.Fatalf("ordinary lookalike entered lifecycle: first=%#v second=%#v", first, second)
+	}
+}
+
+func TestControllerManagerRejectsTypedNilLifecycleWhenProducingApplication(t *testing.T) {
+	var channels *managerChannels
+	manager := contexture.NewControllerManagerWithChannels(channels)
+	if _, err := manager.RegisterSkill(func() *contexture.Skill {
+		return &contexture.Skill{Name: "read", Description: "Read.", Instructions: "Read."}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Application("typed-nil"); !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("typed-nil manager Channels = %v", err)
+	}
+}
+
 func TestControllerManagerRejectsInvalidNodeFactsAtTypedRegistration(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -303,7 +381,10 @@ func TestControllerManagerRejectsInvalidNodeFactsAtTypedRegistration(t *testing.
 
 type managerInput struct{}
 
-type managerChannels struct{ opens, closes int }
+type managerChannels struct {
+	contexture.ChannelsLifecycle
+	opens, closes int
+}
 
 func (channels *managerChannels) Open(context.Context, contexture.CleanupRegistrar) error {
 	channels.opens++

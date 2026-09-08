@@ -241,6 +241,15 @@ If Open or serve panics, Contexture completes the applicable unwind and
 re-panics that original value even when Close or cleanup also panics. Ordinary
 returned errors keep their existing joined-error behavior.
 
+A lifecycle owner embeds `contexture.ChannelsLifecycle` and implements
+`Open`/`Close`; the marker is the explicit opt-in that prevents a deployment
+handle with coincidentally named methods from entering lifecycle management.
+Use `NewControllerManagerWithChannelHandle` and `RebindChannelHandle` for an
+ordinary dependency. Runtime passes that exact identity to Tools through
+`CurrentChannels(ctx)` without calling its methods. Existing Application and
+Index snapshots retain the handle captured when they were created; a rebind
+only affects future snapshots.
+
 ### Compiled Index queries
 
 `Index` is an immutable compilation snapshot. `Count`, `Has`, `Bound`, and
