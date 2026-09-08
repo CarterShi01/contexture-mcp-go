@@ -77,3 +77,34 @@ func TestRootSelectionIsExactAndMonotonic(t *testing.T) {
 		t.Fatal("descendant selection accepted")
 	}
 }
+
+func TestDisclosureOmitsPromptRootFromModelVisibleUses(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "prompt-use",
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Skill{Name: "diagnose", Description: "Diagnose.", Instructions: "Inspect.", Uses: []string{"command"}}
+		}},
+		PromptRoots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Skill{Name: "command", Description: "Person only.", Instructions: "Wait."}
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := contexture.NewDisclosure(index, contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened, err := view.Open("diagnose", contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	uses, ok := opened["uses"].([]map[string]any)
+	if !ok || len(uses) != 0 {
+		t.Fatalf("Prompt root leaked through Uses: %#v", opened)
+	}
+}

@@ -237,6 +237,15 @@ Host 的 immutable principal，但不会被 caller-supplied graph 扩大。Tool 
 有意采用的 lazy factory，同时保持
 canonical ref identity 与 compiled snapshot 的不可变性。
 
+公开 Node lifecycle 只有 `RouteCompileLevel` 与 `ActiveCompileLevel` 两个状态。
+`RouteOf` 只返回 kind、name 和 description；`CompileNode` 通过 `View` 增加 canonical
+ref 与 actionable detail。`Disclosure` 是标准的 forest-backed View；nil View 则是
+standalone 形式：对已编译的 nested node 保留 canonical ref，并在没有 binding-aware forest
+可回答时使用空 schema。`GroupCards` 始终按 declaration order 返回完整的 `roles`、
+`skills`、`tools` 三个 bucket。active Role 包含其直接 member 的 route card，active Skill
+包含 instructions，active Tool 携带 execution facts；声明的 `Uses` 始终只投影一层 route
+card，绝不会递归展开。
+
 `Role.Branches`、`Role.Members` 与 `Role.Member` 为已编译 snapshot 提供相应的 Role-local
 结构查询。Branches 仅返回直接 child Role；Members 按 declaration group 顺序返回直接 child Role、Skill
 和 Tool；Member 在这三类直接成员之间按 name 查找，未找到时返回带 Role 已知 name（排序后）的

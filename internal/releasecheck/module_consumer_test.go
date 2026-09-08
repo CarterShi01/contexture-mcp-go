@@ -59,6 +59,12 @@ var _ = contexture.NewControllerManagerWithChannels
 var _ = contexture.RegisterRoot
 var _ = contexture.BranchesOf
 var _ = contexture.MembersOf
+var _ = contexture.RouteOf
+var _ = contexture.CardOf
+var _ = contexture.GroupCards
+var _ = contexture.CompileNode
+var _ contexture.View
+var _ contexture.CompileLevel = contexture.ActiveCompileLevel
 var _ = contexture.NewSelectedGraph
 var _ = contexture.WithGraph
 var _ = contexture.NewExecutionAPI
@@ -210,6 +216,18 @@ func main() {
     facadeBranches, facadeBranchesErr := contexture.BranchesOf(compiledRole)
     if facadeMembersErr != nil || len(facadeMembers) != 4 || facadeBranchesErr != nil || len(facadeBranches) != 0 {
         panic("public Node containment facade did not retain compiled facts")
+    }
+    compiledCard, compiledCardErr := contexture.CompileNode(compiledRole, contexture.ActiveCompileLevel, skillDisclosure)
+    if compiledCardErr != nil || compiledCard["ref"] != "graph" || compiledCard["instructions"] != "Inspect." {
+        panic("public Node active compilation did not retain canonical View facts")
+    }
+    standaloneTool, standaloneToolErr := contexture.CompileNode(selectedMember, contexture.ActiveCompileLevel, nil)
+    if standaloneToolErr != nil || standaloneTool["ref"] != "graph/strict" || standaloneTool["read_only"] != true {
+        panic("public standalone Node compilation did not retain canonical Tool facts")
+    }
+    groupedCards, groupedCardsErr := contexture.GroupCards(facadeMembers, skillDisclosure)
+    if groupedCardsErr != nil || len(groupedCards["roles"].([]contexture.CompiledContext)) != 0 || len(groupedCards["skills"].([]contexture.CompiledContext)) != 1 || len(groupedCards["tools"].([]contexture.CompiledContext)) != 3 {
+        panic("public GroupCards did not retain the closed sibling shape")
     }
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
     execution, executionErr := contexture.NewExecutionAPI(runtime)

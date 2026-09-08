@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
@@ -60,6 +61,89 @@ func newDisclosure(index *Index, selection RootSelection, bound bool, telemetry 
 
 // Index returns the immutable canonical graph projected by this Disclosure.
 func (view *Disclosure) Index() *Index { return view.index }
+
+// RefOf returns the canonical address for a Node held by this View.
+func (view *Disclosure) RefOf(node Node) (string, error) { return view.index.RefOf(node) }
+
+// CardOf renders one policy-aware route card for a held Node.
+func (view *Disclosure) CardOf(node Node) (CompiledContext, error) {
+	return CardOf(node, view)
+}
+
+// CardFor renders one selected, model-visible dependency by canonical ref.
+func (view *Disclosure) CardFor(ref string) (CompiledContext, error) {
+	if !view.selection.ContainsRef(ref) {
+		return nil, &RootOutsideSelectionError{Ref: ref}
+	}
+	root := strings.Split(canonicalRef(ref), foundation.ReferenceSeparator)[0]
+	if _, prompt := view.promptRoots[root]; prompt {
+		return nil, errors.Join(ErrInvalidDeclaration, fmt.Errorf("%q belongs to a Prompt-only root and has no model routing card", ref))
+	}
+	node, err := view.index.Find(ref)
+	if err != nil {
+		return nil, err
+	}
+	return view.CardOf(node)
+}
+
+// CardsOf renders a grouped sibling set after applying this View's policy.
+func (view *Disclosure) CardsOf(nodes []Node) (CompiledContext, error) {
+	visible := make([]Node, 0, len(nodes))
+	for _, node := range nodes {
+		ref, err := view.index.RefOf(node)
+		if err != nil {
+			return nil, err
+		}
+		root := strings.Split(ref, foundation.ReferenceSeparator)[0]
+		if view.selection.ContainsRef(ref) {
+			if _, prompt := view.promptRoots[root]; !prompt {
+				visible = append(visible, node)
+			}
+		}
+	}
+	return GroupCards(visible, view)
+}
+
+// CardsFor renders selected model-visible dependency cards in declaration order.
+func (view *Disclosure) CardsFor(refs []string) ([]CompiledContext, error) {
+	cards := make([]CompiledContext, 0, len(refs))
+	for _, ref := range refs {
+		if !view.selection.ContainsRef(ref) {
+			continue
+		}
+		root := strings.Split(canonicalRef(ref), foundation.ReferenceSeparator)[0]
+		if _, prompt := view.promptRoots[root]; prompt {
+			continue
+		}
+		card, err := view.CardFor(ref)
+		if err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	return cards, nil
+}
+
+// ExecutionOf exposes callable Tool facts only for a bound Index.
+func (view *Disclosure) ExecutionOf(node Node) (CompiledContext, error) {
+	tool, ok := node.(*Tool)
+	if !ok {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("only a Tool has an executable disclosure facet"))
+	}
+	if !view.bound {
+		return CompiledContext{}, nil
+	}
+	schema, err := view.SchemaOf(tool)
+	if err != nil {
+		return nil, err
+	}
+	return CompiledContext{"read_only": tool.ReadOnly, "input_schema": schema}, nil
+}
+
+// SchemaOf returns one bound Tool's defensive input schema.
+func (view *Disclosure) SchemaOf(node Node) (map[string]any, error) {
+	return view.index.SchemaOf(node)
+}
 
 // EffectiveSelection applies the view's ceiling to one requested root selection.
 func (view *Disclosure) EffectiveSelection(requested RootSelection) (RootSelection, error) {
@@ -146,8 +230,9 @@ func (view *Disclosure) reportOpen(ref string, node Node) {
 }
 
 func (view *Disclosure) card(node Node, bound bool) map[string]any {
+	card, _ := RouteOf(node)
 	ref, _ := view.index.RefOf(node)
-	card := map[string]any{"kind": string(node.nodeKind()), "name": node.nodeName(), "description": node.nodeDescription(), "ref": ref}
+	card["ref"] = ref
 	// Execution facts are meaningful only when this disclosure is backed by a
 	// bound Index. A disclosure-only Host intentionally gives agents structural
 	// routing cards, not a claim that a Tool can be invoked or is read-only.
@@ -198,6 +283,10 @@ func (view *Disclosure) addUses(card map[string]any, refs []string, selection Ro
 	uses := []map[string]any{}
 	for _, ref := range refs {
 		if !selection.ContainsRef(ref) {
+			continue
+		}
+		root := strings.Split(canonicalRef(ref), foundation.ReferenceSeparator)[0]
+		if _, prompt := view.promptRoots[root]; prompt {
 			continue
 		}
 		target, _ := view.index.Find(ref)

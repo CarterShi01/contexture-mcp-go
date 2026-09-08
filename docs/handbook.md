@@ -274,6 +274,17 @@ typed-nil node returns an `ErrInvalidDeclaration`-typed error instead. This maps
 Python's constructed object members to Go's deliberate lazy factories while
 keeping canonical ref identity and compiled snapshots immutable.
 
+The public Node lifecycle uses exactly `RouteCompileLevel` and
+`ActiveCompileLevel`. `RouteOf` returns only kind, name, and description;
+`CompileNode` adds the canonical ref and actionable details through a `View`.
+`Disclosure` is the standard forest-backed View, while a nil View is the
+standalone form: it retains a compiled nested node's canonical ref and uses an
+empty schema where no binding-aware forest can answer. `GroupCards` always
+returns all three `roles`, `skills`, and `tools` buckets in declaration order.
+An active Role contains route cards for its direct members, an active Skill
+contains its instructions, and an active Tool carries its execution facts.
+Declared `Uses` remain one layer of route cards and never recursively expand.
+
 `Role.Branches`, `Role.Members`, and `Role.Member` provide the corresponding
 Role-local structural queries on a compiled snapshot. Branches returns only
 direct child Roles; Members returns direct child Roles, Skills, and Tools in

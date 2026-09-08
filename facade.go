@@ -15,6 +15,9 @@ type (
 	ControllerManager      = model.ControllerManager
 	Node                   = model.Node
 	Kind                   = model.Kind
+	CompileLevel           = model.CompileLevel
+	CompiledContext        = model.CompiledContext
+	View                   = model.View
 	Role                   = model.Role
 	Skill                  = model.Skill
 	Tool                   = model.Tool
@@ -64,6 +67,9 @@ const (
 	SkillKind = model.SkillKind
 	ToolKind  = model.ToolKind
 
+	RouteCompileLevel  = model.RouteCompileLevel
+	ActiveCompileLevel = model.ActiveCompileLevel
+
 	ModelMayOpen           = model.ModelMayOpen
 	ModelReservedForPerson = model.ModelReservedForPerson
 
@@ -112,6 +118,22 @@ func BranchesOf(node Node) ([]Node, error) { return model.BranchesOf(node) }
 // MembersOf returns one compiled Node's direct containment members. Leaf Nodes
 // have no members and return an empty defensive result.
 func MembersOf(node Node) ([]Node, error) { return model.MembersOf(node) }
+
+// RouteOf renders one Node's broad-routing facts.
+func RouteOf(node Node) (CompiledContext, error) { return model.RouteOf(node) }
+
+// CardOf renders one openable routing card through its owning View.
+func CardOf(node Node, view View) (CompiledContext, error) { return model.CardOf(node, view) }
+
+// GroupCards renders one closed Role/Skill/Tool sibling shape.
+func GroupCards(nodes []Node, view View) (CompiledContext, error) {
+	return model.GroupCards(nodes, view)
+}
+
+// CompileNode renders one Node at route or active disclosure level.
+func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, error) {
+	return model.CompileNode(node, level, view)
+}
 
 // Compile builds one fresh canonical forest from a lazy Application.
 func Compile(application *Application) (*Index, error) {
