@@ -61,6 +61,22 @@ func goldenTool[I any](name, description string, readOnly bool, handler func(con
 	}
 }
 
+func goldenLogsTool() contexture.Factory {
+	return func() contexture.Node {
+		tool, err := contexture.NewToolWithSchema("get_pod_logs", "Return the recent container logs for a Pod.", true, map[string]any{
+			"type": "object", "properties": map[string]any{
+				"namespace": map[string]any{"type": "string"},
+				"pod":       map[string]any{"type": "string"},
+				"previous":  map[string]any{"type": "boolean", "default": false},
+			}, "required": []any{"namespace", "pod"},
+		}, func(context.Context, logsInput) (string, error) { return "", nil })
+		if err != nil {
+			panic(err)
+		}
+		return tool
+	}
+}
+
 func goldenDemo(t *testing.T) (*contexture.Gateway, *surface.Publications) {
 	t.Helper()
 	crashLoop := goldenFixture(t, "CRASH_LOOP_RUNBOOK")
@@ -77,7 +93,7 @@ func goldenDemo(t *testing.T) (*contexture.Gateway, *surface.Publications) {
 							}},
 							Tools: []contexture.Factory{
 								goldenTool("get_pod_status", "Return the current phase, container state, and restart count of a Pod.", true, func(context.Context, podInput) (string, error) { return "", nil }),
-								goldenTool("get_pod_logs", "Return the recent container logs for a Pod.", true, func(context.Context, logsInput) (string, error) { return "", nil }),
+								goldenLogsTool(),
 								goldenTool("get_pod_events", "Return the Kubernetes events recorded against a Pod.", true, func(context.Context, podInput) (string, error) { return "", nil }),
 								goldenTool("crash_loop_runbook", "How to diagnose a container that keeps restarting, and what not to do.", true, func(context.Context, noInput) (string, error) { return crashLoop, nil }),
 							},

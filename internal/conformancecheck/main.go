@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	expectedRevision = "e107a81a933c5eb5b4530e762311619be3a7a80f"
+	expectedRevision = "3b274421360d5569a23922bfc72b71d5828cf995"
 	expectedVersion  = "0.12"
 )
 

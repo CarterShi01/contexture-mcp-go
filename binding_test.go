@@ -55,6 +55,39 @@ type collectionInput struct {
 	Labels map[string]int32 `json:"labels"`
 }
 
+type defaultedInput struct {
+	Previous *bool `json:"previous,omitempty" default:"false"`
+}
+
+type numericWidthsInput struct {
+	Int     int     `json:"int"`
+	Int8    int8    `json:"int8"`
+	Int16   int16   `json:"int16"`
+	Int32   int32   `json:"int32"`
+	Int64   int64   `json:"int64"`
+	Uint    uint    `json:"uint"`
+	Uint8   uint8   `json:"uint8"`
+	Uint16  uint16  `json:"uint16"`
+	Uint32  uint32  `json:"uint32"`
+	Uint64  uint64  `json:"uint64"`
+	Float32 float32 `json:"float32"`
+	Float64 float64 `json:"float64"`
+}
+
+type customScalar string
+
+func (value *customScalar) UnmarshalJSON(raw []byte) error {
+	if string(raw) != `"accepted"` {
+		return errors.New("custom rejection")
+	}
+	*value = "accepted"
+	return nil
+}
+
+type customDecoderInput struct {
+	Value customScalar `json:"value"`
+}
+
 func strictInputSchema() map[string]any {
 	return map[string]any{
 		"type": "object", "additionalProperties": false,
@@ -96,6 +129,9 @@ func TestToolBindingSharesSchemaValidationAndHandler(t *testing.T) {
 	if _, err := binding.Call(context.Background(), json.RawMessage(`{}`)); !errors.Is(err, contexture.ErrInvalidInput) {
 		t.Fatalf("missing required argument error = %v, want invalid input", err)
 	}
+	if _, err := binding.Call(context.Background(), json.RawMessage(`{"service":"api"} {"extra":true}`)); !errors.Is(err, contexture.ErrInvalidInput) {
+		t.Fatalf("trailing JSON value error = %v, want invalid input", err)
+	}
 	result, err = binding.Call(context.Background(), json.RawMessage(`{"service":"api"}`))
 	if err != nil {
 		t.Fatal(err)
@@ -131,6 +167,144 @@ func TestNewToolMatchesTheDerivedSchemaUnknownFieldPolicyRecursively(t *testing.
 	}
 	if calls != 1 {
 		t.Fatalf("nested unknown field handler calls = %d", calls)
+	}
+}
+
+func TestExplicitSchemaDefaultsAreAppliedBeforeValidationAndDecoding(t *testing.T) {
+	tool, err := contexture.NewToolWithSchema("defaults", "Defaults.", true, map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{
+			"previous": map[string]any{"type": []any{"boolean", "null"}, "default": false},
+		},
+		"required": []any{},
+	}, func(_ context.Context, input defaultedInput) (any, error) {
+		return input.Previous, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := tool.Binding()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous, err := binding.Call(context.Background(), json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if previous == nil || *previous.(*bool) {
+		t.Fatalf("applied default = %#v, want pointer to false", previous)
+	}
+
+	derived, err := contexture.NewTool("derived-default-tag", "Ignore non-standard tags.", true, func(_ context.Context, input defaultedInput) (*bool, error) {
+		return input.Previous, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	derivedBinding, err := derived.Binding()
+	if err != nil {
+		t.Fatal(err)
+	}
+	property := derivedBinding.Schema()["properties"].(map[string]any)["previous"].(map[string]any)
+	if _, advertised := property["default"]; advertised {
+		t.Fatalf("derived schema advertised a non-standard struct-tag default: %#v", property)
+	}
+	value, err := derivedBinding.Call(context.Background(), json.RawMessage(`{}`))
+	if err != nil || value.(*bool) != nil {
+		t.Fatalf("derived omitted value = %#v, %v; want nil", value, err)
+	}
+
+	_, err = contexture.NewToolWithSchema("bad-default", "Bad default.", true, map[string]any{
+		"type": "object", "additionalProperties": false,
+		"properties": map[string]any{"previous": map[string]any{"type": []any{"boolean", "null"}, "default": "false"}},
+		"required":   []any{},
+	}, func(context.Context, defaultedInput) (string, error) { return "unexpected", nil })
+	if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("invalid default declaration error = %v", err)
+	}
+}
+
+func TestDerivedNumericSchemasMatchGoDecoderWidths(t *testing.T) {
+	tool, err := contexture.NewTool("numbers", "Numbers.", true, func(_ context.Context, input numericWidthsInput) (numericWidthsInput, error) {
+		return input, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := tool.Binding()
+	if err != nil {
+		t.Fatal(err)
+	}
+	properties := binding.Schema()["properties"].(map[string]any)
+	wantBounds := map[string]numericBoundsForTest{
+		"int":     {minimum: -math.Ldexp(1, 63), exclusiveMaximum: math.Ldexp(1, 63)},
+		"int8":    {minimum: math.MinInt8, maximum: float64(math.MaxInt8)},
+		"int16":   {minimum: math.MinInt16, maximum: float64(math.MaxInt16)},
+		"int32":   {minimum: math.MinInt32, maximum: float64(math.MaxInt32)},
+		"int64":   {minimum: -math.Ldexp(1, 63), exclusiveMaximum: math.Ldexp(1, 63)},
+		"uint":    {minimum: 0, exclusiveMaximum: math.Ldexp(1, 64)},
+		"uint8":   {minimum: 0, maximum: float64(math.MaxUint8)},
+		"uint16":  {minimum: 0, maximum: float64(math.MaxUint16)},
+		"uint32":  {minimum: 0, maximum: float64(math.MaxUint32)},
+		"uint64":  {minimum: 0, exclusiveMaximum: math.Ldexp(1, 64)},
+		"float32": {minimum: -math.MaxFloat32, maximum: float64(math.MaxFloat32)},
+		"float64": {minimum: -math.MaxFloat64, maximum: float64(math.MaxFloat64)},
+	}
+	for name, want := range wantBounds {
+		property := properties[name].(map[string]any)
+		if property["minimum"] != want.minimum || property["maximum"] != want.maximum || property["exclusiveMaximum"] != want.exclusiveMaximum {
+			t.Errorf("%s bounds = minimum %v, maximum %v, exclusiveMaximum %v; want %#v", name, property["minimum"], property["maximum"], property["exclusiveMaximum"], want)
+		}
+	}
+
+	valid := map[string]any{"int": 0, "int8": 0, "int16": 0, "int32": 0, "int64": 0, "uint": 0, "uint8": 0, "uint16": 0, "uint32": 0, "uint64": 0, "float32": 0, "float64": 0}
+	raw, _ := json.Marshal(valid)
+	if _, err := binding.Call(context.Background(), raw); err != nil {
+		t.Fatalf("valid numeric input: %v", err)
+	}
+	exact, err := binding.Call(context.Background(), json.RawMessage(`{"int":9007199254740993,"int8":127,"int16":32767,"int32":2147483647,"int64":9223372036854775807,"uint":18446744073709551615,"uint8":255,"uint16":65535,"uint32":4294967295,"uint64":18446744073709551615,"float32":3.4028234663852886e38,"float64":1.7976931348623157e308}`))
+	if err != nil {
+		t.Fatalf("exact numeric extremes: %v", err)
+	}
+	extremes := exact.(numericWidthsInput)
+	if extremes.Int != 9007199254740993 || extremes.Int64 != math.MaxInt64 || extremes.Uint != math.MaxUint64 || extremes.Uint64 != math.MaxUint64 {
+		t.Fatalf("numeric precision lost: %#v", extremes)
+	}
+	invalid := map[string]string{
+		"int": "9223372036854775808", "int8": "128", "int16": "32768", "int32": "2147483648", "int64": "9223372036854775808",
+		"uint": "-1", "uint8": "256", "uint16": "65536", "uint32": "4294967296", "uint64": "18446744073709551616",
+		"float32": "3.5e38", "float64": "1e400",
+	}
+	for name, number := range invalid {
+		encoded := make(map[string]json.RawMessage, len(valid))
+		for field := range valid {
+			encoded[field] = json.RawMessage("0")
+		}
+		encoded[name] = json.RawMessage(number)
+		arguments, _ := json.Marshal(encoded)
+		if _, err := binding.Call(context.Background(), arguments); !errors.Is(err, contexture.ErrInvalidInput) {
+			t.Errorf("overflowing %s accepted: %v", name, err)
+		}
+	}
+	valid["int8"] = 1.5
+	raw, _ = json.Marshal(valid)
+	if _, err := binding.Call(context.Background(), raw); !errors.Is(err, contexture.ErrInvalidInput) {
+		t.Fatalf("fractional integer error = %v, want invalid input", err)
+	}
+}
+
+type numericBoundsForTest struct {
+	minimum          float64
+	maximum          any
+	exclusiveMaximum any
+}
+
+func TestDerivedToolRejectsCustomJSONUnmarshalers(t *testing.T) {
+	_, err := contexture.NewTool("custom", "Custom.", true, func(context.Context, customDecoderInput) (string, error) {
+		return "unexpected", nil
+	})
+	if !errors.Is(err, contexture.ErrInvalidDeclaration) {
+		t.Fatalf("custom JSON decoder error = %v, want invalid declaration", err)
 	}
 }
 
@@ -195,8 +369,6 @@ func TestNewToolWithSchemaRejectsTransportContractDriftAtDeclaration(t *testing.
 		{"extra property", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}, "extra": map[string]any{"type": "string"}}, "required": []any{"name"}, "additionalProperties": false}},
 		{"optional marked required", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}}, "required": []any{"name", "filter"}, "additionalProperties": false}},
 		{"required omitted", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}}, "required": []any{}, "additionalProperties": false}},
-		{"unknown fields permitted", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}}, "required": []any{"name"}, "additionalProperties": true}},
-		{"unknown field policy omitted", map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}}, "required": []any{"name"}}},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -205,6 +377,36 @@ func TestNewToolWithSchemaRejectsTransportContractDriftAtDeclaration(t *testing.
 				t.Fatalf("NewToolWithSchema error = %v, want invalid declaration", err)
 			}
 		})
+	}
+}
+
+func TestNewToolWithSchemaCanDiscloseAndStripUnknownFields(t *testing.T) {
+	for _, additional := range []any{nil, true} {
+		schema := map[string]any{
+			"type":       "object",
+			"properties": map[string]any{"name": map[string]any{"type": "string"}, "filter": map[string]any{"type": "string"}},
+			"required":   []any{"name"},
+		}
+		if additional != nil {
+			schema["additionalProperties"] = additional
+		}
+		tool, err := contexture.NewToolWithSchema("permissive", "Permissive.", true, schema, func(_ context.Context, input strictInput) (strictInput, error) {
+			return input, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		binding, err := tool.Binding()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if binding.Schema()["additionalProperties"] != additional {
+			t.Fatalf("additionalProperties = %#v, want %#v", binding.Schema()["additionalProperties"], additional)
+		}
+		value, err := binding.Call(context.Background(), json.RawMessage(`{"name":"Ada","unknown":true}`))
+		if err != nil || value.(strictInput) != (strictInput{Name: "Ada"}) {
+			t.Fatalf("permissive invocation = %#v, %v", value, err)
+		}
 	}
 }
 

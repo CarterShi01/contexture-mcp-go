@@ -140,14 +140,21 @@ surface 时，才导入 `server` 或 `web`。
 `NewTool` 从带 tag 的 input struct 推导 schema。`NewToolWithSchema` 是用于 enum 等 reflection
 无法直接表达约束的公开 escape hatch，但它不能让已发布的 card 承诺 Go 会拒绝的输入。构造时，其 explicit
 root schema 必须是 object；properties 必须与 input struct 中 exported 且带 JSON tag 的 field 精确一致；
-required name 必须与未使用 `omitempty` 或 `omitzero` 的 field 精确一致；并且必须设置
-`additionalProperties: false`。这与 binding 的严格 `encoding/json` decoder 一致，在披露的 explicit schema
-中保留该 unknown-field policy，并会在 Application compile 前以 `ErrInvalidDeclaration` 拒绝 drift。
+required name 必须与未使用 `omitempty` 或 `omitzero` 的 field 精确一致。省略 `additionalProperties` 或设为
+true 时，会接受并剥离 unknown root field；设为 false 则选择 strict decoder，并在披露 schema 中保留该拒绝
+policy。contract drift 会在 Application compile 前以 `ErrInvalidDeclaration` 拒绝。
 
 reference-derived 的 `NewTool` card 有意省略 `additionalProperties`，因此它和 decoder 都会接受 unknown
 argument，这与 pinned Python/MCP binding 一致；required 与 typed field 仍会被校验。若 contract 需要严格拒绝
-unknown field，应选择 `NewToolWithSchema`；此时 explicit 的 `additionalProperties: false` 会被发布，并递归地
-对 nested input struct 生效。
+`NewToolWithSchema` 可以在保留该 policy 的同时增加 default 与 constraint，也可以选择严格拒绝 unknown
+field；此时 explicit 的 `additionalProperties: false` 会被发布，并递归地对 nested input struct 生效。
+
+default 是 contract data，而不是 Go struct metadata。应在 explicit `NewToolWithSchema` property 中声明；
+Binding 会 deep-copy，并在校验与解码 handler input 前填充缺失的 default。`NewTool` 会忽略非标准
+`default` struct tag，避免披露普通 `encoding/json` decoding 实际不会产生的 value。派生 numeric property
+会包含对应 Go width 的有限边界。对于 64-bit integer，披露边界使用可精确表示的二次幂
+`exclusiveMaximum`，既接受完整 Go range，也不会承诺下一个越界 integer。default 填充与 schema validation
+会在 typed decoding 前无损保留 JSON number。
 
 JSON tag option 会被完整扫描，而不是按位置解释，因此 `json:"value,omitempty,string"` 与
 `json:"value,string,omitempty"` 都会让 `value` 成为 optional。property-level JSON Schema constraint 可以

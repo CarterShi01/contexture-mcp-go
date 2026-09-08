@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -34,6 +36,9 @@ func NewTool[I any, O any](name, description string, readOnly bool, handler func
 	if err := requireJSONTags(typeOf); err != nil {
 		return nil, err
 	}
+	if err := rejectDerivedJSONUnmarshalers(typeOf, "tool input", make(map[reflect.Type]bool)); err != nil {
+		return nil, err
+	}
 	schema, err := jsonschema.For[I](nil)
 	if err != nil {
 		return nil, fmt.Errorf("derive Tool schema: %w", err)
@@ -41,7 +46,7 @@ func NewTool[I any, O any](name, description string, readOnly bool, handler func
 	// The reference-derived schema omits additionalProperties, which means
 	// unknown arguments are accepted. Keep the generated card and decoder on
 	// that same policy; explicit schemas can deliberately opt into strictness.
-	return newToolWithSchema(name, description, readOnly, typeOf, schema, false, false, handler)
+	return newToolWithSchema(name, description, readOnly, typeOf, schema, false, false, true, handler)
 }
 
 // NewToolWithSchema couples an explicit JSON Schema to the same validated,
@@ -69,17 +74,21 @@ func NewToolWithSchema[I any, O any](name, description string, readOnly bool, in
 	if err := json.Unmarshal(raw, &contract); err != nil {
 		return nil, fmt.Errorf("%w: decode explicit Tool schema: %v", ErrInvalidDeclaration, err)
 	}
-	if err := validateExplicitSchema(contract, typeOf); err != nil {
+	disallowUnknownFields, err := validateExplicitSchema(contract, typeOf)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateSchemaDefaults(contract, "explicit Tool schema"); err != nil {
 		return nil, err
 	}
 	var schema jsonschema.Schema
 	if err := json.Unmarshal(raw, &schema); err != nil {
 		return nil, fmt.Errorf("%w: decode explicit Tool schema: %v", ErrInvalidDeclaration, err)
 	}
-	return newToolWithSchema(name, description, readOnly, typeOf, &schema, true, true, handler)
+	return newToolWithSchema(name, description, readOnly, typeOf, &schema, true, disallowUnknownFields, false, handler)
 }
 
-func newToolWithSchema[I any, O any](name, description string, readOnly bool, typeOf reflect.Type, schema *jsonschema.Schema, preserveAdditionalProperties, disallowUnknownFields bool, handler func(context.Context, I) (O, error)) (*Tool, error) {
+func newToolWithSchema[I any, O any](name, description string, readOnly bool, typeOf reflect.Type, schema *jsonschema.Schema, preserveAdditionalProperties, disallowUnknownFields, derived bool, handler func(context.Context, I) (O, error)) (*Tool, error) {
 	raw, err := json.Marshal(schema)
 	if err != nil {
 		return nil, fmt.Errorf("marshal Tool schema: %w", err)
@@ -88,7 +97,10 @@ func newToolWithSchema[I any, O any](name, description string, readOnly bool, ty
 	if err := json.Unmarshal(raw, &rendered); err != nil {
 		return nil, fmt.Errorf("decode Tool schema: %w", err)
 	}
-	normalizeSchema(rendered, typeOf, preserveAdditionalProperties)
+	normalizeSchema(rendered, preserveAdditionalProperties)
+	if derived {
+		addDerivedNumericBounds(rendered, rendered, typeOf, make(map[string]bool))
+	}
 	validationSchema := schema
 	if !disallowUnknownFields {
 		// jsonschema-go derives additionalProperties:false for Go structs, but
@@ -110,27 +122,10 @@ func newToolWithSchema[I any, O any](name, description string, readOnly bool, ty
 	return &Tool{Name: name, Description: description, ReadOnly: readOnly, binding: &typedBinding[I, O]{schema: rendered, validator: validator, disallowUnknownFields: disallowUnknownFields, handler: handler}}, nil
 }
 
-func normalizeSchema(schema map[string]any, input reflect.Type, preserveAdditionalProperties bool) {
+func normalizeSchema(schema map[string]any, preserveAdditionalProperties bool) {
 	normalizeSchemaValue(schema, preserveAdditionalProperties)
 	if schema["type"] == "object" && schema["properties"] == nil {
 		schema["properties"] = map[string]any{}
-	}
-	properties, _ := schema["properties"].(map[string]any)
-	for _, field := range reflect.VisibleFields(input) {
-		if !field.IsExported() || field.Anonymous {
-			continue
-		}
-		name := strings.Split(field.Tag.Get("json"), ",")[0]
-		property, _ := properties[name].(map[string]any)
-		if property == nil {
-			continue
-		}
-		if defaultValue, ok := field.Tag.Lookup("default"); ok {
-			var decoded any
-			if json.Unmarshal([]byte(defaultValue), &decoded) == nil {
-				property["default"] = decoded
-			}
-		}
 	}
 }
 
@@ -174,15 +169,30 @@ func (binding *typedBinding[I, O]) Call(ctx context.Context, arguments json.RawM
 		arguments = json.RawMessage("{}")
 	}
 	var rawInput any
-	if err := json.Unmarshal(arguments, &rawInput); err != nil {
+	rawDecoder := json.NewDecoder(bytes.NewReader(arguments))
+	rawDecoder.UseNumber()
+	if err := rawDecoder.Decode(&rawInput); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
 	}
+	var trailing any
+	if err := rawDecoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return nil, fmt.Errorf("%w: multiple JSON values", ErrInvalidInput)
+		}
+		return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+	}
+	applySchemaDefaults(rawInput, binding.schema, binding.schema, make(map[string]bool))
+	rawInput = normalizeJSONNumbers(rawInput)
 	if binding.validator != nil {
 		if err := binding.validator.Validate(&rawInput); err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
 		}
 	}
-	decoder := json.NewDecoder(bytes.NewReader(arguments))
+	normalizedArguments, err := json.Marshal(rawInput)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(normalizedArguments))
 	if binding.disallowUnknownFields {
 		decoder.DisallowUnknownFields()
 	}
@@ -193,10 +203,227 @@ func (binding *typedBinding[I, O]) Call(ctx context.Context, arguments json.RawM
 	if decoder.More() {
 		return nil, fmt.Errorf("%w: multiple JSON values", ErrInvalidInput)
 	}
-	if err := requireJSONFields(arguments, reflect.TypeFor[I]()); err != nil {
+	if err := requireJSONFields(normalizedArguments, reflect.TypeFor[I]()); err != nil {
 		return nil, err
 	}
 	return binding.handler(ctx, input)
+}
+
+func normalizeJSONNumbers(value any) any {
+	switch typed := value.(type) {
+	case json.Number:
+		text := typed.String()
+		if !strings.ContainsAny(text, ".eE") {
+			if signed, err := typed.Int64(); err == nil {
+				return signed
+			}
+			if unsigned, err := strconv.ParseUint(text, 10, 64); err == nil {
+				return unsigned
+			}
+			return typed
+		}
+		if floating, err := typed.Float64(); err == nil && !math.IsInf(floating, 0) {
+			return floating
+		}
+		return typed
+	case map[string]any:
+		for key, item := range typed {
+			typed[key] = normalizeJSONNumbers(item)
+		}
+	case []any:
+		for index, item := range typed {
+			typed[index] = normalizeJSONNumbers(item)
+		}
+	}
+	return value
+}
+
+func applySchemaDefaults(value any, schema, root map[string]any, visiting map[string]bool) {
+	schema = referencedSchema(schema, root, visiting)
+	switch typed := value.(type) {
+	case map[string]any:
+		properties, _ := schema["properties"].(map[string]any)
+		for name, propertyValue := range properties {
+			property, ok := propertyValue.(map[string]any)
+			if !ok {
+				continue
+			}
+			item, exists := typed[name]
+			if !exists {
+				if defaultValue, hasDefault := property["default"]; hasDefault {
+					item = cloneJSONValue(reflect.ValueOf(defaultValue))
+					typed[name] = item
+				} else {
+					continue
+				}
+			}
+			applySchemaDefaults(item, property, root, make(map[string]bool))
+		}
+		if additional, ok := schema["additionalProperties"].(map[string]any); ok {
+			for name, item := range typed {
+				if _, declared := properties[name]; !declared {
+					applySchemaDefaults(item, additional, root, make(map[string]bool))
+				}
+			}
+		}
+	case []any:
+		if items, ok := schema["items"].(map[string]any); ok {
+			for _, item := range typed {
+				applySchemaDefaults(item, items, root, make(map[string]bool))
+			}
+		}
+	}
+}
+
+func referencedSchema(schema, root map[string]any, visiting map[string]bool) map[string]any {
+	ref, _ := schema["$ref"].(string)
+	if ref == "" || visiting[ref] {
+		return schema
+	}
+	const prefix = "#/$defs/"
+	if !strings.HasPrefix(ref, prefix) {
+		return schema
+	}
+	definitions, _ := root["$defs"].(map[string]any)
+	name := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(ref, prefix), "~1", "/"), "~0", "~")
+	target, _ := definitions[name].(map[string]any)
+	if target == nil {
+		return schema
+	}
+	visiting[ref] = true
+	return referencedSchema(target, root, visiting)
+}
+
+func addDerivedNumericBounds(schema, root map[string]any, typeOf reflect.Type, visiting map[string]bool) {
+	ref, _ := schema["$ref"].(string)
+	if ref != "" {
+		if visiting[ref+"|"+typeOf.String()] {
+			return
+		}
+		visiting[ref+"|"+typeOf.String()] = true
+		schema = referencedSchema(schema, root, make(map[string]bool))
+	}
+	for typeOf.Kind() == reflect.Pointer {
+		typeOf = typeOf.Elem()
+	}
+	switch typeOf.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if typeOf.Bits() == 64 {
+			setNumericInterval(schema, -math.Ldexp(1, 63), math.Ldexp(1, 63))
+		} else {
+			setNumericBounds(schema, signedIntegerBounds(typeOf.Bits()))
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		if typeOf.Bits() == 64 {
+			setNumericInterval(schema, 0, math.Ldexp(1, 64))
+		} else {
+			setNumericBounds(schema, unsignedIntegerBounds(typeOf.Bits()))
+		}
+	case reflect.Float32, reflect.Float64:
+		setNumericBounds(schema, floatBounds(typeOf.Bits()))
+	case reflect.Struct:
+		properties, _ := schema["properties"].(map[string]any)
+		for _, field := range reflect.VisibleFields(typeOf) {
+			if !field.IsExported() || field.Anonymous {
+				continue
+			}
+			name := strings.Split(field.Tag.Get("json"), ",")[0]
+			property, _ := properties[name].(map[string]any)
+			if property != nil {
+				addDerivedNumericBounds(property, root, field.Type, visiting)
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		if items, ok := schema["items"].(map[string]any); ok {
+			addDerivedNumericBounds(items, root, typeOf.Elem(), visiting)
+		}
+	case reflect.Map:
+		if additional, ok := schema["additionalProperties"].(map[string]any); ok {
+			addDerivedNumericBounds(additional, root, typeOf.Elem(), visiting)
+		}
+	}
+}
+
+func setNumericBounds(schema map[string]any, bounds numericBounds) {
+	if _, exists := schema["minimum"]; !exists {
+		schema["minimum"] = bounds.minimum
+	}
+	if _, exists := schema["maximum"]; !exists {
+		schema["maximum"] = bounds.maximum
+	}
+}
+
+func setNumericInterval(schema map[string]any, minimum, exclusiveMaximum float64) {
+	if _, exists := schema["minimum"]; !exists {
+		schema["minimum"] = minimum
+	}
+	delete(schema, "maximum")
+	if _, exists := schema["exclusiveMaximum"]; !exists {
+		schema["exclusiveMaximum"] = exclusiveMaximum
+	}
+}
+
+func rejectDerivedJSONUnmarshalers(typeOf reflect.Type, location string, visiting map[reflect.Type]bool) error {
+	for typeOf.Kind() == reflect.Pointer {
+		typeOf = typeOf.Elem()
+	}
+	if visiting[typeOf] {
+		return nil
+	}
+	visiting[typeOf] = true
+	if implementsJSONUnmarshaler(typeOf) {
+		return fmt.Errorf("%w: %s uses a custom JSON unmarshaler and needs an explicit non-reflective Binding", ErrInvalidDeclaration, location)
+	}
+	switch typeOf.Kind() {
+	case reflect.Struct:
+		for _, field := range reflect.VisibleFields(typeOf) {
+			if field.IsExported() && !field.Anonymous {
+				if err := rejectDerivedJSONUnmarshalers(field.Type, location+" field "+field.Name, visiting); err != nil {
+					return err
+				}
+			}
+		}
+	case reflect.Slice, reflect.Array, reflect.Map:
+		return rejectDerivedJSONUnmarshalers(typeOf.Elem(), location+" element", visiting)
+	}
+	return nil
+}
+
+func validateSchemaDefaults(schema map[string]any, location string) error {
+	if defaultValue, exists := schema["default"]; exists {
+		raw, err := json.Marshal(schema)
+		if err != nil {
+			return fmt.Errorf("%w: marshal %s default schema: %v", ErrInvalidDeclaration, location, err)
+		}
+		var typed jsonschema.Schema
+		if err := json.Unmarshal(raw, &typed); err != nil {
+			return fmt.Errorf("%w: decode %s default schema: %v", ErrInvalidDeclaration, location, err)
+		}
+		validator, err := typed.Resolve(nil)
+		if err != nil {
+			return fmt.Errorf("%w: resolve %s default schema: %v", ErrInvalidDeclaration, location, err)
+		}
+		if err := validator.Validate(&defaultValue); err != nil {
+			return fmt.Errorf("%w: %s default does not satisfy its schema: %v", ErrInvalidDeclaration, location, err)
+		}
+	}
+	for keyword, child := range schema {
+		switch typed := child.(type) {
+		case map[string]any:
+			if err := validateSchemaDefaults(typed, location+" "+keyword); err != nil {
+				return err
+			}
+		case []any:
+			for index, item := range typed {
+				if nested, ok := item.(map[string]any); ok {
+					if err := validateSchemaDefaults(nested, fmt.Sprintf("%s %s[%d]", location, keyword, index)); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func requireJSONTags(t reflect.Type) error {
@@ -270,11 +497,17 @@ func inputJSONFields(t reflect.Type) ([]jsonInputField, error) {
 // whose JSON acceptance set differs from encoding/json. Detailed constraints
 // may narrow an accepted scalar, but every schema branch must remain decodable
 // by the tagged Go input type.
-func validateExplicitSchema(schema map[string]any, input reflect.Type) error {
-	return validateObjectSchema(schema, input, false, "explicit Tool schema")
+func validateExplicitSchema(schema map[string]any, input reflect.Type) (bool, error) {
+	disallowUnknownFields := schema["additionalProperties"] == false
+	if additional, exists := schema["additionalProperties"]; exists {
+		if _, ok := additional.(bool); !ok {
+			return false, fmt.Errorf("%w: explicit Tool schema additionalProperties must be a boolean", ErrInvalidDeclaration)
+		}
+	}
+	return disallowUnknownFields, validateObjectSchema(schema, input, false, disallowUnknownFields, "explicit Tool schema")
 }
 
-func validateObjectSchema(schema map[string]any, input reflect.Type, nullable bool, location string) error {
+func validateObjectSchema(schema map[string]any, input reflect.Type, nullable, requireStrict bool, location string) error {
 	types, err := schemaTypes(schema, location)
 	if err != nil {
 		return err
@@ -286,11 +519,22 @@ func validateObjectSchema(schema map[string]any, input reflect.Type, nullable bo
 	if !ok {
 		return fmt.Errorf("%w: %s properties must be an object", ErrInvalidDeclaration, location)
 	}
-	if additional, ok := schema["additionalProperties"].(bool); !ok || additional {
+	additional, hasAdditional := schema["additionalProperties"].(bool)
+	if requireStrict && (!hasAdditional || additional) {
 		return fmt.Errorf("%w: %s must set additionalProperties to false because Tool decoding rejects unknown fields", ErrInvalidDeclaration, location)
 	}
-	if _, exists := schema["patternProperties"]; exists {
-		return fmt.Errorf("%w: %s cannot use patternProperties because Tool decoding rejects unknown struct fields", ErrInvalidDeclaration, location)
+	if requireStrict {
+		if _, exists := schema["patternProperties"]; exists {
+			return fmt.Errorf("%w: %s cannot use patternProperties because Tool decoding rejects unknown struct fields", ErrInvalidDeclaration, location)
+		}
+	}
+	if !requireStrict && hasAdditional && !additional {
+		return fmt.Errorf("%w: %s cannot reject unknown fields while Tool decoding strips them", ErrInvalidDeclaration, location)
+	}
+	if !requireStrict {
+		if _, exists := schema["patternProperties"]; exists {
+			return fmt.Errorf("%w: %s cannot constrain unknown fields because Tool decoding strips them", ErrInvalidDeclaration, location)
+		}
 	}
 	fields, err := inputJSONFields(input)
 	if err != nil {
@@ -393,7 +637,7 @@ func validateSchemaForType(schema map[string]any, typeOf reflect.Type, stringEnc
 		}
 		return validateMapSchema(schema, typeOf.Elem(), nullable, location)
 	case reflect.Struct:
-		return validateObjectSchema(schema, typeOf, nullable, location)
+		return validateObjectSchema(schema, typeOf, nullable, true, location)
 	default:
 		return fmt.Errorf("%w: %s uses unsupported Go input type %s", ErrInvalidDeclaration, location, typeOf)
 	}

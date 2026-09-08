@@ -49,7 +49,7 @@ func getPodLogs() contexture.Node {
 			"namespace": map[string]any{"type": "string"},
 			"pod":       map[string]any{"type": "string"},
 			"previous":  map[string]any{"type": "boolean", "default": false},
-		}, "required": []any{"namespace", "pod"}, "additionalProperties": false,
+		}, "required": []any{"namespace", "pod"},
 	}, func(_ context.Context, input logsInput) (string, error) {
 		return PodLogs, requirePod(podInput{Namespace: input.Namespace, Pod: input.Pod})
 	}))

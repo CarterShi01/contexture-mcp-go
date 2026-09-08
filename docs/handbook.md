@@ -165,18 +165,29 @@ one of those Host surfaces.
 the public escape hatch for constraints such as enums, but it does not let a
 published card promise inputs that Go will reject. At construction its explicit
 root schema must be an object whose properties exactly match the input struct's
-exported JSON-tagged fields; required names must exactly match fields without
-`omitempty` or `omitzero`; and it must set `additionalProperties: false`.
-This matches the binding's strict `encoding/json` decoder, preserves that
-unknown-field policy in the disclosed explicit schema, and rejects drift with
-`ErrInvalidDeclaration` before an Application is compiled.
+exported JSON-tagged fields, and required names must exactly match fields
+without `omitempty` or `omitzero`. An omitted or true `additionalProperties`
+policy accepts and strips unknown root fields. Setting it to false opts into a
+strict decoder and preserves that rejection policy in the disclosed schema.
+Contract drift is rejected with `ErrInvalidDeclaration` before compilation.
 
 The reference-derived `NewTool` card intentionally omits
 `additionalProperties`, so it and its decoder accept unknown arguments, just
 as the pinned Python/MCP binding does. Its required and typed fields are still
-validated. Choose `NewToolWithSchema` when the contract needs strict unknown
-field rejection; the explicit `additionalProperties: false` is then both
-published and enforced recursively for nested input structs.
+validated. `NewToolWithSchema` can add defaults and constraints while retaining
+that policy, or opt into strict unknown-field rejection; an explicit
+`additionalProperties: false` is both published and enforced recursively for
+nested input structs.
+
+Defaults are contract data, not Go struct metadata. Declare them in an explicit
+`NewToolWithSchema` property; the Binding deep-copies and applies omitted
+defaults before validating and decoding the handler input. `NewTool` ignores
+non-standard `default` struct tags rather than advertising a value that normal
+`encoding/json` decoding would not produce. Derived numeric properties include
+finite bounds for their Go width. For 64-bit integers the disclosed edge is
+expressed as an exact power-of-two `exclusiveMaximum`, so the full Go range is
+accepted without promising the next out-of-range integer. Defaults and schema
+validation retain JSON numbers losslessly before typed decoding.
 
 JSON tag options are scanned rather than positionally interpreted, so both
 `json:"value,omitempty,string"` and `json:"value,string,omitempty"` make

@@ -1,7 +1,7 @@
 {
   "$schema": "./specification.schema.json",
   "repository": "https://github.com/CarterShi01/contexture-mcp",
-  "revision": "e107a81a933c5eb5b4530e762311619be3a7a80f",
+  "revision": "3b274421360d5569a23922bfc72b71d5828cf995",
   "specificationVersion": "0.12",
   "status": "conformant",
   "implementedRules": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
