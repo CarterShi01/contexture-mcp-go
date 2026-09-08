@@ -67,6 +67,8 @@ var _ = contexture.CompileNode
 var _ contexture.View
 var _ contexture.CompileLevel = contexture.ActiveCompileLevel
 var _ = contexture.NewSelectedGraph
+var _ = contexture.AllSurfaces
+var _ = contexture.OnlySurfaces
 var _ = contexture.WithGraph
 var _ = contexture.CurrentChannels
 var _ = contexture.NewExecutionAPI
@@ -77,6 +79,9 @@ var _ contexture.ChannelHandle
 var _ contexture.ChannelsLifecycle
 var _ contexture.RootSelectionError
 var _ contexture.RootOutsideSelectionError
+var _ contexture.SurfaceSelection
+var _ contexture.SurfaceSelectionError
+var _ contexture.OutsideSelectionError
 var _ contexture.WrongDoorError
 var _ contexture.NodeRef
 var _ contexture.SignpostLevel
@@ -86,8 +91,13 @@ var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI:
 var _ = inspection.Replay
 var _ = server.NewMCPServer
 var _ = server.NewContextureOptions
+var _ = (*server.ApplicationServer).BuildForSurfaces
+var _ = (*server.ApplicationServer).StartWithAuthAndSurfaceSelector
+var _ = (*server.ApplicationServer).ServeListenerWithAuthAndSurfaceSelector
 var _ = server.Auth{}
 var _ = server.HeaderRootSelector{}
+var _ = server.HeaderSurfaceSelector{}
+var _ = server.SelectHeader
 var _ = server.Launch{}
 var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
@@ -130,6 +140,23 @@ func main() {
         panic("public NodeNotFoundError facts are not classifiable")
     }
     _, _ = contexture.NewSelectedGraph(index, contexture.AllRoots())
+    pathApplication, pathApplicationErr := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "surface-consumer", Roots: []contexture.Factory{func() contexture.Node {
+        return &contexture.Role{Name: "team", Description: "Team.", Instructions: "Route.", Children: []contexture.Factory{func() contexture.Node { return &contexture.Role{Name: "editor", Description: "Editor.", Instructions: "Edit."} }}}
+    }}})
+    if pathApplicationErr != nil { panic(pathApplicationErr) }
+    pathIndex, _ := contexture.Compile(pathApplication)
+    pathSelection, _ := contexture.OnlySurfaces("team/*")
+    pathGraph, pathGraphErr := contexture.NewSelectedGraph(pathIndex, pathSelection)
+    pathRoot := pathGraph.Roots()[0]
+    pathParent, pathParentErr := pathGraph.ParentOf(pathRoot)
+    if pathGraphErr != nil || pathParentErr != nil || pathParent != nil || pathGraph.Walk()[0] != "team/editor" { panic("public path-selected surface did not promote its descendant") }
+    pathDisclosure, pathDisclosureErr := contexture.NewDisclosure(pathIndex, pathSelection)
+    pathDiscovery, pathDiscoveryErr := pathDisclosure.Discover(contexture.AllSurfaces())
+    pathOpen, pathOpenErr := pathDisclosure.Open("team/editor", contexture.AllSurfaces())
+    if pathDisclosureErr != nil || pathDiscoveryErr != nil || pathOpenErr != nil || pathDiscovery["roles"][0]["ref"] != "team/editor" || pathOpen["ref"] != "team/editor" { panic("public disclosure did not expose the promoted surface root") }
+    headerSelection, headerSelectionErr := (server.HeaderSurfaceSelector{}).Select(pathIndex, map[string]string{server.SelectHeader: "team/editor"}, nil)
+    legacySelection, legacySelectionErr := (server.HeaderRootSelector{}).Select(pathIndex, map[string]string{server.RootsHeader: "team"}, nil)
+    if headerSelectionErr != nil || legacySelectionErr != nil || headerSelection.Names()[0] != "team/editor" || legacySelection.Names()[0] != "team" { panic("public current and legacy selection headers failed") }
     _ = index.Count()
     _ = index.Has("operations")
     _ = index.NodesWithRefs()

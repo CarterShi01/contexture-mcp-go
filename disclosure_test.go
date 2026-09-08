@@ -60,7 +60,7 @@ func TestDisclosureProjectsRootsAndOneSiblingLevel(t *testing.T) {
 	}
 }
 
-func TestRootSelectionIsExactAndMonotonic(t *testing.T) {
+func TestRootSelectionCompatibilityAliasIsPathAwareAndMonotonic(t *testing.T) {
 	view := disclosureFixture(t)
 	selection, err := contexture.OnlyRoots("operations")
 	if err != nil {
@@ -73,8 +73,9 @@ func TestRootSelectionIsExactAndMonotonic(t *testing.T) {
 	if _, err := selection.Intersect(other); err == nil {
 		t.Fatal("empty intersection accepted")
 	}
-	if _, err := contexture.OnlyRoots("operations/status"); err == nil {
-		t.Fatal("descendant selection accepted")
+	descendant, err := contexture.OnlyRoots("operations/status")
+	if err != nil || !descendant.ContainsRef("operations/status") || descendant.ContainsRef("operations") {
+		t.Fatalf("path-aware compatibility selection = %#v, %v", descendant, err)
 	}
 }
 

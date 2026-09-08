@@ -60,9 +60,9 @@ func (server *ApplicationServer) Build() (*ContextureMCPServer, error) {
 	return server.adapter, server.buildErr
 }
 
-// BuildForRoots constructs an adapter whose gateway and publications share one
-// validated immutable root projection.
-func (server *ApplicationServer) BuildForRoots(selection contexture.RootSelection) (*ContextureMCPServer, error) {
+// BuildForSurfaces constructs an adapter whose gateway and publications share
+// one validated immutable surface projection.
+func (server *ApplicationServer) BuildForSurfaces(selection contexture.SurfaceSelection) (*ContextureMCPServer, error) {
 	if server == nil || server.application == nil {
 		return nil, fmt.Errorf("Contexture application server must not be nil")
 	}
@@ -81,6 +81,11 @@ func (server *ApplicationServer) BuildForRoots(selection contexture.RootSelectio
 	return newContextureMCPServerForRoots(server.identity, gateway, selection, instructions, server.application.Publications), nil
 }
 
+// BuildForRoots is the compatibility spelling for BuildForSurfaces.
+func (server *ApplicationServer) BuildForRoots(selection contexture.RootSelection) (*ContextureMCPServer, error) {
+	return server.BuildForSurfaces(selection)
+}
+
 func (server *ApplicationServer) instructionsFor(selection contexture.RootSelection) (string, error) {
 	if server.instructions != nil {
 		return *server.instructions, nil
@@ -90,13 +95,13 @@ func (server *ApplicationServer) instructionsFor(selection contexture.RootSelect
 
 // Start blocks while serving stdio or streamable HTTP with Channels open for the lifetime.
 func (server *ApplicationServer) Start(ctx context.Context, options *ContextureOptions) error {
-	return server.StartWithAuthAndRootSelector(ctx, options, nil, nil)
+	return server.StartWithAuthAndSurfaceSelector(ctx, options, nil, nil)
 }
 
-// StartWithAuthAndRootSelector starts one transport with optional HTTP bearer
-// identity and request-local root attenuation. Those HTTP-only policies are
+// StartWithAuthAndSurfaceSelector starts one transport with optional HTTP bearer
+// identity and request-local surface attenuation. Those HTTP-only policies are
 // rejected for stdio rather than silently ignored.
-func (server *ApplicationServer) StartWithAuthAndRootSelector(ctx context.Context, options *ContextureOptions, identity *Auth, selector RootSelector) error {
+func (server *ApplicationServer) StartWithAuthAndSurfaceSelector(ctx context.Context, options *ContextureOptions, identity *Auth, selector SurfaceSelector) error {
 	options, identity, err := resolveServeOptions(options, identity)
 	if err != nil {
 		return err
@@ -123,23 +128,29 @@ func (server *ApplicationServer) StartWithAuthAndRootSelector(ctx context.Contex
 	// resolveServeOptions has already installed an explicit identity into the
 	// validated options. Do not pass it a second time through the embedding
 	// entry point, where two sources are intentionally rejected.
-	return server.ServeListenerWithAuthAndRootSelector(ctx, listener, options, nil, selector)
+	return server.ServeListenerWithAuthAndSurfaceSelector(ctx, listener, options, nil, selector)
+}
+
+// StartWithAuthAndRootSelector is the compatibility spelling for
+// StartWithAuthAndSurfaceSelector.
+func (server *ApplicationServer) StartWithAuthAndRootSelector(ctx context.Context, options *ContextureOptions, identity *Auth, selector RootSelector) error {
+	return server.StartWithAuthAndSurfaceSelector(ctx, options, identity, selector)
 }
 
 // ServeListener serves streamable HTTP through an existing listener; it is useful for embedding and tests.
 func (server *ApplicationServer) ServeListener(ctx context.Context, listener net.Listener, options *ContextureOptions) error {
-	return server.ServeListenerWithAuthAndRootSelector(ctx, listener, options, nil, nil)
+	return server.ServeListenerWithAuthAndSurfaceSelector(ctx, listener, options, nil, nil)
 }
 
 // ServeListenerWithAuth serves one HTTP listener and validates bearer tokens before MCP dispatch.
 func (server *ApplicationServer) ServeListenerWithAuth(ctx context.Context, listener net.Listener, options *ContextureOptions, identity *Auth) error {
-	return server.ServeListenerWithAuthAndRootSelector(ctx, listener, options, identity, nil)
+	return server.ServeListenerWithAuthAndSurfaceSelector(ctx, listener, options, identity, nil)
 }
 
-// ServeListenerWithAuthAndRootSelector serves one HTTP listener with optional
-// bearer identity and request-local root attenuation. Authentication runs before
+// ServeListenerWithAuthAndSurfaceSelector serves one HTTP listener with optional
+// bearer identity and request-local surface attenuation. Authentication runs before
 // selection, so a selector ceiling receives only a verified Principal.
-func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx context.Context, listener net.Listener, options *ContextureOptions, identity *Auth, selector RootSelector) error {
+func (server *ApplicationServer) ServeListenerWithAuthAndSurfaceSelector(ctx context.Context, listener net.Listener, options *ContextureOptions, identity *Auth, selector SurfaceSelector) error {
 	if server == nil || server.application == nil || listener == nil {
 		return fmt.Errorf("Contexture HTTP server requires an application and listener")
 	}
@@ -179,7 +190,7 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, MaxRequestBodyBytes: options.MaxRequestBodyBytes})
 	var protected http.Handler = guarded(handler, options)
 	if selector != nil {
-		protected = selectedRoots(protected, server.application.Index, selector)
+		protected = selectedSurfaces(protected, server.application.Index, selector)
 	}
 	if identity != nil {
 		middleware, err := identity.Middleware()
@@ -200,6 +211,12 @@ func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx contex
 		}
 		return err
 	})
+}
+
+// ServeListenerWithAuthAndRootSelector is the compatibility spelling for
+// ServeListenerWithAuthAndSurfaceSelector.
+func (server *ApplicationServer) ServeListenerWithAuthAndRootSelector(ctx context.Context, listener net.Listener, options *ContextureOptions, identity *Auth, selector RootSelector) error {
+	return server.ServeListenerWithAuthAndSurfaceSelector(ctx, listener, options, identity, selector)
 }
 
 // validateListenerOptions makes an embedding listener subject to the same
@@ -265,9 +282,9 @@ func resolveServeOptions(input *ContextureOptions, explicit *Auth) (*ContextureO
 	return validated, validated.Auth, nil
 }
 
-// selectedRoots resolves request facts once before MCP dispatch and retains the
+// selectedSurfaces resolves request facts once before MCP dispatch and retains the
 // immutable projection in the request context consumed by the MCP factory.
-func selectedRoots(next http.Handler, index *contexture.Index, selector RootSelector) http.Handler {
+func selectedSurfaces(next http.Handler, index *contexture.Index, selector SurfaceSelector) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		selection, err := selector.Select(index, requestHeaders(request.Header), PrincipalOf(request.Context()))
 		if err != nil {

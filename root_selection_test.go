@@ -71,7 +71,7 @@ func TestRootSelectionValuesClassifyErrorsAndHideUnknownRoots(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(selection.Names(), []string{"alpha", "beta"}) || selection.IsAll() {
 		t.Fatalf("OnlyRoots value = %#v, %v", selection, err)
 	}
-	for _, values := range [][]string{{}, {" "}, {"alpha/child"}} {
+	for _, values := range [][]string{{}, {" "}, {"alpha/**"}} {
 		if _, err := contexture.OnlyRoots(values...); !errors.Is(err, contexture.ErrInvalidSelection) {
 			t.Fatalf("OnlyRoots(%#v) = %v, want ErrInvalidSelection", values, err)
 		} else if typed := new(contexture.RootSelectionError); !errors.As(err, &typed) {
@@ -92,6 +92,78 @@ func TestRootSelectionValuesClassifyErrorsAndHideUnknownRoots(t *testing.T) {
 	}
 	if !contexture.CurrentSelection(context.Background()).IsAll() {
 		t.Fatal("CurrentSelection outside invocation must be all-roots")
+	}
+}
+
+func TestSurfaceSelectionResolvesPathsWildcardsAndAntichains(t *testing.T) {
+	index := selectionIndex(t, false)
+	selection, err := contexture.OnlySurfaces("alpha", "alpha/child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection, err = selection.Resolve(index)
+	if err != nil || !reflect.DeepEqual(selection.Names(), []string{"alpha"}) {
+		t.Fatalf("resolved antichain = %#v, %v", selection.Names(), err)
+	}
+	wildcard, err := contexture.OnlySurfaces("alpha/*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wildcard, err = wildcard.Resolve(index)
+	if err != nil || !reflect.DeepEqual(wildcard.Names(), []string{"alpha/child", "alpha/inspect"}) || !wildcard.ContainsRef("alpha/child/tool") || wildcard.ContainsRef("alpha") {
+		t.Fatalf("direct-child wildcard = %#v, %v", wildcard.Names(), err)
+	}
+	for _, selectors := range [][]string{{}, {"alpha/**"}, {"alpha/ch*"}, {"alpha/*/inspect"}} {
+		if _, err := contexture.OnlySurfaces(selectors...); !errors.Is(err, contexture.ErrInvalidSelection) {
+			t.Fatalf("OnlySurfaces(%#v) = %v", selectors, err)
+		}
+	}
+	unknown, _ := contexture.OnlySurfaces("missing")
+	if _, err := unknown.Resolve(index); !errors.Is(err, contexture.ErrInvalidSelection) || containsAny(err.Error(), "alpha", "beta") {
+		t.Fatalf("unknown selector leaked graph facts: %v", err)
+	}
+}
+
+func TestSurfaceSelectionIntersectionAndPromotedGraphRoots(t *testing.T) {
+	alpha, _ := contexture.OnlySurfaces("alpha")
+	child, _ := contexture.OnlySurfaces("alpha/child")
+	narrowed, err := alpha.Intersect(child)
+	if err != nil || !reflect.DeepEqual(narrowed.Names(), []string{"alpha/child"}) {
+		t.Fatalf("path intersection = %#v, %v", narrowed.Names(), err)
+	}
+	graph, err := contexture.NewSelectedGraph(selectionIndex(t, false), child)
+	if err != nil || !reflect.DeepEqual(graph.Walk(), []string{"alpha/child"}) || !reflect.DeepEqual(namesOf(graph.Roots()), []string{"child"}) {
+		t.Fatalf("promoted graph = roots=%#v walk=%#v err=%v", namesOf(graph.Roots()), graph.Walk(), err)
+	}
+	selected, err := graph.Find("alpha/child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parent, err := graph.ParentOf(selected); err != nil || parent != nil {
+		t.Fatalf("promoted root parent = %#v, %v", parent, err)
+	}
+	if _, err := graph.Find("alpha"); !errors.Is(err, contexture.ErrRootOutsideSelection) {
+		t.Fatalf("hidden ancestor = %v", err)
+	}
+}
+
+func TestDisclosureDiscoversAndOpensPromotedSurfaceRoot(t *testing.T) {
+	index := selectionIndex(t, false)
+	selection, _ := contexture.OnlySurfaces("alpha/child")
+	disclosure, err := contexture.NewDisclosure(index, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovered, err := disclosure.Discover(contexture.AllSurfaces())
+	if err != nil || len(discovered["roles"]) != 1 || discovered["roles"][0]["ref"] != "alpha/child" {
+		t.Fatalf("promoted discovery = %#v, %v", discovered, err)
+	}
+	opened, err := disclosure.Open("alpha/child", contexture.AllSurfaces())
+	if err != nil || opened["ref"] != "alpha/child" {
+		t.Fatalf("promoted open = %#v, %v", opened, err)
+	}
+	if _, err := disclosure.Open("alpha", contexture.AllSurfaces()); !errors.Is(err, contexture.ErrRootOutsideSelection) {
+		t.Fatalf("hidden ancestor open = %v", err)
 	}
 }
 
@@ -117,8 +189,11 @@ func TestSelectedGraphProjectsEveryGraphOperationWithoutCrossRootLeakage(t *test
 	} else if typed := new(contexture.RootOutsideSelectionError); !errors.As(err, &typed) || typed.Ref != "beta/read" {
 		t.Fatalf("outside error facts = %#v", typed)
 	}
-	if _, err := graph.Find(""); !errors.Is(err, contexture.ErrNodeNotFound) {
-		t.Fatalf("empty ref should retain Index error, got %v", err)
+	if _, err := graph.Find(""); !errors.Is(err, contexture.ErrRootOutsideSelection) {
+		t.Fatalf("empty ref should be outside the selected surface, got %v", err)
+	}
+	if _, err := graph.Find("/alpha/child"); !errors.Is(err, contexture.ErrRootOutsideSelection) {
+		t.Fatalf("non-canonical ref should be outside the selected surface, got %v", err)
 	}
 	child, err := graph.Find("alpha/child")
 	if err != nil {

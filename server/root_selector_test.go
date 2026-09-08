@@ -13,7 +13,9 @@ func selectorIndex(t *testing.T) *contexture.Index {
 	t.Helper()
 	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "roots", Roots: []contexture.Factory{
 		func() contexture.Node {
-			return &contexture.Role{Name: "diagnose", Description: "Diagnose.", Instructions: "Read."}
+			return &contexture.Role{Name: "diagnose", Description: "Diagnose.", Instructions: "Read.", Children: []contexture.Factory{func() contexture.Node {
+				return &contexture.Role{Name: "service", Description: "Service.", Instructions: "Inspect."}
+			}}}
 		},
 		func() contexture.Node {
 			return &contexture.Role{Name: "release", Description: "Release.", Instructions: "Read."}
@@ -45,7 +47,7 @@ func TestHeaderRootSelectorAttenuatesButNeverWidensTheCeiling(t *testing.T) {
 	if err != nil || !selection.ContainsRef("diagnose/tool") || selection.ContainsRef("release/tool") {
 		t.Fatalf("ceiling selection = %#v, %v", selection, err)
 	}
-	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "release"}, nil); err == nil || !strings.Contains(err.Error(), "effective root selection is empty") {
+	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "release"}, nil); err == nil || !strings.Contains(err.Error(), "effective surface selection is empty") {
 		t.Fatalf("widened selection error = %v", err)
 	}
 }
@@ -91,9 +93,53 @@ func TestHeaderRootSelectorRejectsMalformedAndOversizedRequests(t *testing.T) {
 	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "diagnose,release"}, nil); err == nil || !strings.Contains(err.Error(), "root limit") {
 		t.Fatalf("count error = %v", err)
 	}
-	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "missing"}, nil); err == nil || !strings.Contains(err.Error(), "unknown root") {
+	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "missing"}, nil); err == nil || !strings.Contains(err.Error(), "unknown or empty Contexture selector") {
 		t.Fatalf("unknown root error = %v", err)
 	} else if strings.Contains(err.Error(), "diagnose") || strings.Contains(err.Error(), "release") {
 		t.Fatalf("unknown root selection leaked undisclosed roots: %v", err)
+	}
+}
+
+func TestHeaderSurfaceSelectorSupportsPathsWildcardsAndLegacyHeader(t *testing.T) {
+	index := selectorIndex(t)
+	selector := server.HeaderSurfaceSelector{}
+	exact, err := selector.Select(index, map[string]string{server.SelectHeader: "diagnose/service"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wildcard, err := selector.Select(index, map[string]string{server.SelectHeader: "diagnose/*"}, nil)
+	if err != nil || !reflect.DeepEqual(exact.Names(), []string{"diagnose/service"}) || !reflect.DeepEqual(wildcard.Names(), exact.Names()) {
+		t.Fatalf("surface headers = exact=%#v wildcard=%#v err=%v", exact.Names(), wildcard.Names(), err)
+	}
+	legacy, err := (server.HeaderRootSelector{}).Select(index, map[string]string{"contexture-roots": "diagnose"}, nil)
+	if err != nil || !reflect.DeepEqual(legacy.Names(), []string{"diagnose"}) {
+		t.Fatalf("legacy header = %#v, %v", legacy.Names(), err)
+	}
+	if _, err := selector.Select(index, map[string]string{server.SelectHeader: "diagnose", server.RootsHeader: "release"}, nil); err == nil {
+		t.Fatal("canonical and legacy headers were accepted together")
+	}
+}
+
+func TestHeaderSurfaceSelectorCustomHeaderRetainsOrExplicitlyDisablesLegacyFallback(t *testing.T) {
+	index := selectorIndex(t)
+	selector := server.HeaderSurfaceSelector{Header: "X-Contexture-Select"}
+	legacy, err := selector.Select(index, map[string]string{server.RootsHeader: "diagnose"}, nil)
+	if err != nil || !reflect.DeepEqual(legacy.Names(), []string{"diagnose"}) {
+		t.Fatalf("custom header legacy fallback = %#v, %v", legacy.Names(), err)
+	}
+	disabled := server.HeaderSurfaceSelector{Header: "X-Contexture-Select", DisableLegacy: true}
+	all, err := disabled.Select(index, map[string]string{server.RootsHeader: "diagnose"}, nil)
+	if err != nil || !all.IsAll() {
+		t.Fatalf("disabled legacy fallback = %#v, %v", all, err)
+	}
+}
+
+func TestHeaderSurfaceSelectorCeilingOnlyNarrowsPaths(t *testing.T) {
+	selector := server.HeaderSurfaceSelector{Ceiling: func(*contexture.Principal) (contexture.SurfaceSelection, error) {
+		return contexture.OnlySurfaces("diagnose")
+	}}
+	selected, err := selector.Select(selectorIndex(t), map[string]string{server.SelectHeader: "diagnose/service,release"}, nil)
+	if err != nil || !reflect.DeepEqual(selected.Names(), []string{"diagnose/service"}) {
+		t.Fatalf("narrowed surface = %#v, %v", selected.Names(), err)
 	}
 }

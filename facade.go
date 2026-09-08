@@ -38,6 +38,9 @@ type (
 	ChannelsLifecycle         = model.ChannelsLifecycle
 	Channels                  = model.Channels
 	Index                     = model.Index
+	SurfaceSelection          = model.SurfaceSelection
+	SurfaceSelectionError     = model.SurfaceSelectionError
+	OutsideSelectionError     = model.OutsideSelectionError
 	RootSelection             = model.RootSelection
 	RootSelectionError        = model.RootSelectionError
 	RootOutsideSelectionError = model.RootOutsideSelectionError
@@ -216,9 +219,19 @@ func AllRoots() RootSelection {
 	return model.AllRoots()
 }
 
+// AllSurfaces returns the projection containing every capability.
+func AllSurfaces() SurfaceSelection {
+	return model.AllSurfaces()
+}
+
 // OnlyRoots constructs an exact non-empty root selection.
 func OnlyRoots(names ...string) (RootSelection, error) {
 	return model.OnlyRoots(names...)
+}
+
+// OnlySurfaces constructs an exact ref/direct-child subtree selection.
+func OnlySurfaces(selectors ...string) (SurfaceSelection, error) {
+	return model.OnlySurfaces(selectors...)
 }
 
 // NewSelectedGraph creates a validated read-only root projection over Index.

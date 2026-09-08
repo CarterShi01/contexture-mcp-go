@@ -165,9 +165,14 @@ func (view *Disclosure) Discover(requested RootSelection) (map[string][]map[stri
 		return nil, err
 	}
 	result := map[string][]map[string]any{"roles": {}, "skills": {}, "tools": {}}
-	for _, root := range view.index.ModelRoots() {
+	graph, err := NewSelectedGraph(view.index, selection)
+	if err != nil {
+		return nil, err
+	}
+	for _, root := range graph.Roots() {
 		ref, _ := view.index.RefOf(root)
-		if !selection.ContainsRef(ref) {
+		rootRef := strings.Split(ref, foundation.ReferenceSeparator)[0]
+		if _, prompt := view.promptRoots[rootRef]; prompt {
 			continue
 		}
 		key := string(root.nodeKind()) + "s"
@@ -303,9 +308,10 @@ func (view *Disclosure) resolve(ref string, selection RootSelection, roots []Nod
 	if err != nil {
 		return nil, err
 	}
+	topLevel := strings.Split(canonicalRef(ref), foundation.ReferenceSeparator)[0]
 	for _, root := range roots {
 		rootRef, _ := view.index.RefOf(root)
-		if selection.ContainsRef(rootRef) && strings.Split(ref, foundation.ReferenceSeparator)[0] == rootRef {
+		if rootRef == topLevel && selection.ContainsRef(ref) {
 			return node, nil
 		}
 	}

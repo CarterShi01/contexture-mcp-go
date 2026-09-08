@@ -316,11 +316,16 @@ error: Go declarations deliberately store factories, unlike Python's already
 constructed member lists. Every `Uses` ref is checked after the complete forest
 exists; it must resolve, be unique/non-blank, and must not name its own ref.
 
-### Request root projections
+### Request surface projections
 
-`RootSelection` is either `AllRoots()` or an exact complete-root allowlist
-created with `OnlyRoots`. It rejects empty and descendant refs, resolves names
-without revealing unrelated roots, and only ever narrows through `Intersect`.
+`SurfaceSelection` is either `AllSurfaces()` or an exact path/direct-child
+selector allowlist created with `OnlySurfaces`. An exact ref promotes that
+complete subtree to a surface root without exposing its ancestors or siblings;
+a final `/*` expands direct members only and never crosses another `/`.
+Resolution rejects unknown or empty matches and reduces overlapping anchors to
+a minimal antichain. `Intersect` is path-aware and only ever narrows a surface.
+`RootSelection`, `AllRoots`, and `OnlyRoots` remain compatibility aliases with
+the same generalized semantics.
 `RootSelectionError` classifies invalid or contradictory selectors with
 `errors.Is(err, contexture.ErrInvalidSelection)`; a valid ref outside the
 effective request surface instead returns `*RootOutsideSelectionError`, which
@@ -341,9 +346,11 @@ it preserves the Host's immutable principal but cannot be widened by a
 caller-supplied graph. A Tool handler may retain and query its one
 `CurrentGraph` for its whole invocation; concurrent calls receive distinct
 root-projected graphs.
-`HeaderRootSelector` treats `Contexture-Roots` solely as an attenuation request:
-it validates unknown names without listing other roots and intersects it with
-the authenticated principal's ceiling.
+`HeaderSurfaceSelector` treats `Contexture-Select` solely as an attenuation
+request. It accepts the case-insensitive legacy `Contexture-Roots` spelling
+only when the new header is absent, rejects requests that send both, validates
+paths without listing unrelated refs, and intersects them with the authenticated
+principal's ceiling. `HeaderRootSelector` remains an alias.
 
 ### Telemetry
 

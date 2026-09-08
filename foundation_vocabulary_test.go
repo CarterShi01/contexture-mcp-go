@@ -1,7 +1,6 @@
 package contexture_test
 
 import (
-	"errors"
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
@@ -76,7 +75,11 @@ func TestReferenceSeparatorDrivesCoreReferenceParsing(t *testing.T) {
 	if node, err := index.Find(contexture.ReferenceSeparator + ref + contexture.ReferenceSeparator); err != nil || node.NodeName() != "diagnose" {
 		t.Fatalf("Find normalized public separator ref = %#v, %v", node, err)
 	}
-	if _, err := contexture.OnlyRoots("operations" + contexture.ReferenceSeparator + "diagnose"); !errors.Is(err, contexture.ErrInvalidSelection) {
-		t.Fatalf("OnlyRoots accepted descendant spelled with ReferenceSeparator: %v", err)
+	selection, err := contexture.OnlyRoots(ref)
+	if err != nil {
+		t.Fatalf("OnlyRoots rejected descendant spelled with ReferenceSeparator: %v", err)
+	}
+	if got := selection.Selectors(); len(got) != 1 || got[0] != ref {
+		t.Fatalf("OnlyRoots selectors = %#v, want [%q]", got, ref)
 	}
 }

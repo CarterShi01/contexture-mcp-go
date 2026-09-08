@@ -17,13 +17,13 @@ type NodeRef struct {
 }
 
 // SelectedGraph is a read-only graph facade that cannot enumerate or resolve
-// a root excluded from the current request surface.
+// a node excluded from the current request surface.
 type SelectedGraph struct {
 	index     *Index
 	selection RootSelection
 }
 
-// NewSelectedGraph validates and creates a root-projected graph facade.
+// NewSelectedGraph validates and creates a path-projected graph facade.
 func NewSelectedGraph(index *Index, selection RootSelection) (*SelectedGraph, error) {
 	if index == nil {
 		return nil, selectionError("a selected graph needs a compiled Index")
@@ -43,7 +43,7 @@ func (graph *SelectedGraph) Index() *Index {
 	return graph.index
 }
 
-// Selection returns the immutable root projection serving this request.
+// Selection returns the immutable surface projection serving this request.
 func (graph *SelectedGraph) Selection() RootSelection {
 	if graph == nil {
 		return AllRoots()
@@ -51,16 +51,27 @@ func (graph *SelectedGraph) Selection() RootSelection {
 	return graph.selection
 }
 
-// Roots returns selected complete roots in Index declaration order.
+// Roots returns selected surface roots in Index declaration order. A selected
+// descendant is promoted without exposing its parent or siblings.
 func (graph *SelectedGraph) Roots() []Node {
 	if graph == nil || graph.index == nil {
 		return nil
 	}
 	result := make([]Node, 0)
-	for _, root := range graph.index.roots {
-		ref := graph.index.refByNode[root]
-		if graph.selection.ContainsRef(ref) {
+	if graph.selection.IsAll() {
+		for _, root := range graph.index.roots {
+			ref := graph.index.refByNode[root]
 			result = append(result, cloneNode(root, graph.index, ref))
+		}
+		return result
+	}
+	anchors := map[string]struct{}{}
+	for _, ref := range graph.selection.Names() {
+		anchors[ref] = struct{}{}
+	}
+	for _, ref := range graph.index.order {
+		if _, selected := anchors[ref]; selected {
+			result = append(result, cloneNode(graph.index.byRef[ref], graph.index, ref))
 		}
 	}
 	return result
@@ -120,10 +131,27 @@ func (graph *SelectedGraph) RefOf(node Node) (string, error) {
 
 // ParentOf resolves a selected node's containment parent.
 func (graph *SelectedGraph) ParentOf(node Node) (*Role, error) {
-	if _, err := graph.RefOf(node); err != nil {
+	ref, err := graph.RefOf(node)
+	if err != nil {
 		return nil, err
 	}
-	return graph.index.ParentOf(node)
+	for _, anchor := range graph.selection.Names() {
+		if anchor == ref {
+			return nil, nil
+		}
+	}
+	parent, err := graph.index.ParentOf(node)
+	if err != nil || parent == nil {
+		return parent, err
+	}
+	parentRef, err := graph.index.RefOf(parent)
+	if err != nil {
+		return nil, err
+	}
+	if err := graph.selection.RequireRef(parentRef); err != nil {
+		return nil, err
+	}
+	return parent, nil
 }
 
 // ChildrenOf resolves immediate selected children in declaration order.

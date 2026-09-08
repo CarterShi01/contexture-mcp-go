@@ -216,10 +216,13 @@ ref 与 sub-role count；`Crossings` 列出跨越 root 的声明 `Uses` edge。�
 披露 node member card。`Find` 与 `Signpost` 会在成功 lookup 前把重复、开头或结尾的 `/` separator 归一化为
 同一 canonical address。
 
-### Request root projections
+### Request surface projections
 
-`RootSelection` 要么是 `AllRoots()`，要么是用 `OnlyRoots` 创建的完整 root 精确 allowlist。它会拒绝
-空 ref 和 descendant ref，在 resolve name 时不会泄露无关 root，并且只能通过 `Intersect` 收窄。
+`SurfaceSelection` 要么是 `AllSurfaces()`，要么是用 `OnlySurfaces` 创建的 exact path / direct-child
+selector allowlist。exact ref 会把完整 subtree 提升为 surface root，而不会泄漏 ancestor 或 sibling；
+末尾 `/*` 只展开 direct member，绝不会跨越另一个 `/`。resolve 会拒绝未知或空匹配，并把重叠 anchor
+归约为最小 antichain；`Intersect` 按 path 计算且只能继续收窄。`RootSelection`、`AllRoots` 与
+`OnlyRoots` 保留为同一广义语义的兼容 alias。
 `RootSelectionError` 通过 `errors.Is(err, contexture.ErrInvalidSelection)` 分类无效或矛盾的 selector；
 有效但位于当前 request surface 之外的 ref 则返回 `*RootOutsideSelectionError`，它会 unwrap 到
 `ErrRootOutsideSelection` 并保留 `Ref`。
@@ -233,8 +236,9 @@ scoped `bound_graph` 的原生对应：它派生 immutable child context，因�
 即可恢复 parent graph。Runtime 会为 Tool call 安装自己的 selected graph、root selection 与 telemetry；它保留
 Host 的 immutable principal，但不会被 caller-supplied graph 扩大。Tool handler 可在整个 invocation 内保留并查询
 其唯一的 `CurrentGraph`；并发 call 会得到彼此独立的 root-projected graph。
-`HeaderRootSelector` 仅将 `Contexture-Roots` 当作 attenuation request：它会验证未知 name 而不列出其他 root，
-并与经过认证的 principal ceiling 求交。
+`HeaderSurfaceSelector` 仅将 `Contexture-Select` 当作 attenuation request；只有新 header 缺失时才接受
+大小写不敏感的 legacy `Contexture-Roots`，同时发送两者会被拒绝。它校验 path 时不会列出无关 ref，
+并与经过认证的 principal ceiling 求交。`HeaderRootSelector` 保留为 alias。
 
 每个已编译 `Node` 还公开 `Ref()`：它返回该 node 的 canonical address，而不从可变的 display field 重新拼接。
 `BranchesOf` 与 `MembersOf` 是 Python base node traversal method 的 Go 原生等价物。Role 返回直接 child Role branch，
