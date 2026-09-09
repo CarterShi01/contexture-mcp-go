@@ -26,8 +26,8 @@ func TestWithGraphNestsAndRestoresByContextDerivation(t *testing.T) {
 	base := context.Background()
 	outer := contexture.WithGraph(base, all)
 	inner := contexture.WithGraph(outer, selected)
-	if contexture.CurrentGraph(base) != nil || contexture.CurrentGraph(outer) != all || contexture.CurrentGraph(inner) != selected {
-		t.Fatalf("nested graph contexts = base:%#v outer:%#v inner:%#v", contexture.CurrentGraph(base), contexture.CurrentGraph(outer), contexture.CurrentGraph(inner))
+	if contexture.CurrentGraph(outer) != all || contexture.CurrentGraph(inner) != selected {
+		t.Fatalf("nested graph contexts = outer:%#v inner:%#v", contexture.CurrentGraph(outer), contexture.CurrentGraph(inner))
 	}
 	if _, err := contexture.CurrentGraph(inner).Find("beta"); !errors.Is(err, contexture.ErrRootOutsideSelection) {
 		t.Fatalf("nested selected graph leaked beta: %v", err)
@@ -97,7 +97,7 @@ func TestRuntimeOwnsInvocationFactsOverNestedCallerContext(t *testing.T) {
 	if observedGraph == nil || observedGraph == all {
 		t.Fatalf("runtime retained caller graph: %#v", observedGraph)
 	}
-	if contexture.CurrentGraph(caller) != all || !contexture.CurrentSelection(caller).IsAll() || contexture.CurrentTelemetry(caller) != nil || contexture.CurrentPrincipal(caller).Subject() != "ada" {
-		t.Fatalf("caller context changed after invocation: graph=%#v selection=%#v telemetry=%#v principal=%#v", contexture.CurrentGraph(caller), contexture.CurrentSelection(caller), contexture.CurrentTelemetry(caller), contexture.CurrentPrincipal(caller))
+	if contexture.CurrentGraph(caller) != all || !contexture.CurrentSelection(caller).IsAll() || contexture.CurrentPrincipal(caller).Subject() != "ada" {
+		t.Fatalf("caller context changed after invocation: graph=%#v selection=%#v principal=%#v", contexture.CurrentGraph(caller), contexture.CurrentSelection(caller), contexture.CurrentPrincipal(caller))
 	}
 }

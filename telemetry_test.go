@@ -137,9 +137,6 @@ func TestTelemetryConcurrentAggregationAndExporterFailureDoNotChangeCalls(t *tes
 	if value, err := panicking.InvokeReadOnly(context.Background(), "status", json.RawMessage(`{"value":"x"}`), contexture.AllRoots()); err != nil || value != "ok" {
 		t.Fatalf("panicking exporter changed business result = %#v, %v", value, err)
 	}
-	if contexture.CurrentTelemetry(context.Background()) != nil {
-		t.Fatal("telemetry leaked outside a Tool invocation")
-	}
 }
 
 func TestTelemetryExporterFailurePreservesDisclosurePayloadsAndBusinessFailure(t *testing.T) {

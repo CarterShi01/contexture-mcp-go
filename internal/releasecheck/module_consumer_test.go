@@ -193,9 +193,14 @@ func main() {
     graphIndex, _ := contexture.Compile(graphApplication)
     consumerGraph, consumerGraphErr := contexture.NewSelectedGraph(graphIndex, contexture.AllRoots())
     consumerGraphContext := contexture.WithGraph(context.Background(), consumerGraph)
-    if consumerGraphErr != nil || contexture.CurrentGraph(context.Background()) != nil || contexture.CurrentGraph(consumerGraphContext) != consumerGraph {
+    if consumerGraphErr != nil || contexture.CurrentGraph(consumerGraphContext) != consumerGraph {
         panic("public graph context did not derive or isolate the selected graph")
     }
+    missingGraphPanicked := false
+    func() { defer func() { missingGraphPanicked = recover() != nil }(); _ = contexture.CurrentGraph(context.Background()) }()
+    missingTelemetryPanicked := false
+    func() { defer func() { missingTelemetryPanicked = recover() != nil }(); _ = contexture.CurrentTelemetry(context.Background()) }()
+    if !missingGraphPanicked || !missingTelemetryPanicked { panic("public runtime context accessors did not fail fast outside invocation scope") }
     skillDisclosure, disclosureErr := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
     if disclosureErr != nil { panic(disclosureErr) }
     navigation, navigationErr := contexture.NewDisclosureAPI(skillDisclosure, "graph/check")

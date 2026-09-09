@@ -266,7 +266,7 @@ func CurrentPrincipal(ctx context.Context) *Principal {
 	return model.CurrentPrincipal(ctx)
 }
 
-// CurrentGraph returns the request-local selected graph, or nil outside a Tool invocation.
+// CurrentGraph returns the request-local selected graph and panics outside a Tool invocation or WithGraph scope.
 func CurrentGraph(ctx context.Context) *SelectedGraph {
 	return model.CurrentGraph(ctx)
 }
@@ -285,7 +285,7 @@ func CurrentSelection(ctx context.Context) RootSelection {
 	return model.CurrentSelection(ctx)
 }
 
-// CurrentTelemetry returns the request-local telemetry exporter.
+// CurrentTelemetry returns the request-local telemetry exporter and panics outside a Tool invocation.
 func CurrentTelemetry(ctx context.Context) Telemetry {
 	return model.CurrentTelemetry(ctx)
 }

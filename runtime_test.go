@@ -13,10 +13,22 @@ type runtimeInput struct {
 	Value string `json:"value"`
 }
 
-func TestCurrentGraphIsAbsentOutsideAnInvocation(t *testing.T) {
-	if graph := contexture.CurrentGraph(context.Background()); graph != nil {
-		t.Fatalf("CurrentGraph outside invocation = %#v, want nil", graph)
-	}
+func TestCurrentGraphFailsFastOutsideAnInvocation(t *testing.T) {
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("CurrentGraph outside invocation did not panic")
+		}
+	}()
+	contexture.CurrentGraph(context.Background())
+}
+
+func TestCurrentTelemetryFailsFastOutsideAnInvocation(t *testing.T) {
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("CurrentTelemetry outside invocation did not panic")
+		}
+	}()
+	contexture.CurrentTelemetry(context.Background())
 }
 
 func TestRuntimeUsesBindingDoorsAndRequestContext(t *testing.T) {

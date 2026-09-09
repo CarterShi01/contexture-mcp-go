@@ -230,8 +230,9 @@ selector allowlist。exact ref 会把完整 subtree 提升为 surface root，而
 `NewSelectedGraph(index, selection)` 提供 request-safe graph view：`Roots`、`Walk`、`NodesWithRefs`、
 `Find`、`RefOf`、`ParentOf`、`ChildrenOf`、`UsesOf`、`DependentsOf` 和 `MatchingRefs` 都会保留 canonical
 ordering，同时排除其他 root。跨 root 的 `uses` 与 dependent 会被过滤而不是披露。`CurrentGraph(ctx)` 与
-`CurrentSelection(ctx)` 仅在 Tool invocation 内有效。Go 有意让 invocation 外的 `CurrentGraph` 返回 `nil`
-（不存在 ambient graph），而 `CurrentSelection` 会安全地默认为 all roots。`WithGraph(ctx, graph)` 是 Python
+`CurrentTelemetry(ctx)` 在 Tool invocation 外会 fail fast（graph 也可通过显式 `WithGraph` scope 绑定），
+因此缺失 framework context 不会被误认为 all-roots graph 或无 telemetry。`CurrentSelection` 会安全地默认为
+all roots。`WithGraph(ctx, graph)` 是 Python
 scoped `bound_graph` 的原生对应：它派生 immutable child context，因此嵌套 scope 只需保留 parent context
 即可恢复 parent graph。Runtime 会为 Tool call 安装自己的 selected graph、root selection 与 telemetry；它保留
 Host 的 immutable principal，但不会被 caller-supplied graph 扩大。Tool handler 可在整个 invocation 内保留并查询

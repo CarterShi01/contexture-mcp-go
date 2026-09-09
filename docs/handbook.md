@@ -335,10 +335,10 @@ unwraps to `ErrRootOutsideSelection` and retains `Ref`.
 `Roots`, `Walk`, `NodesWithRefs`, `Find`, `RefOf`, `ParentOf`, `ChildrenOf`,
 `UsesOf`, `DependentsOf`, and `MatchingRefs` all retain canonical ordering while
 excluding other roots. Cross-root `uses` and dependents are filtered rather
-than disclosed. `CurrentGraph(ctx)` and `CurrentSelection(ctx)` are scoped to a
-Tool invocation. Go deliberately returns `nil` from `CurrentGraph` outside an
-invocation (there is no ambient graph), while `CurrentSelection` safely defaults
-to all roots. `WithGraph(ctx, graph)` is the native equivalent of Python's
+than disclosed. `CurrentGraph(ctx)` and `CurrentTelemetry(ctx)` fail fast outside
+a Tool invocation (or, for the graph, an explicit `WithGraph` scope), so missing
+framework context cannot be mistaken for an all-roots graph or absent telemetry.
+`CurrentSelection` safely defaults to all roots. `WithGraph(ctx, graph)` is the native equivalent of Python's
 scoped `bound_graph`: it derives an immutable child context, so nested scopes
 restore the parent graph simply by retaining the parent context. Runtime always
 installs its own selected graph, root selection, and telemetry for a Tool call;

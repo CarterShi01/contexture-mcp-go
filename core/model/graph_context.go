@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
@@ -66,11 +67,13 @@ func CurrentPrincipal(ctx context.Context) *foundation.Principal {
 }
 
 // CurrentGraph returns the graph constrained to the exact current selection.
-// Go deliberately returns nil outside a derived graph scope; it cannot use a
-// process-global task-local accessor, and nil must never be mistaken for an
-// all-roots graph.
+// It panics outside a derived graph scope so missing framework context cannot
+// be mistaken for an all-roots graph, matching Python's fail-fast accessor.
 func CurrentGraph(ctx context.Context) *SelectedGraph {
 	graph, _ := ctx.Value(graphKey).(*SelectedGraph)
+	if graph == nil {
+		panic(fmt.Errorf("no compiled Contexture graph is active; use CurrentGraph only inside a Tool invocation or WithGraph scope"))
+	}
 	return graph
 }
 
@@ -86,5 +89,8 @@ func CurrentSelection(ctx context.Context) RootSelection {
 // CurrentTelemetry returns the current request telemetry exporter.
 func CurrentTelemetry(ctx context.Context) Telemetry {
 	telemetry, _ := ctx.Value(telemetryKey).(Telemetry)
+	if telemetry == nil {
+		panic(fmt.Errorf("no Contexture telemetry is active; use CurrentTelemetry only inside a Tool invocation"))
+	}
 	return telemetry
 }
