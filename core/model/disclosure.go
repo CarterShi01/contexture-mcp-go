@@ -62,6 +62,21 @@ func newDisclosure(index *Index, selection RootSelection, bound bool, telemetry 
 // Index returns the immutable canonical graph projected by this Disclosure.
 func (view *Disclosure) Index() *Index { return view.index }
 
+// Unrestricted removes Prompt-only model ownership while retaining the exact
+// selected surface and all other immutable disclosure facts.
+func (view *Disclosure) Unrestricted() *Disclosure {
+	if view == nil {
+		return nil
+	}
+	return &Disclosure{
+		index:       view.index,
+		selection:   view.selection,
+		promptRoots: map[string]struct{}{},
+		bound:       view.bound,
+		telemetry:   view.telemetry,
+	}
+}
+
 // RefOf returns the canonical address for a Node held by this View.
 func (view *Disclosure) RefOf(node Node) (string, error) { return view.index.RefOf(node) }
 
@@ -197,7 +212,11 @@ func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]an
 	if _, prompt := view.promptRoots[strings.Split(canonicalRef(ref), foundation.ReferenceSeparator)[0]]; prompt {
 		return nil, &RefusedError{Message: TakenByPersonMessage(ref)}
 	}
-	node, err := view.resolve(ref, selection, view.index.ModelRoots())
+	roots := view.index.ModelRoots()
+	if len(view.promptRoots) == 0 {
+		roots = view.index.Roots()
+	}
+	node, err := view.resolve(ref, selection, roots)
 	if err != nil {
 		return nil, err
 	}

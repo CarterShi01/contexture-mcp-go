@@ -60,6 +60,25 @@ func TestDisclosureProjectsRootsAndOneSiblingLevel(t *testing.T) {
 	}
 }
 
+func TestDisclosureUnrestrictedRemovesPromptOwnershipButKeepsSelection(t *testing.T) {
+	view := disclosureFixture(t)
+	selection, err := contexture.OnlyRoots("command")
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := contexture.NewDisclosure(view.Index(), selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unrestricted := selected.Unrestricted()
+	if _, err := unrestricted.Open("command", contexture.AllRoots()); err != nil {
+		t.Fatalf("unrestricted prompt open = %v", err)
+	}
+	if _, err := unrestricted.Open("operations", contexture.AllRoots()); err == nil {
+		t.Fatal("unrestricted widened the selected surface")
+	}
+}
+
 func TestRootSelectionCompatibilityAliasIsPathAwareAndMonotonic(t *testing.T) {
 	view := disclosureFixture(t)
 	selection, err := contexture.OnlyRoots("operations")

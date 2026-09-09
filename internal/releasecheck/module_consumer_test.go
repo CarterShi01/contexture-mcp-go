@@ -155,6 +155,7 @@ func main() {
     pathDiscovery, pathDiscoveryErr := pathDisclosure.Discover(contexture.AllSurfaces())
     pathOpen, pathOpenErr := pathDisclosure.Open("team/editor", contexture.AllSurfaces())
     if pathDisclosureErr != nil || pathDiscoveryErr != nil || pathOpenErr != nil || pathDiscovery["roles"][0]["ref"] != "team/editor" || pathOpen["ref"] != "team/editor" { panic("public disclosure did not expose the promoted surface root") }
+    if _, unrestrictedOutsideErr := pathDisclosure.Unrestricted().Open("team", contexture.AllSurfaces()); !errors.Is(unrestrictedOutsideErr, contexture.ErrRootOutsideSelection) { panic("public unrestricted disclosure widened its selected surface") }
     headerSelection, headerSelectionErr := (server.HeaderSurfaceSelector{}).Select(pathIndex, map[string]string{server.SelectHeader: "team/editor"}, nil)
     legacySelection, legacySelectionErr := (server.HeaderRootSelector{}).Select(pathIndex, map[string]string{server.RootsHeader: "team"}, nil)
     if headerSelectionErr != nil || legacySelectionErr != nil || headerSelection.Names()[0] != "team/editor" || legacySelection.Names()[0] != "team" { panic("public current and legacy selection headers failed") }
