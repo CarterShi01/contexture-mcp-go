@@ -49,6 +49,9 @@ type GatewayTool struct {
 	ReadOnly    bool
 }
 
+// SystemTool is the compatibility name for one fixed framework entry point.
+type SystemTool = GatewayTool
+
 var gatewayTools = []GatewayTool{
 	{Name: DiscoverGatewayName, ReadOnly: true, Description: "List the top-level capabilities this server serves, as short routing cards. Most are roles: open the one that matches the task; its sub-roles arrive with it, one level at a time, so a large tree costs only the branch you enter. A role card is a name, a sentence, and the ref that opens it — instructions and what a role holds arrive on opening, never here."},
 	{Name: OpenGatewayName, ReadOnly: true, Description: "Open one role, skill or tool by ref. Opening a role returns its instructions and a card for every skill, tool and sub-role it holds, each with the ref that opens it and each tool with the schema needed to call it. Opening a skill returns its complete procedure, available here and nowhere else. A tool's card is already complete, so run the tool rather than opening it. Pass a ref taken from a card; never assemble one."},
@@ -59,6 +62,15 @@ var gatewayTools = []GatewayTool{
 // GatewayTools returns the complete immutable four-tool system surface in
 // registration order. Business tools are deliberately never entries here.
 func GatewayTools() []GatewayTool { return append([]GatewayTool(nil), gatewayTools...) }
+
+// GatewayToolNames returns the names-only compatibility inventory.
+func GatewayToolNames() []GatewayName {
+	result := make([]GatewayName, 0, len(gatewayTools))
+	for _, tool := range gatewayTools {
+		result = append(result, tool.Name)
+	}
+	return result
+}
 
 // DisclosureGatewayTools returns the independently installable navigation half.
 func DisclosureGatewayTools() []GatewayTool { return append([]GatewayTool(nil), gatewayTools[:2]...) }
@@ -113,6 +125,16 @@ func (gateway *Gateway) Open(ref string, selection RootSelection) (map[string]an
 	return result, gateway.recover(err)
 }
 
+// OpenForPerson proxies the person-owned navigation door without widening selection.
+func (gateway *Gateway) OpenForPerson(ref string, selection RootSelection) (map[string]any, error) {
+	return gateway.disclosure.OpenForPerson(ref, selection)
+}
+
+// OpenForAPerson retains the Python compatibility spelling.
+func (gateway *Gateway) OpenForAPerson(ref string, selection RootSelection) (map[string]any, error) {
+	return gateway.OpenForPerson(ref, selection)
+}
+
 // InvokeReadOnly runs a read-only Tool through the fixed read-only door.
 func (gateway *Gateway) InvokeReadOnly(ctx context.Context, ref string, arguments json.RawMessage, selection RootSelection) (any, error) {
 	if gateway.execution == nil {
@@ -127,6 +149,19 @@ func (gateway *Gateway) Invoke(ctx context.Context, ref string, arguments json.R
 		return nil, &RefusedError{Message: fmt.Sprintf("This Contexture server is disclosure-only. Call %s or %s instead.", DiscoverGatewayName, OpenGatewayName)}
 	}
 	return gateway.execution.Invoke(ctx, ref, arguments, selection)
+}
+
+// ReadForHost proxies the argument-free read-only Host door.
+func (gateway *Gateway) ReadForHost(ctx context.Context, ref string, selection RootSelection) (any, error) {
+	if gateway.execution == nil {
+		return nil, &RefusedError{Message: fmt.Sprintf("This Contexture server is disclosure-only. Call %s or %s instead.", DiscoverGatewayName, OpenGatewayName)}
+	}
+	return gateway.execution.ReadForHost(ctx, ref, selection)
+}
+
+// ReadForAHost retains the Python compatibility spelling.
+func (gateway *Gateway) ReadForAHost(ctx context.Context, ref string, selection RootSelection) (any, error) {
+	return gateway.ReadForHost(ctx, ref, selection)
 }
 
 func (gateway *Gateway) recover(err error) error {
@@ -185,3 +220,7 @@ func WrongDoorMessage(ref string, isReadOnly bool) string {
 func TakenByPersonMessage(ref string) string {
 	return fmt.Sprintf("%s is opened by a person, not by an agent. It is reachable only as a command in this host's menu. Do not reproduce its steps another way; tell the user which command runs it and let them decide when.", ref)
 }
+
+// Compatibility names share the native implementations.
+type SystemAPI = Gateway
+type Refused = RefusedError

@@ -48,9 +48,12 @@ type (
 	DisclosureAPI             = model.DisclosureAPI
 	GatewayName               = model.GatewayName
 	GatewayTool               = model.GatewayTool
+	SystemTool                = model.SystemTool
 	Gateway                   = model.Gateway
+	SystemAPI                 = model.SystemAPI
 	ExecutionAPI              = model.ExecutionAPI
 	RefusedError              = model.RefusedError
+	Refused                   = model.Refused
 	WrongDoorError            = model.WrongDoorError
 	Telemetry                 = model.Telemetry
 	CallEvent                 = model.CallEvent
@@ -187,6 +190,9 @@ func NewRuntime(index *Index, selection, ceiling RootSelection, telemetry Teleme
 func NewGateway(disclosure *Disclosure, runtime *Runtime) (*Gateway, error) {
 	return model.NewGateway(disclosure, runtime)
 }
+
+// GatewayToolNames returns the fixed names-only gateway inventory.
+func GatewayToolNames() []GatewayName { return model.GatewayToolNames() }
 
 // NewExecutionAPI exposes the independently installable invocation half over
 // a bound Runtime. It owns neither discovery nor a Host transport.

@@ -53,6 +53,10 @@ var _ = contexture.ErrRootOutsideSelection
 var _ = contexture.NewMemoryTelemetry
 var _ = contexture.NewDisclosureWithTelemetry
 var _ = contexture.NewDisclosureAPI
+var _ = contexture.GatewayToolNames
+var _ contexture.SystemTool
+var _ *contexture.SystemAPI
+var _ *contexture.Refused
 var _ = contexture.ReportTelemetry
 var _ = contexture.NewControllerManager
 var _ = contexture.NewControllerManagerWithChannels
@@ -209,6 +213,7 @@ func main() {
     if navigationErr != nil || len(navigation.Tools()) != 2 || navigation.Tools()[0].Name != contexture.DiscoverGatewayName {
         panic("public DisclosureAPI did not expose the fixed navigation surface")
     }
+    if names := contexture.GatewayToolNames(); len(names) != 4 || names[0] != contexture.DiscoverGatewayName || names[3] != contexture.InvokeGatewayName { panic("public names-only gateway inventory is incomplete") }
     navigationRoots, navigationRootsErr := navigation.Discover(contexture.AllRoots())
     if navigationRootsErr != nil || len(navigationRoots["roles"]) != 1 || navigationRoots["roles"][0]["ref"] != "graph" {
         panic("public DisclosureAPI did not project root routing cards")

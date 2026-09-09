@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -68,6 +69,9 @@ func TestGatewayHasFixedOrderedSurfaceAndActionableLookupRecoveries(t *testing.T
 	gateway := recoveryGateway(t, &calls)
 	tools := contexture.GatewayTools()
 	want := []contexture.GatewayName{contexture.DiscoverGatewayName, contexture.OpenGatewayName, contexture.InvokeReadOnlyGatewayName, contexture.InvokeGatewayName}
+	if got := contexture.GatewayToolNames(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("gateway tool names = %#v", got)
+	}
 	if len(tools) != len(want) {
 		t.Fatalf("tools = %#v", tools)
 	}
@@ -75,6 +79,12 @@ func TestGatewayHasFixedOrderedSurfaceAndActionableLookupRecoveries(t *testing.T
 		if tools[i].Name != name {
 			t.Fatalf("tools[%d] = %q, want %q", i, tools[i].Name, name)
 		}
+		if len(tools[i].Description) <= 80 {
+			t.Fatalf("tool %q description is incomplete", name)
+		}
+	}
+	if !strings.Contains(tools[1].Description, "schema") || strings.Contains(tools[0].Description, "schema") {
+		t.Fatal("gateway descriptions assign schema delivery to the wrong door")
 	}
 	if len(contexture.DisclosureGatewayTools()) != 2 || len(contexture.ExecutionGatewayTools()) != 2 {
 		t.Fatal("gateway halves are not fixed")
@@ -105,6 +115,24 @@ func TestGatewayHasFixedOrderedSurfaceAndActionableLookupRecoveries(t *testing.T
 	var wrong *contexture.WrongDoorError
 	if !errors.As(err, &wrong) || wrong.Ref != "beta/read" || !wrong.ReadOnly || !errors.Is(err, contexture.ErrWrongDoor) {
 		t.Fatalf("gateway wrong-door chain = %T %#v", err, wrong)
+	}
+	_, err = gateway.InvokeReadOnly(context.Background(), "beta/write", json.RawMessage("{}"), contexture.AllRoots())
+	if got := refused(t, err).Error(); !strings.Contains(got, "contexture_invoke") || calls.Load() != 0 {
+		t.Fatalf("reverse wrong door = %q, calls = %d", got, calls.Load())
+	}
+	if !errors.As(err, &wrong) || wrong.Ref != "beta/write" || wrong.ReadOnly {
+		t.Fatalf("reverse wrong-door chain = %T %#v", err, wrong)
+	}
+}
+
+func TestSystemAPICompatibilityFacadeProxiesPersonAndHostDoors(t *testing.T) {
+	var calls atomic.Int32
+	var api *contexture.SystemAPI = recoveryGateway(t, &calls)
+	if opened, err := api.OpenForAPerson("beta", contexture.AllRoots()); err != nil || opened["ref"] != "beta" {
+		t.Fatalf("OpenForAPerson = %#v, %v", opened, err)
+	}
+	if value, err := api.ReadForAHost(context.Background(), "beta/read", contexture.AllRoots()); err != nil || value != "read" {
+		t.Fatalf("ReadForAHost = %#v, %v", value, err)
 	}
 }
 
