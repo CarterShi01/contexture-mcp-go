@@ -159,3 +159,28 @@ func TestGlobalCommandRunsGeneratedProjectFromNestedDirectory(t *testing.T) {
 		t.Fatalf("forwarded check output = %q", output)
 	}
 }
+
+func TestFindProjectStopsAtNearestModuleBoundary(t *testing.T) {
+	outer, err := NewProject("Outer Context", t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	inner := filepath.Join(outer, "inner")
+	if err := os.MkdirAll(filepath.Join(inner, "nested"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inner, "go.mod"), []byte("module inner\n\ngo 1.25.0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(previous)
+	if err := os.Chdir(filepath.Join(inner, "nested")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := findProject(); err == nil || !strings.Contains(err.Error(), "no generated cmd/assistant") {
+		t.Fatalf("nearest incomplete module was skipped: %v", err)
+	}
+}

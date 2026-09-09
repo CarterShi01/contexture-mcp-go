@@ -432,6 +432,11 @@ template variables.
 Programmatic application runners import `RunApplication` and the classifiable
 `UsageError` from the `cli` package. The command package owns process argument
 adaptation; usage failures write stderr and return status two.
+The global command walks upward to the nearest `go.mod` and requires that same
+module to own `cmd/assistant/main.go`; it never skips an incomplete nested
+module to execute an outer project. Go's statically linked Application carries
+roots, Channels, Prompts, and Resources directly, replacing Python's dynamic
+project targets and legacy configuration keys.
 
 ## 4. Work locally before starting a Host
 

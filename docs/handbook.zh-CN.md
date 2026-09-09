@@ -334,6 +334,9 @@ scaffold 暴露一个名为 `project` 的稳定 template；`AvailableTemplates` 
 `NewProjectFromTemplate` 会拒绝未知名称并列出可用选择。生成的 project 不包含未解析 template variable。
 programmatic application runner 从 `cli` package 导入 `RunApplication` 和可分类的 `UsageError`。command package
 负责 process argument adaptation；usage failure 写入 stderr 并返回 status 2。
+global command 向上查找最近的 `go.mod`，并要求同一 module 拥有 `cmd/assistant/main.go`；它不会跳过
+不完整的 nested module 去执行外层 project。Go statically linked Application 直接携带 roots、Channels、
+Prompts 与 Resources，取代 Python dynamic project target 与 legacy config key。
 
 ## 4. 启动 Host 前先在本地工作
 
