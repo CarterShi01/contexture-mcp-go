@@ -135,6 +135,7 @@ var _ = server.SelectHeader
 var _ = server.Launch{}
 var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
+var _ web.RestRoute
 
 func main() {
     demoApplication, demoApplicationErr := demo.Application(); demoServer, demoServerErr := demo.Build(); if demoApplicationErr != nil || demoServerErr != nil || demoApplication.Name() != "contexture-demo" || demoServer == nil { panic("public demo package is incomplete") }
@@ -313,6 +314,11 @@ func main() {
         panic("public GroupCards did not retain the closed sibling shape")
     }
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
+    publicRest, publicRestErr := web.NewRestRouter(runtime, []web.RestRoute{{Method: " get ", Path: " /graph ", Ref: " graph/graph "}})
+    publicRoutes := publicRest.Routes()
+    if publicRestErr != nil || len(publicRoutes) != 1 || publicRoutes[0].Method != "GET" || publicRoutes[0].Path != "/graph" || publicRoutes[0].Ref != "graph/graph" || publicRoutes[0].Status != 200 {
+        panic("public RestRoute construction did not retain normalized facts")
+    }
     execution, executionErr := contexture.NewExecutionAPI(runtime)
     if executionErr != nil || len(execution.Tools()) != 2 || execution.Tools()[0].Name != contexture.InvokeReadOnlyGatewayName {
         panic("public ExecutionAPI did not expose the fixed invocation surface")

@@ -88,6 +88,55 @@ func TestRestRouterUsesExplicitAllowlistAndFixedDoors(t *testing.T) {
 	}
 }
 
+func TestRestRouteNormalizationMethodsAndDefensiveSnapshots(t *testing.T) {
+	read, err := contexture.NewTool("status", "Status.", true, func(context.Context, restEmptyInput) (string, error) { return "ok", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	write, err := contexture.NewTool("reset", "Reset.", false, func(context.Context, restEmptyInput) (string, error) { return "ok", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := restRuntime(t, read, write)
+	router, err := web.NewRestRouter(runtime, []web.RestRoute{{Method: " get ", Path: " / ", Ref: " ops/status "}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	routes := router.Routes()
+	if len(routes) != 1 || routes[0] != (web.RestRoute{Method: http.MethodGet, Path: "/", Ref: "ops/status", Status: http.StatusOK}) {
+		t.Fatalf("normalized routes = %#v", routes)
+	}
+	routes[0].Path = "/forged"
+	if router.Routes()[0].Path != "/" {
+		t.Fatal("Routes returned mutable internal state")
+	}
+	routes = append(routes, web.RestRoute{Method: http.MethodPost, Path: "/forged", Ref: "ops/reset"})
+	routes[0], routes[1] = routes[1], routes[0]
+	if snapshot := router.Routes(); len(snapshot) != 1 || snapshot[0].Path != "/" {
+		t.Fatalf("Routes returned a mutable slice snapshot: %#v", snapshot)
+	}
+	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		ref := "ops/reset"
+		if method == http.MethodGet || method == http.MethodHead {
+			ref = "ops/status"
+		}
+		if _, err := web.NewRestRouter(runtime, []web.RestRoute{{Method: method, Path: "/" + strings.ToLower(method), Ref: ref}}); err != nil {
+			t.Fatalf("method %s = %v", method, err)
+		}
+	}
+	for _, status := range []int{99, 600} {
+		if _, err := web.NewRestRouter(runtime, []web.RestRoute{{Method: http.MethodGet, Path: "/status", Ref: "ops/status", Status: status}}); err == nil {
+			t.Fatalf("status %d was accepted", status)
+		}
+	}
+	if _, err := web.NewRestRouter(runtime, []web.RestRoute{
+		{Method: " get ", Path: " /duplicate ", Ref: " ops/status "},
+		{Method: http.MethodGet, Path: "/duplicate", Ref: "ops/status"},
+	}); err == nil {
+		t.Fatal("routes colliding after normalization were accepted")
+	}
+}
+
 func TestRestSurfaceMapsInvocationFailures(t *testing.T) {
 	denied, err := contexture.NewTool("denied", "Denied.", true, func(context.Context, restEmptyInput) (string, error) {
 		return "", fs.ErrPermission
