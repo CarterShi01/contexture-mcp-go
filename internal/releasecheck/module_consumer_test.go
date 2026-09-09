@@ -33,6 +33,7 @@ import (
     contexture "github.com/CarterShi01/contexture-mcp-go"
     "github.com/CarterShi01/contexture-mcp-go/inspection"
     contexturecli "github.com/CarterShi01/contexture-mcp-go/cli"
+    "github.com/CarterShi01/contexture-mcp-go/demo"
     "github.com/CarterShi01/contexture-mcp-go/server"
     "github.com/CarterShi01/contexture-mcp-go/server/instructions"
     "github.com/CarterShi01/contexture-mcp-go/server/messages"
@@ -100,6 +101,13 @@ var _ contexture.ReferenceCrossing
 var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: contexture.ModelReservedForPerson}
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
+var _ = demo.KubernetesPlatform
+var _ = demo.IncidentResponse
+var _ = demo.DeploymentOps
+var _ = demo.RollBackARelease
+var _ = demo.CrashLoopRunbookDocument
+var _ = demo.RollbackPolicyDocument
+var _ = demo.Build
 var _ = server.NewMCPServer
 var _ = messages.Signpost
 var _ = messages.TruncatedCompletion
@@ -129,6 +137,7 @@ var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
 
 func main() {
+    demoApplication, demoApplicationErr := demo.Application(); demoServer, demoServerErr := demo.Build(); if demoApplicationErr != nil || demoServerErr != nil || demoApplication.Name() != "contexture-demo" || demoServer == nil { panic("public demo package is incomplete") }
     if !errors.Is(&contexturecli.UsageError{Message: "usage"}, contexture.ErrContexture) { panic("public CLI UsageError is not classifiable") }
     if !strings.Contains(messages.Preamble, "contexture_open") || !strings.Contains(messages.RefRule, "never assemble") || messages.TruncatedCompletion(100, 103) != "... 3 more match; keep typing to narrow." { panic("public message contract is incomplete") }
     if instructions.InstructionsLimit != 2048 || instructions.RosterBudget != 1200 || instructions.SelfContainedPrefix != 512 || !strings.Contains(instructions.Neutral(), "request-specific") { panic("public instruction contract is incomplete") }

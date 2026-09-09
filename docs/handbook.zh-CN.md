@@ -338,6 +338,13 @@ global command 向上查找最近的 `go.mod`，并要求同一 module 拥有 `c
 不完整的 nested module 去执行外层 project。Go statically linked Application 直接携带 roots、Channels、
 Prompts 与 Resources，取代 Python dynamic project target 与 legacy config key。
 
+### 维护中的 Kubernetes demo
+
+可导入的 `demo` package 是 deterministic、fixture-driven 的 Kubernetes incident-response reference
+application。它公开 lazy `KubernetesPlatform`、`IncidentResponse`、`DeploymentOps` role factory、一个
+rollback Prompt、两个 Markdown Resource declaration、`Application()` 与不启动 transport 的 `Build()`
+helper。CLI 消费同一个 Application。import/build 不会打开 connection 或 transport，demo 也不会连接真实 cluster。
+
 ## 4. 启动 Host 前先在本地工作
 
 | 问题 | 命令 |

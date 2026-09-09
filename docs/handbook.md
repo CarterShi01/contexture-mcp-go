@@ -438,6 +438,16 @@ module to execute an outer project. Go's statically linked Application carries
 roots, Channels, Prompts, and Resources directly, replacing Python's dynamic
 project targets and legacy configuration keys.
 
+### Maintained Kubernetes demo
+
+The importable `demo` package is the deterministic, fixture-driven Kubernetes
+incident-response reference application. It exposes lazy
+`KubernetesPlatform`, `IncidentResponse`, and `DeploymentOps` role factories;
+one rollback Prompt; two Markdown Resource declarations; `Application()`; and
+a non-starting `Build()` helper. The CLI consumes the same Application. Import
+and build open no connection or transport, and the demo never contacts a real
+cluster.
+
 ## 4. Work locally before starting a Host
 
 | Question | Command |

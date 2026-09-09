@@ -66,3 +66,23 @@ func TestDemoPreservesTheCompleteReferenceProceduresAndDocuments(t *testing.T) {
 		t.Fatalf("runbook was abbreviated: %q", runbook)
 	}
 }
+
+func TestDemoExposesLazyTopologyPublicationsAndBuilder(t *testing.T) {
+	if demo.KubernetesPlatform().NodeName() != "kubernetes-platform" || demo.IncidentResponse().NodeName() != "incident-response" || demo.DeploymentOps().NodeName() != "deployment-ops" {
+		t.Fatal("public demo role factories drifted")
+	}
+	if demo.RollBackARelease().Name != "roll-back-a-release" || demo.CrashLoopRunbookDocument().MIMEType != "text/markdown" || demo.RollbackPolicyDocument().URI != "contexture://runbooks/rollback-policy" {
+		t.Fatal("public demo publications drifted")
+	}
+	application, err := demo.Application()
+	if err != nil || application.RootCount() != 1 || len(application.Prompts()) != 1 || len(application.Resources()) != 2 {
+		t.Fatalf("demo Application = %#v, %v", application, err)
+	}
+	built, err := demo.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := built.Build(); err != nil {
+		t.Fatal(err)
+	}
+}
