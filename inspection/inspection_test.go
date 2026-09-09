@@ -3,6 +3,7 @@ package inspection_test
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -68,8 +69,67 @@ func TestInspectionCostAndBreadthFirstReferences(t *testing.T) {
 	if cost := inspection.CostOf("😀"); cost.Characters != 1 || cost.Bytes != 4 || cost.Tokens != 0 {
 		t.Fatalf("wrong astral cost: %#v", cost)
 	}
+	if inspection.CostOf("ab").Tokens != 0 || inspection.CostOf("abcdef").Tokens != 2 {
+		t.Fatal("token estimate does not use ties-to-even rounding")
+	}
 	if refs := inspection.EveryRef(fixture(t)); len(refs) != 2 || refs[0] != "operations" || refs[1] != "operations/diagnose" {
 		t.Fatalf("wrong refs: %#v", refs)
+	}
+}
+
+func TestInspectionReadsTextAndDescribesBinary(t *testing.T) {
+	text, err := contexture.NewTool("text", "Read text.", true, func(context.Context, struct{}) (string, error) { return "TEXT", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary, err := contexture.NewTool("binary", "Read bytes.", true, func(context.Context, struct{}) ([]byte, error) { return []byte{1, 2, 3}, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "read-inspection", Roots: []contexture.Factory{func() contexture.Node { return text }, func() contexture.Node { return binary }}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if step := inspection.ReadStep(t.Context(), runtime, "text"); step.Refused || step.Body != "TEXT" {
+		t.Fatalf("text read = %#v", step)
+	}
+	if step := inspection.ReadStep(t.Context(), runtime, "binary"); step.Refused || step.Body != "<3 bytes of binary>" {
+		t.Fatalf("binary read = %#v", step)
+	}
+}
+
+func TestInspectionNestedRoleSweepIsBreadthFirst(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "nested-inspection", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "root", Description: "Root.", Instructions: "Route.", Children: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{Name: "child", Description: "Child.", Instructions: "Route.", Skills: []contexture.Factory{func() contexture.Node {
+				return &contexture.Skill{Name: "leaf", Description: "Leaf.", Instructions: "Read."}
+			}}}
+		}}, Skills: []contexture.Factory{func() contexture.Node {
+			return &contexture.Skill{Name: "root-leaf", Description: "Root leaf.", Instructions: "Read."}
+		}}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := contexture.NewDisclosure(index, contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"root", "root/root-leaf", "root/child", "root/child/leaf"}
+	if got := inspection.EveryRef(view); !reflect.DeepEqual(got, want) {
+		t.Fatalf("nested refs = %#v", got)
 	}
 }
 

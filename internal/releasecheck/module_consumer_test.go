@@ -220,6 +220,10 @@ func main() {
         panic("public Prompt/Resource declarations did not retain foundation facts")
     }
     graphIndex, _ := contexture.Compile(graphApplication)
+    graphDisclosureForInspection, _ := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
+    inspectionTrace := inspection.Replay(context.Background(), graphDisclosureForInspection, nil, []string{"graph"}, true, false, "contexture_open")
+    inspectionJSON, inspectionJSONErr := inspection.AsJSON(inspectionTrace)
+    if inspectionJSONErr != nil || len(inspectionTrace.Steps) != 3 || !strings.Contains(inspectionJSON, "\"total\"") { panic("public inspection replay is incomplete") }
     consumerGraph, consumerGraphErr := contexture.NewSelectedGraph(graphIndex, contexture.AllRoots())
     consumerGraphContext := contexture.WithGraph(context.Background(), consumerGraph)
     if consumerGraphErr != nil || contexture.CurrentGraph(consumerGraphContext) != consumerGraph {

@@ -34,7 +34,13 @@ func CostOf(text string) Cost {
 		}
 	}
 	characters := utf8.RuneCountInString(text)
-	return Cost{Characters: characters, Bytes: len([]byte(text)), Tokens: int(float64(wide) + float64(characters-wide)/4 + 0.5)}
+	ordinary := characters - wide
+	tokens := wide + ordinary/4
+	remainder := ordinary % 4
+	if remainder > 2 || (remainder == 2 && tokens%2 == 1) {
+		tokens++
+	}
+	return Cost{Characters: characters, Bytes: len([]byte(text)), Tokens: tokens}
 }
 
 // Add combines two disclosure costs.
@@ -91,7 +97,7 @@ func (item Step) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(encodedStep{
 		Call: item.Call, Ref: ref, Refused: item.Refused, Body: item.Body,
-		Payload: item.Payload, Checks: item.Checks, Cost: item.Cost, Aside: aside,
+		Payload: item.Payload, Checks: item.Checks, Cost: CostOf(item.Body), Aside: aside,
 	})
 }
 
@@ -99,6 +105,20 @@ func (item Step) MarshalJSON() ([]byte, error) {
 type Trace struct {
 	Steps []Step `json:"steps"`
 	Total Cost   `json:"total"`
+}
+
+// MarshalJSON derives the total from step bodies so callers cannot serialize
+// contradictory cost facts through public struct fields.
+func (trace Trace) MarshalJSON() ([]byte, error) {
+	total := Cost{}
+	for _, item := range trace.Steps {
+		total = total.Add(CostOf(item.Body))
+	}
+	type encodedTrace struct {
+		Steps []Step `json:"steps"`
+		Total Cost   `json:"total"`
+	}
+	return json.Marshal(encodedTrace{Steps: trace.Steps, Total: total})
 }
 
 // Failures returns refused steps and failed checks.
