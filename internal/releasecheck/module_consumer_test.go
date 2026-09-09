@@ -33,6 +33,7 @@ import (
     contexture "github.com/CarterShi01/contexture-mcp-go"
     "github.com/CarterShi01/contexture-mcp-go/inspection"
     "github.com/CarterShi01/contexture-mcp-go/server"
+    "github.com/CarterShi01/contexture-mcp-go/server/instructions"
     "github.com/CarterShi01/contexture-mcp-go/server/messages"
     "github.com/CarterShi01/contexture-mcp-go/web"
 )
@@ -100,6 +101,8 @@ var _ = server.NewMCPServer
 var _ = messages.Signpost
 var _ = messages.TruncatedCompletion
 var _ = messages.CommandDescription
+var _ = instructions.Build
+var _ = instructions.Neutral
 var _ = server.CompileApplication
 var _ = server.CompileDisclosureApplication
 var _ = server.BuildServer
@@ -124,6 +127,7 @@ var _ = web.NewRestRouter
 
 func main() {
     if !strings.Contains(messages.Preamble, "contexture_open") || !strings.Contains(messages.RefRule, "never assemble") || messages.TruncatedCompletion(100, 103) != "... 3 more match; keep typing to narrow." { panic("public message contract is incomplete") }
+    if instructions.InstructionsLimit != 2048 || instructions.RosterBudget != 1200 || instructions.SelfContainedPrefix != 512 || !strings.Contains(instructions.Neutral(), "request-specific") { panic("public instruction contract is incomplete") }
     if contexture.PackageName != "contexture" || contexture.Version != "0.12.0rc1" || contexture.ReferenceSeparator != "/" {
         panic("public Contexture vocabulary has an unexpected spelling")
     }

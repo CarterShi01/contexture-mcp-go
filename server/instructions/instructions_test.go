@@ -61,4 +61,38 @@ func TestBuildCutsRootsAndExposesNeutralRequestSelectedText(t *testing.T) {
 	if !strings.Contains(instructions.Neutral(), "request-specific set of complete root capabilities") {
 		t.Fatal("neutral instructions lost their request-selection contract")
 	}
+	if instructions.RosterBudget != 1200 || instructions.InstructionsLimit != 2048 || instructions.SelfContainedPrefix != 512 {
+		t.Fatal("instruction budget constants drifted")
+	}
+}
+
+func TestBuildMeasuresUTF8BytesAndNeverSplitsChildSiblingGroup(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "unicode-instructions", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "root", Description: "根职责", Instructions: "Route.", Children: []contexture.Factory{
+			func() contexture.Node {
+				return &contexture.Role{Name: "first", Description: strings.Repeat("甲", 20), Instructions: "A."}
+			},
+			func() contexture.Node {
+				return &contexture.Role{Name: "second", Description: strings.Repeat("乙", 20), Instructions: "B."}
+			},
+		}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := contexture.Compile(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := contexture.NewDisclosure(index, contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err := instructions.Build(view, contexture.AllRoots(), 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, "- root: 根职责") || strings.Contains(text, "root/first") || strings.Contains(text, "root/second") || !strings.Contains(text, "and 2 more role(s) below") {
+		t.Fatalf("unicode sibling cut = %q", text)
+	}
 }
