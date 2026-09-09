@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/CarterShi01/contexture-mcp-go/server"
@@ -24,6 +25,13 @@ func TestLaunchRendersHostConfigurationAndSafeInstallCommands(t *testing.T) {
 	}
 	if got, want := server.CodexConfig(launch), "[mcp_servers.operations]\ncommand = \"node\"\nargs = [\"dist/cli/main.js\", \"serve\", \"--label\", \"O'Reilly & sons\"]\n"; got != want {
 		t.Fatalf("CodexConfig() = %q, want %q", got, want)
+	}
+	commands := server.CLICommands(launch)
+	if !strings.Contains(commands["claude-code"], "claude mcp add --scope project operations -- ") {
+		t.Fatalf("Claude install command = %q", commands["claude-code"])
+	}
+	if !strings.HasSuffix(commands["claude-code"], launch.AsShell()) || !strings.HasSuffix(commands["codex"], launch.AsShell()) {
+		t.Fatalf("install commands do not share launch suffix: %#v", commands)
 	}
 }
 
