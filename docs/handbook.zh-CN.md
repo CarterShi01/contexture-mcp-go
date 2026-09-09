@@ -274,8 +274,9 @@ Role，调用会返回 `ErrInvalidDeclaration`-typed error：这是一项有意�
 `error_count` 与 `last_used_at`；从未见过的 ref 保留该 ref 且计数为零。
 
 框架只记录成功打开的 Role 与 Skill，以及实际执行的 Tool invocation（包括失败的 invocation）。
-`discover` 和打开 Tool card 都不算一次 use。`CurrentTelemetry(ctx)` 只会在 Tool handler 的 request
-context 内非 nil。exporter 的 error 或 panic 会被忽略，因此 telemetry 不会改变业务结果。
+`discover` 和打开 Tool card 都不算一次 use。`CurrentTelemetry(ctx)` 在 Tool handler 或显式
+`WithTelemetry` scope 内返回同一个 collector，在 scope 外 fail fast；嵌套派生 context 会恢复外层 collector。
+exporter 的 error 或 panic 会被忽略，因此 telemetry 不会改变业务结果。
 `MemoryTelemetry.Events()` 返回非破坏性的 snapshot，并有意保留全部 event；需要有界保留或远程导出时，
 应提供自定义 `Telemetry` 实现。
 `ReportTelemetry(telemetry, ref, failed)` 是供拥有额外 observation 的 Host boundary 使用的、公开的 Go

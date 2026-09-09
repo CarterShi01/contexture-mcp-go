@@ -36,14 +36,16 @@ func withSelection(ctx context.Context, selection RootSelection) context.Context
 	return context.WithValue(ctx, selectionKey, selection)
 }
 
-func withTelemetry(ctx context.Context, telemetry Telemetry) context.Context {
+// WithTelemetry derives a context carrying one task-local collector. Nested
+// contexts retain their parent and therefore restore the outer collector.
+func WithTelemetry(ctx context.Context, telemetry Telemetry) context.Context {
 	return context.WithValue(ctx, telemetryKey, telemetry)
 }
 
 func withInvocationFacts(ctx context.Context, graph *SelectedGraph, selection RootSelection, telemetry Telemetry, channels ChannelHandle) context.Context {
 	ctx = WithGraph(ctx, graph)
 	ctx = withSelection(ctx, selection)
-	ctx = withTelemetry(ctx, telemetry)
+	ctx = WithTelemetry(ctx, telemetry)
 	ctx = context.WithValue(ctx, channelsKey, channels)
 	// Keep the request identity from the Host context explicit in the derived
 	// invocation scope. Principal is immutable; this does not grant a Tool an

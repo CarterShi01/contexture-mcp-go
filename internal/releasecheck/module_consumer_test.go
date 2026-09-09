@@ -70,6 +70,7 @@ var _ = contexture.NewSelectedGraph
 var _ = contexture.AllSurfaces
 var _ = contexture.OnlySurfaces
 var _ = contexture.WithGraph
+var _ = contexture.WithTelemetry
 var _ = contexture.CurrentChannels
 var _ = contexture.NewExecutionAPI
 var _ = contexture.WithChannels[struct{}]

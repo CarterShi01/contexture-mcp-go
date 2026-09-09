@@ -362,8 +362,9 @@ JSON-ready snapshot with `ref`, `call_count`, `error_count`, and
 
 The framework records only successful Role and Skill opens and actual Tool
 invocations (including a failing invocation). `discover` and opening a Tool
-card do not count as use. `CurrentTelemetry(ctx)` is non-nil only inside the
-Tool handler's request context. Exporter errors and panics are ignored so
+card do not count as use. `CurrentTelemetry(ctx)` returns the exact collector
+inside a Tool handler or explicit `WithTelemetry` scope and fails fast outside
+one; nested derived contexts restore the outer collector. Exporter errors and panics are ignored so
 telemetry cannot change a business result. `MemoryTelemetry.Events()` returns
 non-destructive snapshots and deliberately retains all events; use a custom
 `Telemetry` implementation when bounded retention or remote export is needed.

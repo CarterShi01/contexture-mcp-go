@@ -280,6 +280,11 @@ func WithGraph(ctx context.Context, graph *SelectedGraph) context.Context {
 	return model.WithGraph(ctx, graph)
 }
 
+// WithTelemetry derives a nested request context carrying one telemetry collector.
+func WithTelemetry(ctx context.Context, telemetry Telemetry) context.Context {
+	return model.WithTelemetry(ctx, telemetry)
+}
+
 // CurrentSelection returns the effective request root selection.
 func CurrentSelection(ctx context.Context) RootSelection {
 	return model.CurrentSelection(ctx)

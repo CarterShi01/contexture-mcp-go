@@ -15,6 +15,16 @@ type telemetryInput struct {
 	Value string `json:"value"`
 }
 
+func TestWithTelemetryNestsAndRestoresByContextDerivation(t *testing.T) {
+	outer := contexture.NewMemoryTelemetry()
+	inner := contexture.NewMemoryTelemetry()
+	outerContext := contexture.WithTelemetry(context.Background(), outer)
+	innerContext := contexture.WithTelemetry(outerContext, inner)
+	if contexture.CurrentTelemetry(outerContext) != outer || contexture.CurrentTelemetry(innerContext) != inner {
+		t.Fatal("nested telemetry contexts did not retain their collector")
+	}
+}
+
 func TestTelemetryAggregatesOnlyActualRoleSkillOpensAndToolInvocations(t *testing.T) {
 	collector := contexture.NewMemoryTelemetry()
 	var runtime *contexture.Runtime
