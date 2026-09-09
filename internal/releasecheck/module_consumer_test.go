@@ -314,10 +314,10 @@ func main() {
         panic("public GroupCards did not retain the closed sibling shape")
     }
     runtime, _ := contexture.NewRuntime(graphIndex, contexture.AllRoots(), contexture.AllRoots(), nil)
-    publicRest, publicRestErr := web.NewRestRouter(runtime, []web.RestRoute{{Method: " get ", Path: " /graph ", Ref: " graph/graph "}})
+    publicRest, publicRestErr := web.NewRestSurface(runtime, []web.RestRoute{{Method: " get ", Path: " /graph ", Ref: " graph/graph "}}, web.RestRouterOptions{})
     publicRoutes := publicRest.Routes()
     if publicRestErr != nil || len(publicRoutes) != 1 || publicRoutes[0].Method != "GET" || publicRoutes[0].Path != "/graph" || publicRoutes[0].Ref != "graph/graph" || publicRoutes[0].Status != 200 {
-        panic("public RestRoute construction did not retain normalized facts")
+        panic("public RestSurface construction did not retain normalized route facts")
     }
     execution, executionErr := contexture.NewExecutionAPI(runtime)
     if executionErr != nil || len(execution.Tools()) != 2 || execution.Tools()[0].Name != contexture.InvokeReadOnlyGatewayName {

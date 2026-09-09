@@ -273,7 +273,7 @@ func (router *RestRouter) invokeProblem(writer http.ResponseWriter, err error) {
 		problem(writer, http.StatusUnprocessableEntity, "invalid-arguments", err.Error())
 		return
 	}
-	if errors.Is(err, contexture.ErrWrongDoor) {
+	if errors.Is(err, contexture.ErrWrongDoor) || errors.Is(err, contexture.ErrNodeNotFound) {
 		problem(writer, http.StatusInternalServerError, "invalid-surface", err.Error())
 		return
 	}

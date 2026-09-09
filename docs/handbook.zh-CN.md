@@ -550,6 +550,11 @@ Go adapter 会在构造时拒绝 1xx、204、205 与 304 route status：与 ASGI
 同一 surface 可以再次 serving，并建立一个新的 Channel lifetime。直接调用 `ServeHTTP` 适合测试，但不会
 建立 application lifetime。
 
+这是 Python ASGI surface 的原生 `net/http` 映射：`ServeHTTP` 处理单个 HTTP request，`Serve` 对应
+ASGI lifespan。Python 还允许用零参数 `Route` subclass 作为简写；Go 没有 declaration-class 惯例，
+因此使用复制后的 `RestRoute` value。两种形式都会在 serving 前规范化并形成 snapshot。Go 的强类型
+`Authenticator` 消除了 Python 的无效返回类型分支，而 nil 结果仍保留相同的 401 行为。
+
 ## 10. 保持合同真实
 
 提出改动前运行完整 repository gate：

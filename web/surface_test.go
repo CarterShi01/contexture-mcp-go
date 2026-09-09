@@ -318,8 +318,12 @@ func TestRestSurfaceEnforcesBodyLimitAndCarriesAuthenticationAndRequest(t *testi
 			if request.Headers["authorization"] != "Bearer test" {
 				return nil
 			}
-			if request.Path == "/who" && (request.Method != http.MethodGet || len(request.Query["value"]) != 2 || request.Query["value"][0] != "" || request.Query["value"][1] != "two") {
-				return nil
+			if request.Path == "/who" {
+				if request.Method != http.MethodGet || len(request.Query["value"]) != 2 || request.Query["value"][0] != "" || request.Query["value"][1] != "two" {
+					return nil
+				}
+				request.Headers["x-request-id"] = "auth-mutated"
+				request.Query["value"][0] = "auth-mutated"
 			}
 			return contexture.NewPrincipal(contexture.PrincipalOptions{Subject: "alice"})
 		},

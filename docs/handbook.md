@@ -700,6 +700,14 @@ be served again, which establishes a fresh Channel lifetime. Calling
 `ServeHTTP` directly is useful for tests but does not establish that
 application lifetime.
 
+This is the native `net/http` mapping of the Python ASGI surface: `ServeHTTP`
+handles one HTTP request and `Serve` corresponds to the ASGI lifespan. Python
+also accepts a zero-argument `Route` subclass as shorthand; Go has no
+declaration-class convention, so it uses copied `RestRoute` values. Both forms
+are normalized and snapshotted before serving. Go's typed `Authenticator`
+eliminates Python's invalid-return-type branch, while a nil result retains the
+same 401 behavior.
+
 ## 10. Keep the contract honest
 
 Run the full repository gate before proposing a change:
