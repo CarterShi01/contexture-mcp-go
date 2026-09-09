@@ -388,6 +388,14 @@ compile/build helpers. Go naming and `context.Context` parameters replace Python
 spelling without removing any promised concept; the external module consumer
 compiles both facades directly.
 
+`server.CompileApplication` returns one bound `RuntimeApplication` sharing its
+Index, Disclosure, Runtime, Publications, and telemetry. The independent
+`server.CompileDisclosureApplication` returns an unbound
+`DisclosureApplication`; its `Server()` installs only discover/open plus
+Prompts, with no Runtime, invocation doors, or Resources. Python's temporary
+parts helpers map to `DeclareApplication` followed by the appropriate compiler,
+and `serve(app)` maps to `BuildServer(app).Start(ctx, options)`.
+
 ## 3. Choose the right node
 
 | Use | When it belongs there |

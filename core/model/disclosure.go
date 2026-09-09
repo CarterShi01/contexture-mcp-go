@@ -40,10 +40,19 @@ func NewDisclosureWithTelemetry(index *Index, selection RootSelection, telemetry
 // NewDisclosureOnly creates navigation that intentionally exposes no Tool schemas.
 // It is used by a disclosure-only Host with no execution bindings or Resources.
 func NewDisclosureOnly(index *Index, selection RootSelection) (*Disclosure, error) {
+	return NewDisclosureOnlyWithTelemetry(index, selection, nil)
+}
+
+// NewDisclosureOnlyWithTelemetry creates structural navigation sharing one
+// collector with its compiled Host container.
+func NewDisclosureOnlyWithTelemetry(index *Index, selection RootSelection, telemetry Telemetry) (*Disclosure, error) {
 	if index == nil || index.bound {
 		return nil, errors.New("disclosure-only navigation requires an unbound Index")
 	}
-	return newDisclosure(index, selection, false, NewMemoryTelemetry())
+	if telemetry == nil {
+		telemetry = NewMemoryTelemetry()
+	}
+	return newDisclosure(index, selection, false, telemetry)
 }
 
 func newDisclosure(index *Index, selection RootSelection, bound bool, telemetry Telemetry) (*Disclosure, error) {

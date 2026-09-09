@@ -174,6 +174,11 @@ func NewDisclosureOnly(index *Index, selection RootSelection) (*Disclosure, erro
 	return model.NewDisclosureOnly(index, selection)
 }
 
+// NewDisclosureOnlyWithTelemetry creates structural navigation sharing one collector.
+func NewDisclosureOnlyWithTelemetry(index *Index, selection RootSelection, telemetry Telemetry) (*Disclosure, error) {
+	return model.NewDisclosureOnlyWithTelemetry(index, selection, telemetry)
+}
+
 // NewDisclosureAPI exposes the independently installable navigation half over
 // one compiled Disclosure. Optional refs reserve model opening for a person;
 // they remain available through OpenForPerson.

@@ -58,3 +58,46 @@ func TestCompileApplicationSharesOneBoundRuntimeSurface(t *testing.T) {
 		t.Fatal("Build() constructed more than one default MCP adapter")
 	}
 }
+
+func TestCompileDisclosureApplicationBuildsNavigationOnlyContainer(t *testing.T) {
+	tool, err := contexture.NewTool("provider", "Read provider.", true, func(context.Context, applicationInput) (string, error) { return "never bound", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	collector := contexture.NewMemoryTelemetry()
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "architecture", Telemetry: collector,
+		Roots: []contexture.Factory{func() contexture.Node {
+			return &contexture.Role{Name: "architecture", Description: "Architecture.", Instructions: "Inspect.", Tools: []contexture.Factory{func() contexture.Node { return tool }}}
+		}},
+		Prompts: []contexture.Prompt{{Opens: "architecture", Description: "Review architecture."}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := server.CompileDisclosureApplication(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compiled.Index.Bound() || compiled.Telemetry != collector || compiled.Disclosure.Index() != compiled.Index || len(compiled.Publications.ResourceCards(contexture.AllRoots())) != 0 {
+		t.Fatalf("structural container = %#v", compiled)
+	}
+	opened, err := compiled.Disclosure.Open("architecture", contexture.AllRoots())
+	if err != nil {
+		t.Fatal(err)
+	}
+	card := opened["tools"].([]map[string]any)[0]
+	if card["read_only"] != nil || card["input_schema"] != nil {
+		t.Fatalf("structural Tool card leaked execution facts: %#v", card)
+	}
+	adapter, err := compiled.Server()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(adapter.GatewayNames) != 2 || adapter.GatewayNames[0] != contexture.DiscoverGatewayName || adapter.GatewayNames[1] != contexture.OpenGatewayName {
+		t.Fatalf("structural gateway = %#v", adapter.GatewayNames)
+	}
+	if _, err := contexture.NewRuntime(compiled.Index, contexture.AllRoots(), contexture.AllRoots(), nil); err == nil {
+		t.Fatal("unbound Index upgraded into Runtime")
+	}
+}

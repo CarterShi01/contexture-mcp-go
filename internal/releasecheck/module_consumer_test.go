@@ -97,6 +97,7 @@ var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI:
 var _ = inspection.Replay
 var _ = server.NewMCPServer
 var _ = server.CompileApplication
+var _ = server.CompileDisclosureApplication
 var _ = server.BuildServer
 var _ = server.ConfigureLogging
 var _ = server.CLICommands
@@ -159,6 +160,9 @@ func main() {
         return &contexture.Role{Name: "team", Description: "Team.", Instructions: "Route.", Children: []contexture.Factory{func() contexture.Node { return &contexture.Role{Name: "editor", Description: "Editor.", Instructions: "Edit."} }}}
     }}})
     if pathApplicationErr != nil { panic(pathApplicationErr) }
+    structuralApplication, structuralApplicationErr := server.CompileDisclosureApplication(pathApplication)
+    structuralServer, structuralServerErr := structuralApplication.Server()
+    if structuralApplicationErr != nil || structuralServerErr != nil || structuralApplication.Index.Bound() || len(structuralServer.GatewayNames) != 2 { panic("public disclosure-only server container is incomplete") }
     pathIndex, _ := contexture.Compile(pathApplication)
     pathSelection, _ := contexture.OnlySurfaces("team/*")
     pathGraph, pathGraphErr := contexture.NewSelectedGraph(pathIndex, pathSelection)

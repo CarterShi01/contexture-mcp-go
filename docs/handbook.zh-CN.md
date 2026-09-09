@@ -301,6 +301,12 @@ Tool，且不会调用它的方法。既有 Application 与 Index snapshot 会�
 selector、telemetry assembly、launch config、logging 以及 compile/build helper。Go 命名与
 `context.Context` 参数替代 Python 拼写，但不删除任何承诺概念；外部 module consumer 会直接编译两个 facade。
 
+`server.CompileApplication` 返回 bound `RuntimeApplication`，共享 Index、Disclosure、Runtime、Publications
+与 telemetry。独立的 `server.CompileDisclosureApplication` 返回 unbound `DisclosureApplication`；其
+`Server()` 只安装 discover/open 与 Prompts，没有 Runtime、invoke door 或 Resource。Python 临时 parts
+helper 映射为 `DeclareApplication` 后调用相应 compiler，`serve(app)` 映射为
+`BuildServer(app).Start(ctx, options)`。
+
 ## 3. 选择正确的节点
 
 | 使用 | 适用情形 |
