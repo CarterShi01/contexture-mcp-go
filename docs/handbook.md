@@ -212,6 +212,8 @@ callsite. A Tool without a Binding is valid only in a disclosure-only Index;
 `Tool.Binding` and runtime compilation classify an attempt to execute it as
 `ErrInvalidDeclaration`. Binding schemas are defensive copies, so caller
 mutation cannot alter a later `Schema` result or a compiled Tool card.
+Generated JSON Schema `title` keywords are removed as non-contract labels, but
+a real property named `title` survives both disclosure and validated decoding.
 
 ### Imperative registration
 

@@ -137,14 +137,30 @@ func normalizeSchemaValue(value any, preserveAdditionalProperties bool) {
 		if additional, ok := typed["additionalProperties"].(bool); ok && !additional && !preserveAdditionalProperties {
 			delete(typed, "additionalProperties")
 		}
-		for _, child := range typed {
-			normalizeSchemaValue(child, preserveAdditionalProperties)
+		for key, child := range typed {
+			if schemaNameMap(key) {
+				normalizeSchemaNameMap(child, preserveAdditionalProperties)
+			} else {
+				normalizeSchemaValue(child, preserveAdditionalProperties)
+			}
 		}
 	case []any:
 		for _, child := range typed {
 			normalizeSchemaValue(child, preserveAdditionalProperties)
 		}
 	}
+}
+
+func normalizeSchemaNameMap(value any, preserveAdditionalProperties bool) {
+	if entries, ok := value.(map[string]any); ok {
+		for _, schema := range entries {
+			normalizeSchemaValue(schema, preserveAdditionalProperties)
+		}
+	}
+}
+
+func schemaNameMap(key string) bool {
+	return key == "properties" || key == "$defs" || key == "definitions" || key == "patternProperties"
 }
 
 // Binding returns the compiled Tool Binding, if this Tool is executable.

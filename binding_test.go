@@ -605,6 +605,40 @@ func TestJSONTagOptionalityScansEveryOption(t *testing.T) {
 	}
 }
 
+type titleInput struct {
+	Title string `json:"title"`
+}
+
+func TestSchemaTitleKeywordsAreStrippedWithoutDeletingTitleProperty(t *testing.T) {
+	tool, err := contexture.NewToolWithSchema("publish", "Publish one title.", true, map[string]any{
+		"title": "PublishInput", "type": "object", "additionalProperties": false,
+		"properties": map[string]any{
+			"title": map[string]any{"title": "Title", "type": "string"},
+		},
+		"required": []any{"title"},
+	}, func(_ context.Context, input titleInput) (string, error) { return input.Title, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := tool.Binding()
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := binding.Schema()
+	if schema["title"] != nil {
+		t.Fatalf("root title keyword survived: %#v", schema)
+	}
+	properties := schema["properties"].(map[string]any)
+	title, ok := properties["title"].(map[string]any)
+	if !ok || title["type"] != "string" || title["title"] != nil {
+		t.Fatalf("title property was lost or not normalized: %#v", properties)
+	}
+	value, err := binding.Call(context.Background(), json.RawMessage(`{"title":"Kept"}`))
+	if err != nil || value != "Kept" {
+		t.Fatalf("title invocation = %#v, %v", value, err)
+	}
+}
+
 func containsString(items []any, want string) bool {
 	for _, item := range items {
 		if item == want {

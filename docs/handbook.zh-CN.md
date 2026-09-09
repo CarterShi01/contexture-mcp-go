@@ -171,6 +171,8 @@ bool，而原始 Go `Tool` literal 在编译前采用 Go 的 zero value（`false
 没有 Binding 的 Tool 只可存在于 disclosure-only Index；`Tool.Binding` 以及 runtime compilation 会将试图执行它的
 行为分类为 `ErrInvalidDeclaration`。Binding schema 是 defensive copy，因此 caller mutation 不会改变之后的
 `Schema` 结果或已编译 Tool card。
+自动生成的 JSON Schema `title` keyword 会作为非 contract label 移除，但名为 `title` 的真实 property
+会同时保留在 disclosure 与 validated decoding 中。
 
 ### Imperative registration
 
