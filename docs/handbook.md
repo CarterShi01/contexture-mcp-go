@@ -377,6 +377,17 @@ of Python's `telemetry.report` for a Host boundary that owns an additional
 observation; it has the same exporter-error and panic isolation. Framework
 navigation and invocation do not need callers to invoke it manually.
 
+### Public package mapping
+
+The root `contexture` package is the native authoring facade: `Contexture`,
+`Channels`, `Principal`, `Prompt`, `Resource`, `Role`, `Skill`, `Tool`, typed
+errors/sentinels, version facts, and request accessors. The `server` package is
+the Host facade: `RuntimeApplication`, `ApplicationServer`, `ContextureOptions`,
+auth and selectors, telemetry assembly, launch configuration, logging, and
+compile/build helpers. Go naming and `context.Context` parameters replace Python
+spelling without removing any promised concept; the external module consumer
+compiles both facades directly.
+
 ## 3. Choose the right node
 
 | Use | When it belongs there |

@@ -293,6 +293,14 @@ handle 被误判为 lifecycle。普通 dependency 应通过 `NewControllerManage
 Tool，且不会调用它的方法。既有 Application 与 Index snapshot 会保留创建时捕获的 handle；rebind
 只影响未来 snapshot。
 
+### Public package 映射
+
+根 `contexture` package 是原生 authoring facade：`Contexture`、`Channels`、`Principal`、`Prompt`、
+`Resource`、`Role`、`Skill`、`Tool`、typed error/sentinel、version facts 与 request accessor。
+`server` package 是 Host facade：`RuntimeApplication`、`ApplicationServer`、`ContextureOptions`、auth 与
+selector、telemetry assembly、launch config、logging 以及 compile/build helper。Go 命名与
+`context.Context` 参数替代 Python 拼写，但不删除任何承诺概念；外部 module consumer 会直接编译两个 facade。
+
 ## 3. 选择正确的节点
 
 | 使用 | 适用情形 |

@@ -37,6 +37,7 @@ import (
 )
 
 var _ = contexture.NewPrincipal
+var _ = contexture.CurrentPrincipal
 var _ = contexture.NewToolWithSchema[struct{}, bool]
 var _ = contexture.Contexture
 var _ = contexture.DeclareApplication
@@ -95,6 +96,15 @@ var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: cont
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
 var _ = server.NewMCPServer
+var _ = server.CompileApplication
+var _ = server.BuildServer
+var _ = server.ConfigureLogging
+var _ = server.CLICommands
+var _ = server.CodexConfig
+var _ = server.CursorConfig
+var _ server.TokenVerifier
+var _ server.RootSelector
+var _ server.RootCeiling
 var _ = server.NewContextureOptions
 var _ = (*server.ApplicationServer).BuildForSurfaces
 var _ = (*server.ApplicationServer).StartWithAuthAndSurfaceSelector
