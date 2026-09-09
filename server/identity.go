@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
@@ -52,12 +53,58 @@ func (value Auth) Middleware() (func(http.Handler) http.Handler, error) {
 		if principal == nil {
 			return nil, auth.ErrInvalidToken
 		}
+		principal = roundTripPrincipal(principal)
 		exp, ok := expiration(principal.Claims()["exp"])
 		if !ok {
 			return nil, auth.ErrInvalidToken
 		}
 		return &auth.TokenInfo{UserID: principal.Subject(), Scopes: principal.Scopes(), Expiration: time.Unix(int64(exp), 0), Extra: map[string]any{"contexture.principal": principal}}, nil
-	}, &auth.RequireBearerTokenOptions{Scopes: append([]string(nil), value.RequiredScopes...), ResourceMetadataURL: value.Resource + "/.well-known/oauth-protected-resource"}), nil
+	}, &auth.RequireBearerTokenOptions{Scopes: append([]string(nil), value.RequiredScopes...), ResourceMetadataURL: value.ResourceMetadataURL()}), nil
+}
+
+// ResourceMetadataURL returns the path-aware RFC 9728 well-known URL.
+func (value Auth) ResourceMetadataURL() string {
+	resource, _ := url.Parse(value.Resource)
+	path := strings.TrimSuffix(resource.Path, "/")
+	return resource.Scheme + "://" + resource.Host + "/.well-known/oauth-protected-resource" + path
+}
+
+// ResourceMetadataPath returns the request path for the RFC 9728 document.
+func (value Auth) ResourceMetadataPath() string {
+	resource, _ := url.Parse(value.Resource)
+	return "/.well-known/oauth-protected-resource" + strings.TrimSuffix(resource.Path, "/")
+}
+
+// MetadataHandler publishes this resource's RFC 9728 discovery document.
+func (value Auth) MetadataHandler() http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodGet {
+			writer.Header().Set("Allow", http.MethodGet)
+			http.Error(writer, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"resource":              value.Resource,
+			"authorization_servers": []string{value.Issuer},
+			"scopes_supported":      append([]string(nil), value.RequiredScopes...),
+		})
+	})
+}
+
+func roundTripPrincipal(principal *contexture.Principal) *contexture.Principal {
+	claims := principal.Claims()
+	issuer := principal.Issuer()
+	if value, exists := claims["iss"]; exists {
+		if value == nil {
+			issuer = ""
+		} else {
+			issuer = fmt.Sprint(value)
+		}
+	} else if issuer != "" {
+		claims["iss"] = issuer
+	}
+	return contexture.NewPrincipal(contexture.PrincipalOptions{Subject: principal.Subject(), ClientID: principal.ClientID(), Issuer: issuer, Scopes: principal.Scopes(), Claims: claims})
 }
 
 // expiration accepts the ordinary Go representations of a JWT NumericDate.

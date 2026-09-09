@@ -199,6 +199,17 @@ func (server *ApplicationServer) ServeListenerWithAuthAndSurfaceSelector(ctx con
 		}
 		protected = middleware(protected)
 	}
+	if identity != nil {
+		metadata := identity.MetadataHandler()
+		mcpHandler := protected
+		protected = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.URL.Path == identity.ResourceMetadataPath() {
+				metadata.ServeHTTP(writer, request)
+				return
+			}
+			mcpHandler.ServeHTTP(writer, request)
+		})
+	}
 	httpServer := &http.Server{Handler: protected}
 	go func() {
 		<-ctx.Done()

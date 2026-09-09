@@ -116,6 +116,12 @@ primitive package。
 defensive copy。普通 Go diagnostic formatting（`%v`、`%+v` 与 `%#v`）只包含 subject、client ID、issuer
 和排序后的 scope；claim 会被刻意脱敏，因为其中可能有 decoded token 或其他 sensitive value。
 
+HTTP `Auth` 只定义 business-owned `TokenVerifier`；Contexture 不提供 verifier，也不签发 token。返回 nil
+表示 invalid credentials，verifier error 则保持 server failure。verifier 必须按 `Resource` 校验 audience；
+`RequiredScopes` 只控制 server 入口，不是 capability authorization。Contexture 会在
+`/.well-known/oauth-protected-resource/<resource-path>` 发布 path-aware RFC 9728 metadata，其中声明
+authorization-server `Issuer` 与受保护的 `Resource`。
+
 `Prompt.ModelOpen` 使用一个对 Go zero value 安全的 policy，而不是会意外保留全部 Prompt target 的
 boolean。默认值 `contexture.ModelMayOpen` 同时允许 model navigation 与具名 person Prompt。设置
 `ModelOpen: contexture.ModelReservedForPerson` 后，target card 仍会在其 parent 中可见，但只拒绝 model

@@ -133,6 +133,14 @@ formatting (`%v`, `%+v`, and `%#v`) includes only subject, client ID, issuer,
 and sorted scopes; claims are deliberately redacted because they may contain a
 decoded token or other sensitive values.
 
+HTTP `Auth` defines only a business-owned `TokenVerifier`; Contexture never
+ships a verifier or issues tokens. Returning nil means invalid credentials,
+while a verifier error remains a server failure. The verifier must validate
+audience against `Resource`; `RequiredScopes` controls only the server entrance,
+not per-capability authorization. Contexture publishes path-aware RFC 9728
+metadata at `/.well-known/oauth-protected-resource/<resource-path>`, naming the
+configured authorization-server `Issuer` and protected `Resource`.
+
 `Prompt.ModelOpen` uses a native zero-safe policy rather than a boolean whose
 zero value would accidentally reserve every Prompt target. Its default,
 `contexture.ModelMayOpen`, permits both model navigation and the named person
