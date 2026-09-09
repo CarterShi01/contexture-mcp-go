@@ -330,6 +330,9 @@ selection 会过滤被排除的 target，而不会泄漏它们。disclosure-only
 `input_schema` 和 `read_only`，因为它没有 executable binding。应从 `list` 或已披露的卡片取得 canonical ref，
 而不是凭记忆拼接。
 
+scaffold 暴露一个名为 `project` 的稳定 template；`AvailableTemplates` 返回该 inventory，
+`NewProjectFromTemplate` 会拒绝未知名称并列出可用选择。生成的 project 不包含未解析 template variable。
+
 ## 4. 启动 Host 前先在本地工作
 
 | 问题 | 命令 |

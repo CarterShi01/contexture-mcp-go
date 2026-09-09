@@ -425,6 +425,11 @@ disclosure-only Index emits structural Tool cards only: it omits both
 canonical ref from `list` or a disclosed card rather than constructing it from
 memory.
 
+The scaffold exposes one stable template named `project`; `AvailableTemplates`
+returns that inventory, and `NewProjectFromTemplate` rejects an unknown name
+while listing the available choice. Generated projects contain no unresolved
+template variables.
+
 ## 4. Work locally before starting a Host
 
 | Question | Command |

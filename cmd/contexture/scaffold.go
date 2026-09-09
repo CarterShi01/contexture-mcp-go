@@ -25,6 +25,9 @@ type Names struct {
 
 var nonAlphaNumeric = regexp.MustCompile(`[^a-z0-9]+`)
 
+// AvailableTemplates returns the stable scaffold inventory.
+func AvailableTemplates() []string { return []string{"project"} }
+
 // DeriveNames turns a display name into native filesystem and Contexture names.
 func DeriveNames(raw string) (Names, error) {
 	slug := strings.Trim(nonAlphaNumeric.ReplaceAllString(strings.ToLower(strings.TrimSpace(raw)), "-"), "-")
@@ -49,6 +52,14 @@ func ProjectTemplate(names Names) map[string]string {
 
 // NewProject writes one starter directory and refuses to overwrite an existing one.
 func NewProject(rawName, destination string) (string, error) {
+	return NewProjectFromTemplate(rawName, destination, "project")
+}
+
+// NewProjectFromTemplate writes one named starter template.
+func NewProjectFromTemplate(rawName, destination, template string) (string, error) {
+	if template != "project" {
+		return "", &UsageError{Message: fmt.Sprintf("Unknown template %q. Available: %s.", template, strings.Join(AvailableTemplates(), ", "))}
+	}
 	names, err := DeriveNames(rawName)
 	if err != nil {
 		return "", err

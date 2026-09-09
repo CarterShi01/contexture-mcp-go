@@ -45,6 +45,15 @@ func TestDeriveNames(t *testing.T) {
 	}
 }
 
+func TestScaffoldTemplateInventoryAndUnknownTemplate(t *testing.T) {
+	if got := AvailableTemplates(); len(got) != 1 || got[0] != "project" {
+		t.Fatalf("AvailableTemplates = %#v", got)
+	}
+	if _, err := NewProjectFromTemplate("Example", t.TempDir(), "missing"); err == nil || !strings.Contains(err.Error(), "Available: project") {
+		t.Fatalf("unknown template error = %v", err)
+	}
+}
+
 func TestNewProjectWritesStarterAndRefusesOverwrite(t *testing.T) {
 	root, err := NewProject("My Context", t.TempDir())
 	if err != nil {
