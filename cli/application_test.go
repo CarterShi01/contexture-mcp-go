@@ -3,14 +3,23 @@ package cli_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	contexture "github.com/CarterShi01/contexture-mcp-go"
 	"github.com/CarterShi01/contexture-mcp-go/cli"
 	"github.com/CarterShi01/contexture-mcp-go/demo"
 )
+
+func TestUsageErrorIsAContextureError(t *testing.T) {
+	err := &cli.UsageError{Message: "bad usage"}
+	if !errors.Is(err, contexture.ErrContexture) {
+		t.Fatalf("UsageError is not classifiable: %v", err)
+	}
+}
 
 func runDemo(t *testing.T, arguments ...string) (int, string, string) {
 	t.Helper()

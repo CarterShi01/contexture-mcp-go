@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/CarterShi01/contexture-mcp-go/cli"
 )
 
-// UsageError is a command-line request error with exit status 2.
-type UsageError struct{ Message string }
-
-func (err *UsageError) Error() string { return err.Message }
+// UsageError is retained as the command-package compatibility alias.
+type UsageError = cli.UsageError
 
 // Names are all stable project identifiers derived from one new-project argument.
 type Names struct {

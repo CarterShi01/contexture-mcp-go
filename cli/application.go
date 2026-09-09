@@ -17,6 +17,12 @@ import (
 	"github.com/CarterShi01/contexture-mcp-go/server/instructions"
 )
 
+// UsageError is an invalid command request with process status two.
+type UsageError struct{ Message string }
+
+func (err *UsageError) Error() string { return err.Message }
+func (err *UsageError) Unwrap() error { return contexture.ErrContexture }
+
 // RunApplication runs project-owned commands over one statically declared Go application.
 func RunApplication(ctx context.Context, application *contexture.Application, arguments []string, stdout, stderr io.Writer) int {
 	if application == nil {

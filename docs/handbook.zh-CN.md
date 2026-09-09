@@ -332,6 +332,8 @@ selection 会过滤被排除的 target，而不会泄漏它们。disclosure-only
 
 scaffold 暴露一个名为 `project` 的稳定 template；`AvailableTemplates` 返回该 inventory，
 `NewProjectFromTemplate` 会拒绝未知名称并列出可用选择。生成的 project 不包含未解析 template variable。
+programmatic application runner 从 `cli` package 导入 `RunApplication` 和可分类的 `UsageError`。command package
+负责 process argument adaptation；usage failure 写入 stderr 并返回 status 2。
 
 ## 4. 启动 Host 前先在本地工作
 

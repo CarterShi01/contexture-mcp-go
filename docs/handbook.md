@@ -429,6 +429,9 @@ The scaffold exposes one stable template named `project`; `AvailableTemplates`
 returns that inventory, and `NewProjectFromTemplate` rejects an unknown name
 while listing the available choice. Generated projects contain no unresolved
 template variables.
+Programmatic application runners import `RunApplication` and the classifiable
+`UsageError` from the `cli` package. The command package owns process argument
+adaptation; usage failures write stderr and return status two.
 
 ## 4. Work locally before starting a Host
 
