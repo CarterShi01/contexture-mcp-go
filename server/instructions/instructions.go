@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
+	"github.com/CarterShi01/contexture-mcp-go/server/messages"
 )
 
 const (
@@ -18,17 +19,6 @@ const (
 	// SelfContainedPrefix is the initial portion Codex reads while deciding.
 	SelfContainedPrefix = 512
 )
-
-const preamble = `Everything this server offers is behind contexture_open. Start from the list
-below: open the role that fits the task to see its skills, tools and
-sub-roles, then open the skill you chose for its procedure. Each call
-reveals one level; keep opening down the branch that fits.
-Run a tool with contexture_invoke_read_only or contexture_invoke, whichever its
-card says, passing the ref and arguments from that card.
-Collect evidence before stating a cause; never assert system state you have
-not read.`
-
-const refRule = "Every card carries a `ref`. Pass it back to contexture_open to open that node; never assemble a ref yourself."
 
 // Neutral returns bootstrap text for a request-selected server without a roster.
 func Neutral() string {
@@ -87,7 +77,7 @@ func Build(disclosure *contexture.Disclosure, requested contexture.RootSelection
 }
 
 func assemble(roster []string) string {
-	return strings.Join(append([]string{preamble, "", "Capabilities:"}, append(roster, "", refRule)...), "\n")
+	return strings.Join(append([]string{messages.Preamble, "", "Capabilities:"}, append(roster, "", messages.RefRule)...), "\n")
 }
 
 func siblingGroups(disclosure *contexture.Disclosure, selection contexture.RootSelection) [][]contexture.Node {

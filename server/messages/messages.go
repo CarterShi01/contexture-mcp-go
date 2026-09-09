@@ -18,6 +18,18 @@ const (
 	// CompletionLimit is the maximum number of values in one completion response.
 	CompletionLimit = 100
 
+	// Preamble teaches the fixed gateway before the capability roster.
+	Preamble = `Everything this server offers is behind contexture_open. Start from the list
+below: open the role that fits the task to see its skills, tools and
+sub-roles, then open the skill you chose for its procedure. Each call
+reveals one level; keep opening down the branch that fits.
+Run a tool with contexture_invoke_read_only or contexture_invoke, whichever its
+card says, passing the ref and arguments from that card.
+Collect evidence before stating a cause; never assert system state you have
+not read.`
+	// RefRule requires consumers to reuse canonical refs from cards.
+	RefRule = "Every card carries a `ref`. Pass it back to contexture_open to open that node; never assemble a ref yourself."
+
 	// GotoDescription is the human-facing description of the universal goto command.
 	GotoDescription = "Open any capability this server holds, by reference. The reference completes as you type, so the whole tree can be browsed here without asking the agent to go and look."
 	// GotoArgumentDescription describes the reference accepted by goto.

@@ -33,6 +33,7 @@ import (
     contexture "github.com/CarterShi01/contexture-mcp-go"
     "github.com/CarterShi01/contexture-mcp-go/inspection"
     "github.com/CarterShi01/contexture-mcp-go/server"
+    "github.com/CarterShi01/contexture-mcp-go/server/messages"
     "github.com/CarterShi01/contexture-mcp-go/web"
 )
 
@@ -96,6 +97,9 @@ var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: cont
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
 var _ = server.NewMCPServer
+var _ = messages.Signpost
+var _ = messages.TruncatedCompletion
+var _ = messages.CommandDescription
 var _ = server.CompileApplication
 var _ = server.CompileDisclosureApplication
 var _ = server.BuildServer
@@ -119,6 +123,7 @@ var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
 
 func main() {
+    if !strings.Contains(messages.Preamble, "contexture_open") || !strings.Contains(messages.RefRule, "never assemble") || messages.TruncatedCompletion(100, 103) != "... 3 more match; keep typing to narrow." { panic("public message contract is incomplete") }
     if contexture.PackageName != "contexture" || contexture.Version != "0.12.0rc1" || contexture.ReferenceSeparator != "/" {
         panic("public Contexture vocabulary has an unexpected spelling")
     }
