@@ -238,7 +238,10 @@ func matchingRefs(refs []string, value string, limit int) ([]string, int) {
 	})
 	total := len(scored)
 	if limit < 0 {
-		limit = 0
+		limit = len(scored) + limit
+		if limit < 0 {
+			limit = 0
+		}
 	}
 	if len(scored) > limit {
 		scored = scored[:limit]

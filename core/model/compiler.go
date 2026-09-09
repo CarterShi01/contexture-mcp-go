@@ -358,7 +358,7 @@ func (index *Index) RefOf(node Node) (string, error) {
 func (index *Index) ParentOf(node Node) (*Role, error) {
 	internal, ok := index.internalNode(node)
 	if !ok {
-		return nil, errors.New("node is not registered in this Index")
+		return nil, nil
 	}
 	parent := index.parent[internal]
 	if parent == nil {
@@ -389,6 +389,9 @@ func (index *Index) UsesOf(ref string) ([]string, error) {
 func (index *Index) ChildrenOf(node Node) ([]Node, error) {
 	internal, ok := index.internalNode(node)
 	if !ok {
+		if _, role := node.(*Role); !role {
+			return []Node{}, nil
+		}
 		return nil, errors.New("node is not registered in this Index")
 	}
 	children := make([]Node, 0)
@@ -465,9 +468,8 @@ func (index *Index) RolesByLevel() []NodeRef {
 	return result
 }
 
-// MatchingRefs ranks all addressable refs against interactive input. A negative
-// limit deliberately returns no matches (rather than Python slice semantics)
-// so a Host cannot accidentally expand a bounded completion response.
+// MatchingRefs ranks all addressable refs against interactive input. Negative
+// limits retain Python slice semantics by omitting results from the end.
 func (index *Index) MatchingRefs(value string, limit int) ([]string, int) {
 	if index == nil {
 		return nil, 0

@@ -210,8 +210,8 @@ bound Index；disclosure-only Index 会返回带 `ErrInvalidDeclaration` 类型�
 data，schema 也是防御性 copy。
 
 `MatchingRefs` 依次按完整 prefix、最后 segment prefix、任一 segment prefix 和 substring 匹配，再按
-rank、Unicode rune length 与 lexical order 排序；返回的 total 是截断前数量。Go 有意将负 limit 视为零结果（而非
-Python 的 negative slice 语义），避免受限 completion response 被意外扩大。`Signpost` 只暴露 ancestor
+rank、Unicode rune length 与 lexical order 排序；返回的 total 是截断前数量。limit 保留 Python slicing
+语义，因此负值会从末尾省略相应数量的结果（`-1` 返回除最后一项外的全部匹配）。`Signpost` 只暴露 ancestor
 ref 与 sub-role count；`Crossings` 列出跨越 root 的声明 `Uses` edge。二者都是结构性 Index facts，均不
 披露 node member card。`Find` 与 `Signpost` 会在成功 lookup 前把重复、开头或结尾的 `/` separator 归一化为
 同一 canonical address。

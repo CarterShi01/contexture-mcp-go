@@ -112,8 +112,18 @@ func TestIndexQueryFacadeBindingMatchingSignpostAndCrossings(t *testing.T) {
 	if matches, total := index.MatchingRefs("ins", 1); total != 1 || !reflect.DeepEqual(matches, []string{"alpha/inspect"}) {
 		t.Fatalf("matches = %#v, %d", matches, total)
 	}
-	if matches, total := index.MatchingRefs("", -1); total != index.Count() || len(matches) != 0 {
+	if matches, total := index.MatchingRefs("", -1); total != index.Count() || !reflect.DeepEqual(matches, []string{"beta", "alpha", "beta/read", "alpha/child", "alpha/write", "alpha/inspect", "alpha/diagnose"}) {
 		t.Fatalf("negative limit = %#v, %d", matches, total)
+	}
+	foreignTool, err := contexture.NewTool("foreign", "Foreign.", true, func(context.Context, struct{}) (string, error) { return "ok", nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parent, err := index.ParentOf(foreignTool); err != nil || parent != nil {
+		t.Fatalf("foreign parent = %#v, %v", parent, err)
+	}
+	if children, err := index.ChildrenOf(foreignTool); err != nil || len(children) != 0 {
+		t.Fatalf("foreign leaf children = %#v, %v", children, err)
 	}
 	if levels, err := index.Signpost("alpha/child/grand"); err != nil || !reflect.DeepEqual(levels, []contexture.SignpostLevel{{Ref: "alpha", SubRoleCount: 1}, {Ref: "alpha/child", SubRoleCount: 1}}) {
 		t.Fatalf("signpost = %#v, %v", levels, err)
