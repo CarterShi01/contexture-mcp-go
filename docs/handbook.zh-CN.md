@@ -349,6 +349,9 @@ Prompts 与 Resources，取代 Python dynamic project target 与 legacy config k
 
 `check` 会编译但不会打开 application Channels。`call` 使用和 serving 相同的、已经校验的
 Tool Binding。默认只允许 read-only Tool；writing Tool 必须显式传入 `--allow-write`。
+`call` 只接受 `--input JSON` 或 `--input-file FILE` 之一。`inspect` 支持 `--read`、
+`--no-discover` 与 `--roster-budget BYTES`；`serve` 会在编译 application 前校验完整 transport policy。
+HTTP startup 提示写入 stderr，使 stdout 保持 script-safe。
 
 ## 5. 检查 Agent 可见 context
 

@@ -31,6 +31,9 @@ func RunApplication(ctx context.Context, application *contexture.Application, ar
 	if len(arguments) == 0 {
 		return fail(stderr, 2, "expected check, list, inspect, call, or serve.")
 	}
+	if err := validateCommandShape(arguments); err != nil {
+		return fail(stderr, 2, err.Error())
+	}
 	compiled, err := server.CompileApplication(application)
 	if err != nil {
 		return fail(stderr, 1, err.Error())
@@ -84,6 +87,28 @@ func RunApplication(ctx context.Context, application *contexture.Application, ar
 	default:
 		return fail(stderr, 2, "expected check, list, inspect, call, or serve.")
 	}
+}
+
+func validateCommandShape(arguments []string) error {
+	switch arguments[0] {
+	case "check", "list":
+		if len(arguments) != 1 {
+			return fmt.Errorf("use %s with no project target; this executable already owns one application", arguments[0])
+		}
+	case "inspect":
+		// Detailed validation is owned by runInspect after compilation.
+	case "call":
+		if len(arguments) < 2 || strings.HasPrefix(arguments[1], "-") {
+			return fmt.Errorf("call needs a Tool ref")
+		}
+	case "serve":
+		if _, err := parseServeOptions(arguments[1:]); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("expected check, list, inspect, call, or serve")
+	}
+	return nil
 }
 
 func runInspect(ctx context.Context, application *server.RuntimeApplication, arguments []string, stdout, stderr io.Writer) int {
@@ -226,7 +251,7 @@ func runServe(ctx context.Context, application *contexture.Application, argument
 		return fail(stderr, 1, err.Error())
 	}
 	if options.Transport == server.StreamableHTTPTransport {
-		_, _ = fmt.Fprintln(stdout, "Serving "+application.Name()+" at "+options.URL())
+		_, _ = fmt.Fprintln(stderr, "Serving "+application.Name()+" at "+options.URL())
 	}
 	if err := assembly.Start(ctx, options); err != nil {
 		return fail(stderr, 1, err.Error())

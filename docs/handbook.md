@@ -450,6 +450,10 @@ project targets and legacy configuration keys.
 `check` compiles without opening application Channels. `call` uses the same
 validated Tool Binding as serving. It permits read-only Tools by default; a
 writing Tool requires the explicit `--allow-write` decision.
+`call` accepts exactly one of `--input JSON` or `--input-file FILE`. `inspect`
+supports `--read`, `--no-discover`, and `--roster-budget BYTES`; `serve`
+validates its complete transport policy before compiling the application.
+Human-facing HTTP startup notices use stderr so stdout stays script-safe.
 
 ## 5. Inspect agent-visible context
 

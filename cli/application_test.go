@@ -21,6 +21,28 @@ func TestUsageErrorIsAContextureError(t *testing.T) {
 	}
 }
 
+func TestUsageShapePrecedesApplicationCompilation(t *testing.T) {
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	status := cli.RunApplication(context.Background(), &contexture.Application{}, []string{"call"}, stdout, stderr)
+	if status != 2 || !strings.Contains(stderr.String(), "call needs a Tool ref") {
+		t.Fatalf("usage precedence = %d, %q", status, stderr.String())
+	}
+}
+
+func TestHTTPServingNoticeUsesStderr(t *testing.T) {
+	application, err := demo.Application()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	status := cli.RunApplication(ctx, application, []string{"serve", "--transport", "streamable-http", "--port", "0"}, stdout, stderr)
+	if status != 0 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "Serving contexture-demo") {
+		t.Fatalf("HTTP notice = %d, stdout=%q stderr=%q", status, stdout.String(), stderr.String())
+	}
+}
+
 func runDemo(t *testing.T, arguments ...string) (int, string, string) {
 	t.Helper()
 	application, err := demo.Application()
