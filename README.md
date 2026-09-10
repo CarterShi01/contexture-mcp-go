@@ -11,7 +11,7 @@ Implementations:
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **Status: all applicable 0.15 source and behavioral-test rows are verified;
+> **Status: all applicable 0.16 source and behavioral-test rows are verified;
 > release remains guarded.** This repository ships native project commands,
 > inspection, generated applications, real MCP transports, authenticated
 > request-local path selection, REST, and the maintained demo. Remaining parity
@@ -32,26 +32,37 @@ split by responsibility under `core/model/`:
 - `Tool` is an executable capability with one typed Binding.
 - `Node` is the sealed interface implemented by their pointer types.
 
-### Optional Publication
+### Optional process members
 
-Set `Role.Publication` to a lazy factory returning `*contexture.Publication`
-when finishing that Role requires separately disclosed procedure and equipment:
+Set `Role.PreProcess` and/or `Role.PostProcess` to lazy factories returning the
+matching strong types when preparation or finishing needs separately disclosed
+procedure and equipment:
 
 ```go
-Publication: func() contexture.Node {
-	return &contexture.Publication{
+PreProcess: func() *contexture.PreProcess {
+	return &contexture.PreProcess{
+		Name: "prepare", Description: "Prepare the workspace.",
+		Instructions: "Validate inputs, then return to the owner's work.",
+	}
+},
+PostProcess: func() *contexture.PostProcess {
+	return &contexture.PostProcess{
 		Name: "publish", Description: "Preserve the result.",
 		Instructions: "Review evidence, obtain approval, then save the result.",
 	}
 },
 ```
 
-A Publication remains kind `role` on the wire and can hold ordinary Roles,
-Skills, Tools, and an explicitly nested Publication. It is finishing equipment,
-not an alternative child branch or automatic callback. Opening the owner adds
-its card and the framework closing contract; opening the Publication only
-discloses procedure. Only explicit Tool invocation has effects, and blocked,
-failed, or approval-pending publication must be reported honestly.
+Both remain kind `role` on the wire and can hold ordinary Roles, Skills, Tools,
+and explicitly nested process members. They are process equipment, not child
+branches or automatic callbacks. ACTIVE instructions place the fixed
+PreProcess contract before unchanged business text and PostProcess after it;
+opening either member only discloses procedure. Only explicit Tool invocation
+has effects. `Publication` and `Role.Publication` were removed without aliases;
+applications must migrate to `PostProcess` and `Role.PostProcess`.
+
+`BindingInstruction(source, body, action)` marks an application-owned hard rule;
+the source must name application authority and cannot impersonate Contexture.
 
 `NewTool` and `NewToolWithSchema` are backed by `core/model/binding.go`. The
 root facade intentionally exposes declarations only; MCP and web adapters are
@@ -140,7 +151,7 @@ Business Tools remain behind Contexture's five fixed gateway Tools:
 `contexture_invoke_read_only`, and `contexture_invoke`. `contexture_inspect`
 atomically compares 1–32 unique refs through pure routing cards for each target,
 its direct members, and declared uses. It activates nothing, invokes nothing,
-and discloses no instructions, execution facets, or Publication contract. The root
+and discloses no instructions, execution facets, or framework process contract. The root
 package is SDK-neutral; `server` owns the official MCP Go SDK and `web` owns
 explicit `net/http` REST adapters. Request-local facts use `context.Context`, and
 application dependencies use `Channels` with reverse-order cleanup.

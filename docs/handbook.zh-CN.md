@@ -102,8 +102,8 @@ Go 不模拟 Python exception inheritance，而是通过 `errors.Is` 提供同�
 
 `contexture.PackageName` 是 framework metadata（`"contexture"`），绝不是 application 的 MCP identity：
 Host 仍发布所声明的 application name。`contexture.ReferenceSeparator` 是 reference segment 之间规范的
-`"/"`。四个面向 model 的固定名称是有类型的 `GatewayName` value：`DiscoverGatewayName`、
-`OpenGatewayName`、`InvokeReadOnlyGatewayName` 与 `InvokeGatewayName`。它们由 model 与 MCP primitive
+`"/"`。五个面向 model 的固定名称是有类型的 `GatewayName` value：`DiscoverGatewayName`、
+`InspectGatewayName`、`OpenGatewayName`、`InvokeReadOnlyGatewayName` 与 `InvokeGatewayName`。它们由 model 与 MCP primitive
 layer 共用同一个 foundation vocabulary。JSON-ready card 和 schema 使用 Go 原生的 `map[string]any`/`[]any`；
 Contexture 有意不为 Python 中仅用于 static typing 的 recursive JSON type 或未使用的 `RequestId` annotation
 暴露一个没有约束力的 `any` alias。
@@ -140,6 +140,29 @@ Gateway caller 仍会收到原有的、带 agent 下一步操作说明的 `Refus
 
 该 facade 有意不导入 MCP SDK、`server` 或 `web`。只有在 declaration 准备好被编译到某个 Host
 surface 时，才导入 `server` 或 `web`。
+
+### 可选过程成员（0.16）
+
+`PreProcess` 与 `PostProcess` 是两个不同的 Go 强类型，但在线上仍是普通 Role。`Role` 可通过
+对应的惰性 `PreProcess` / `PostProcess` 槽各指定一个。槽的函数签名会在编译期拒绝普通 Role
+和相反的过程类型；过程节点也不能作为 application root。
+
+`Members` 和 Index walk 严格按 pre-process、children、post-process、Skills、Tools 排序；
+`Branches` 与 bootstrap Role roster 仍只包含 children。唯一性、循环、canonical ref、完整子树
+selection、Channels、Binding、manager snapshot、Prompt audience 与 disclosure-only 规则完整适用于
+每棵过程子树。
+
+ACTIVE owner disclosure 在不改变业务 instructions 的前后分别组合固定的 PreProcess 与 PostProcess
+框架合约。`pre_process` / `post_process` 是 view 实际给出的 ref 字符串，且相应普通 Role card 必须
+已经可见；任一 card 不可用时，整个 open 会被拒绝，不产生悬空 ref。ROUTE 和 INSPECT 均不披露
+designation 或 contract。打开过程 Role 没有副作用，只有显式 Tool 调用才执行工作。
+
+这是框架级 `Publication` 和 `Role.Publication` 的破坏性替换，两者都没有兼容 alias。业务类仍可
+保留 `TaskPublication` 等名称，但必须以 `PostProcess` 为基类，并放入 `Role.PostProcess` 槽。
+
+公开的 `BindingInstruction(source, body, action)` 只用于无法在 Tool 中强制执行的应用侧硬规则。
+它保留 body，把非空 action 单独放到 `>>> REQUIRED:` 行，并拒绝空 source 或以 `contexture`
+开头的 source。框架 instruction composer 保持私有，防止应用文字冒充框架权威。
 
 ### Typed Tool binding 与 explicit schema
 

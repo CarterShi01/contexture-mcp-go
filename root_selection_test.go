@@ -237,7 +237,7 @@ func TestSelectedGraphProjectsEveryGraphOperationWithoutCrossRootLeakage(t *test
 		t.Fatalf("RefOf = %q, %v", ref, err)
 	}
 	parent, err := graph.ParentOf(child)
-	if err != nil || parent == nil || parent.Name != "alpha" {
+	if err != nil || parent == nil || parent.NodeName() != "alpha" {
 		t.Fatalf("ParentOf = %#v, %v", parent, err)
 	}
 	root, _ := graph.Find("alpha")

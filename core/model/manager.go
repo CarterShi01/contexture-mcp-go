@@ -117,9 +117,6 @@ func (manager *ControllerManager) register(factory Factory, expected Kind) (Node
 	if err != nil {
 		return nil, err
 	}
-	if _, publication := declaration.(*Publication); publication {
-		return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Publication is finishing equipment and cannot be registered as an application root"))
-	}
 	if expected != "" && declaration.nodeKind() != expected {
 		return nil, fmt.Errorf("%w: Register%s received a %s, not a %s", ErrInvalidDeclaration, kindTitle(expected), declaration.nodeKind(), expected)
 	}
@@ -192,11 +189,15 @@ func captureRegisteredNode(node Node, path string, seen map[Node]string, active 
 	defer delete(active, node)
 	switch typed := node.(type) {
 	case *Role:
+		preProcess, err := captureRegisteredPreProcess(typed.PreProcess, path, seen, active, addresses)
+		if err != nil {
+			return nil, err
+		}
 		children, err := captureGroup(typed.Children, RoleKind, path, seen, active, addresses)
 		if err != nil {
 			return nil, err
 		}
-		publication, err := captureRegisteredPublication(typed.Publication, path, seen, active, addresses)
+		postProcess, err := captureRegisteredPostProcess(typed.PostProcess, path, seen, active, addresses)
 		if err != nil {
 			return nil, err
 		}
@@ -208,26 +209,21 @@ func captureRegisteredNode(node Node, path string, seen map[Node]string, active 
 		if err != nil {
 			return nil, err
 		}
-		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), Children: frozenFactories(children), Publication: frozenFactory(publication), Skills: frozenFactories(skills), Tools: frozenFactories(tools)}, nil
-	case *Publication:
+		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), PreProcess: frozenPreProcess(preProcess), Children: frozenFactories(children), PostProcess: frozenPostProcess(postProcess), Skills: frozenFactories(skills), Tools: frozenFactories(tools)}, nil
+	case *PreProcess:
 		role := (*Role)(typed)
-		children, err := captureGroup(role.Children, RoleKind, path, seen, active, addresses)
+		captured, err := captureRegisteredRole(role, path, seen, active, addresses)
 		if err != nil {
 			return nil, err
 		}
-		publication, err := captureRegisteredPublication(role.Publication, path, seen, active, addresses)
+		return (*PreProcess)(captured), nil
+	case *PostProcess:
+		role := (*Role)(typed)
+		captured, err := captureRegisteredRole(role, path, seen, active, addresses)
 		if err != nil {
 			return nil, err
 		}
-		skills, err := captureGroup(role.Skills, SkillKind, path, seen, active, addresses)
-		if err != nil {
-			return nil, err
-		}
-		tools, err := captureGroup(role.Tools, ToolKind, path, seen, active, addresses)
-		if err != nil {
-			return nil, err
-		}
-		return &Publication{Name: role.Name, Description: role.Description, Instructions: role.Instructions, Uses: append([]string(nil), role.Uses...), Children: frozenFactories(children), Publication: frozenFactory(publication), Skills: frozenFactories(skills), Tools: frozenFactories(tools)}, nil
+		return (*PostProcess)(captured), nil
 	case *Skill:
 		return &Skill{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...)}, nil
 	case *Tool:
@@ -237,25 +233,63 @@ func captureRegisteredNode(node Node, path string, seen map[Node]string, active 
 	}
 }
 
-func captureRegisteredPublication(factory Factory, parent string, seen map[Node]string, active map[Node]bool, addresses map[string]Node) (Node, error) {
-	if factory == nil {
-		return nil, nil
-	}
-	publication, err := registrationNode(factory)
+func captureRegisteredRole(role *Role, path string, seen map[Node]string, active map[Node]bool, addresses map[string]Node) (*Role, error) {
+	preProcess, err := captureRegisteredPreProcess(role.PreProcess, path, seen, active, addresses)
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := publication.(*Publication); !ok {
-		return nil, errors.Join(ErrInvalidDeclaration, errors.New("Role Publication factory must return a constructed *Publication"))
+	children, err := captureGroup(role.Children, RoleKind, path, seen, active, addresses)
+	if err != nil {
+		return nil, err
 	}
-	return captureRegisteredNode(publication, parent+foundation.ReferenceSeparator+publication.nodeName(), seen, active, addresses)
+	postProcess, err := captureRegisteredPostProcess(role.PostProcess, path, seen, active, addresses)
+	if err != nil {
+		return nil, err
+	}
+	skills, err := captureGroup(role.Skills, SkillKind, path, seen, active, addresses)
+	if err != nil {
+		return nil, err
+	}
+	tools, err := captureGroup(role.Tools, ToolKind, path, seen, active, addresses)
+	if err != nil {
+		return nil, err
+	}
+	return &Role{Name: role.Name, Description: role.Description, Instructions: role.Instructions, Uses: append([]string(nil), role.Uses...), PreProcess: frozenPreProcess(preProcess), Children: frozenFactories(children), PostProcess: frozenPostProcess(postProcess), Skills: frozenFactories(skills), Tools: frozenFactories(tools)}, nil
 }
 
-func frozenFactory(node Node) Factory {
+func captureRegisteredPreProcess(factory func() *PreProcess, parent string, seen map[Node]string, active map[Node]bool, addresses map[string]Node) (Node, error) {
+	if factory == nil {
+		return nil, nil
+	}
+	process := factory()
+	if process == nil {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("Role PreProcess factory returned nil"))
+	}
+	return captureRegisteredNode(process, parent+foundation.ReferenceSeparator+process.nodeName(), seen, active, addresses)
+}
+
+func captureRegisteredPostProcess(factory func() *PostProcess, parent string, seen map[Node]string, active map[Node]bool, addresses map[string]Node) (Node, error) {
+	if factory == nil {
+		return nil, nil
+	}
+	process := factory()
+	if process == nil {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("Role PostProcess factory returned nil"))
+	}
+	return captureRegisteredNode(process, parent+foundation.ReferenceSeparator+process.nodeName(), seen, active, addresses)
+}
+
+func frozenPreProcess(node Node) func() *PreProcess {
 	if node == nil {
 		return nil
 	}
-	return func() Node { return node }
+	return func() *PreProcess { return node.(*PreProcess) }
+}
+func frozenPostProcess(node Node) func() *PostProcess {
+	if node == nil {
+		return nil
+	}
+	return func() *PostProcess { return node.(*PostProcess) }
 }
 
 func captureGroup(factories []Factory, expected Kind, parent string, seen map[Node]string, active map[Node]bool, addresses map[string]Node) ([]Node, error) {
@@ -418,9 +452,11 @@ func (manager *ControllerManager) Compile(name string) (*Index, error) {
 func snapshotNode(node Node) Node {
 	switch typed := node.(type) {
 	case *Role:
-		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), Children: snapshotFactories(typed.Children), Publication: snapshotFactory(typed.Publication), Skills: snapshotFactories(typed.Skills), Tools: snapshotFactories(typed.Tools)}
-	case *Publication:
-		return &Publication{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), Children: snapshotFactories(typed.Children), Publication: snapshotFactory(typed.Publication), Skills: snapshotFactories(typed.Skills), Tools: snapshotFactories(typed.Tools)}
+		return snapshotRole(typed)
+	case *PreProcess:
+		return (*PreProcess)(snapshotRole((*Role)(typed)))
+	case *PostProcess:
+		return (*PostProcess)(snapshotRole((*Role)(typed)))
 	case *Skill:
 		return &Skill{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...)}
 	case *Tool:
@@ -430,12 +466,23 @@ func snapshotNode(node Node) Node {
 	}
 }
 
-func snapshotFactory(factory Factory) Factory {
+func snapshotRole(role *Role) *Role {
+	return &Role{Name: role.Name, Description: role.Description, Instructions: role.Instructions, Uses: append([]string(nil), role.Uses...), PreProcess: snapshotPreProcess(role.PreProcess), Children: snapshotFactories(role.Children), PostProcess: snapshotPostProcess(role.PostProcess), Skills: snapshotFactories(role.Skills), Tools: snapshotFactories(role.Tools)}
+}
+
+func snapshotPreProcess(factory func() *PreProcess) func() *PreProcess {
 	if factory == nil {
 		return nil
 	}
 	node := factory()
-	return func() Node { return snapshotNode(node) }
+	return func() *PreProcess { return snapshotNode(node).(*PreProcess) }
+}
+func snapshotPostProcess(factory func() *PostProcess) func() *PostProcess {
+	if factory == nil {
+		return nil
+	}
+	node := factory()
+	return func() *PostProcess { return snapshotNode(node).(*PostProcess) }
 }
 
 func snapshotFactories(factories []Factory) []Factory {

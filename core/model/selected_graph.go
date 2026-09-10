@@ -130,7 +130,7 @@ func (graph *SelectedGraph) RefOf(node Node) (string, error) {
 }
 
 // ParentOf resolves a selected node's containment parent.
-func (graph *SelectedGraph) ParentOf(node Node) (*Role, error) {
+func (graph *SelectedGraph) ParentOf(node Node) (Node, error) {
 	ref, err := graph.RefOf(node)
 	if err != nil {
 		return nil, err

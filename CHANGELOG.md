@@ -5,10 +5,22 @@ Versioning once public releases begin.
 
 ## Unreleased
 
+- Align with Contexture 0.16 symmetric optional Role process members:
+  `PreProcess` / `PreProcess` and `PostProcess` / `PostProcess` are distinct
+  strong Go types and slots with ordinary containment, selection, Channels,
+  Tool Binding, manager snapshots, and disclosure-only behavior.
+- Replace the framework-level `Publication` type and `Role.Publication` field
+  without an alias. This is a breaking pre-1.0 change; application subclass
+  names may still use publication as business vocabulary.
+- Compose exact fixed framework instruction blocks before and after unchanged
+  business instructions, using the actual disclosed refs and refusing owners
+  atomically when either process card is unavailable.
+- Add public `BindingInstruction` for application-owned hard rules while
+  keeping the framework composer private.
 - Align with Contexture 0.15 non-activating `INSPECT` and the fifth fixed
   `contexture_inspect` gateway over atomic batches of 1–32 unique trimmed refs.
 - Return only pure routing cards for inspected nodes, direct members, and
-  declared uses; omit instructions, execution facets, Publication contracts,
+  declared uses; omit instructions, execution facets, framework process contracts,
   recursive expansion, and invocation results while invoking nothing.
 - Record inspection telemetry separately from Role/Skill activation and expose
   discover/inspect/open on disclosure-only MCP applications.

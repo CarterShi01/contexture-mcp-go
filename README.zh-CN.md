@@ -11,7 +11,7 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [跨语言规范](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **当前状态：所有适用的 0.15 源码与行为测试条目均已验证，但发布仍受保护。** 本仓库已具备
+> **当前状态：所有适用的 0.16 源码与行为测试条目均已验证，但发布仍受保护。** 本仓库已具备
 > 原生项目命令、inspection、可生成的应用、真实 MCP transport、经过认证的请求级 path
 > selection、REST 与维护中的 demo。剩余 parity 工作是文档、发布资产审查以及干净检出环境的
 > 发布审计；这些门禁通过前不要创建首个 module tag。
@@ -29,14 +29,18 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 - `Tool`：拥有一份强类型 Binding 的可执行能力；
 - `Node`：只能由上述指针类型实现的封闭接口。
 
-### 可选 Publication
+### 可选过程成员
 
-当 Role 的收尾工作需要单独披露的流程和设备时，把 `Role.Publication` 设为返回
-`*contexture.Publication` 的惰性 factory。Publication 在线上仍是 kind `role`，可包含
-普通 Role、Skill、Tool 以及显式嵌套的 Publication。它是收尾设备，不是可替代的 child
-branch，也不是自动 callback。打开 owner 会加入其卡片和框架收尾合约；打开 Publication
-本身只披露流程。只有显式 Tool 调用才会产生副作用；blocked、failed 或等待 approval 的
-状态必须如实报告。
+当准备或收尾需要单独披露的流程和设备时，把 `Role.PreProcess` 和/或
+`Role.PostProcess` 设为返回对应强类型的惰性 factory。两者在线上仍是 kind `role`，可包含
+普通 Role、Skill、Tool 以及显式嵌套的过程成员；它们是过程设备，不是可替代的 child
+branch，也不是自动 callback。ACTIVE 会在不修改业务 instructions 的前后分别组合固定的
+PreProcess/PostProcess 合约；打开过程成员本身只披露流程。只有显式 Tool 调用才会产生副作用。
+框架级 `Publication` 与 `Role.Publication` 已无别名地移除，应用必须迁移到
+`PostProcess` 与 `Role.PostProcess`。
+
+公开的 `BindingInstruction(source, body, action)` 可标记应用自己的硬规则；source 必须说明
+应用侧权威，并且不能冒充 Contexture 框架。
 
 `NewTool` 和 `NewToolWithSchema` 由 `core/model/binding.go` 支持。根 facade
 只暴露声明；MCP 与 web 适配器需要显式单独导入。
@@ -123,7 +127,7 @@ func main() {
 `contexture_inspect`、`contexture_open`、`contexture_invoke_read_only` 与
 `contexture_invoke`。`contexture_inspect` 原子比较 1–32 个唯一 ref，只返回目标、
 直接成员和声明 uses 的纯路由卡；它不激活、不调用，也不披露 instructions、执行 facet
-或 Publication 合约。根包不依赖 SDK；
+或框架过程合约。根包不依赖 SDK；
 `server` 包拥有官方 MCP Go SDK，`web` 包拥有显式 `net/http` REST 适配器。请求级事实通过
 `context.Context` 传递，应用依赖通过 `Channels` 管理并按逆序清理。
 

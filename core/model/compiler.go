@@ -95,31 +95,37 @@ type compiler struct {
 }
 
 func (state *compiler) build(factory Factory, parent *Role, path []string) (Node, error) {
-	return state.buildExpected(factory, parent, path, false)
+	return state.buildExpected(factory, parent, path, "")
 }
 
-func (state *compiler) buildExpected(factory Factory, parent *Role, path []string, publication bool) (Node, error) {
+func (state *compiler) buildExpected(factory Factory, parent *Role, path []string, process string) (Node, error) {
 	if factory == nil {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("node factory must not be nil"))
 	}
-	key := reflect.ValueOf(factory).Pointer()
-	if state.active[key] {
-		return nil, ErrContainmentCycle
+	// PreProcess and PostProcess are adapted to Factory below. Those adapter
+	// closures share one code pointer even when they close over unrelated role
+	// slots, so function-code identity cannot represent their declaration
+	// identity or containment. Concrete node identity is still checked by seen.
+	if process == "" {
+		key := reflect.ValueOf(factory).Pointer()
+		if state.active[key] {
+			return nil, ErrContainmentCycle
+		}
+		state.active[key] = true
+		defer delete(state.active, key)
 	}
-	state.active[key] = true
-	defer delete(state.active, key)
 	declaration := factory()
 	if declaration == nil || (reflect.ValueOf(declaration).Kind() == reflect.Ptr && reflect.ValueOf(declaration).IsNil()) {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("node factory returned nil"))
 	}
-	if !publication && parent == nil {
-		if _, isPublication := declaration.(*Publication); isPublication {
-			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Publication is finishing equipment and cannot be an application root"))
+	if process == "pre_process" {
+		if _, ok := declaration.(*PreProcess); !ok {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("Role PreProcess factory must return a constructed *PreProcess"))
 		}
 	}
-	if publication {
-		if _, ok := declaration.(*Publication); !ok {
-			return nil, errors.Join(ErrInvalidDeclaration, errors.New("Role Publication factory must return a constructed *Publication"))
+	if process == "post_process" {
+		if _, ok := declaration.(*PostProcess); !ok {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("Role PostProcess factory must return a constructed *PostProcess"))
 		}
 	}
 	if state.seen[declaration] {
@@ -146,17 +152,31 @@ func (state *compiler) buildExpected(factory Factory, parent *Role, path []strin
 	state.index.byKind[node.nodeKind()] = append(state.index.byKind[node.nodeKind()], node)
 	role, isRole := node.(*Role)
 	if !isRole {
-		return node, nil
+		switch typed := node.(type) {
+		case *PreProcess:
+			role = (*Role)(typed)
+		case *PostProcess:
+			role = (*Role)(typed)
+		default:
+			return node, nil
+		}
+	}
+	if role.PreProcess != nil {
+		prepared, err := state.buildExpected(func() Node { return role.PreProcess() }, role, strings.Split(ref, foundation.ReferenceSeparator), "pre_process")
+		if err != nil {
+			return nil, err
+		}
+		role.preProcess = internalRole(prepared)
 	}
 	if err := state.buildBranches(role.Children, role, ref); err != nil {
 		return nil, err
 	}
-	if role.Publication != nil {
-		published, err := state.buildExpected(role.Publication, role, strings.Split(ref, foundation.ReferenceSeparator), true)
+	if role.PostProcess != nil {
+		finished, err := state.buildExpected(func() Node { return role.PostProcess() }, role, strings.Split(ref, foundation.ReferenceSeparator), "post_process")
 		if err != nil {
 			return nil, err
 		}
-		role.publication = published.(*Role)
+		role.postProcess = internalRole(finished)
 	}
 	if err := state.buildGroup(role.Skills, role, ref, SkillKind); err != nil {
 		return nil, err
@@ -165,6 +185,19 @@ func (state *compiler) buildExpected(factory Factory, parent *Role, path []strin
 		return nil, err
 	}
 	return node, nil
+}
+
+func internalRole(node Node) *Role {
+	switch typed := node.(type) {
+	case *Role:
+		return typed
+	case *PreProcess:
+		return (*Role)(typed)
+	case *PostProcess:
+		return (*Role)(typed)
+	default:
+		return nil
+	}
 }
 
 func (state *compiler) buildBranches(factories []Factory, parent *Role, ref string) error {
@@ -206,9 +239,13 @@ func validateNode(node Node) error {
 		if strings.TrimSpace(role.Instructions) == "" {
 			return errors.Join(ErrInvalidDeclaration, errors.New("role instructions must not be empty"))
 		}
-	case *Publication:
+	case *PreProcess:
 		if strings.TrimSpace(role.Instructions) == "" {
-			return errors.Join(ErrInvalidDeclaration, errors.New("Publication instructions must not be empty"))
+			return errors.Join(ErrInvalidDeclaration, errors.New("PreProcess instructions must not be empty"))
+		}
+	case *PostProcess:
+		if strings.TrimSpace(role.Instructions) == "" {
+			return errors.Join(ErrInvalidDeclaration, errors.New("PostProcess instructions must not be empty"))
 		}
 	}
 	if skill, ok := node.(*Skill); ok && strings.TrimSpace(skill.Instructions) == "" {
@@ -397,8 +434,9 @@ func (index *Index) RefOf(node Node) (string, error) {
 	return ref, nil
 }
 
-// ParentOf returns the containment owner of a node.
-func (index *Index) ParentOf(node Node) (*Role, error) {
+// ParentOf returns the containment owner of a node while preserving a strong
+// PreProcess or PostProcess identity when process equipment owns the node.
+func (index *Index) ParentOf(node Node) (Node, error) {
 	internal, ok := index.internalNode(node)
 	if !ok {
 		return nil, nil
@@ -408,7 +446,7 @@ func (index *Index) ParentOf(node Node) (*Role, error) {
 		return nil, nil
 	}
 	ref := index.refByNode[parent]
-	return cloneNode(parent, index, ref).(*Role), nil
+	return cloneNode(parent, index, ref), nil
 }
 
 // DependentsOf returns uses sources in declaration order.
@@ -432,15 +470,17 @@ func (index *Index) UsesOf(ref string) ([]string, error) {
 func (index *Index) ChildrenOf(node Node) ([]Node, error) {
 	internal, ok := index.internalNode(node)
 	if !ok {
-		if _, role := node.(*Role); !role {
+		if _, role := roleNode(node); !role {
 			return []Node{}, nil
 		}
 		return nil, errors.New("node is not registered in this Index")
 	}
 	children := make([]Node, 0)
+	internalRef := index.refByNode[internal]
 	for _, ref := range index.order {
 		candidate := index.byRef[ref]
-		if index.parent[candidate] == internal {
+		parent := index.parent[candidate]
+		if parent != nil && parent.ref == internalRef {
 			children = append(children, cloneNode(candidate, index, ref))
 		}
 	}
@@ -585,14 +625,11 @@ func (index *Index) internalNode(node Node) (Node, bool) {
 func cloneNode(node Node, owner *Index, ref string) Node {
 	switch typed := node.(type) {
 	case *Role:
-		clone := &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Children: append([]Factory(nil), typed.Children...), Publication: typed.Publication, Skills: append([]Factory(nil), typed.Skills...), Tools: append([]Factory(nil), typed.Tools...), Uses: append([]string(nil), typed.Uses...), owner: owner, ref: ref}
-		if typed.publication != nil && owner != nil {
-			publicationRef := owner.refByNode[typed.publication]
-			clone.publication = cloneNode(typed.publication, owner, publicationRef).(*Role)
-		}
-		return clone
-	case *Publication:
-		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Children: append([]Factory(nil), typed.Children...), Publication: typed.Publication, Skills: append([]Factory(nil), typed.Skills...), Tools: append([]Factory(nil), typed.Tools...), Uses: append([]string(nil), typed.Uses...), owner: owner, ref: ref}
+		return cloneRole(typed, owner, ref)
+	case *PreProcess:
+		return (*PreProcess)(cloneRole((*Role)(typed), owner, ref))
+	case *PostProcess:
+		return (*PostProcess)(cloneRole((*Role)(typed), owner, ref))
 	case *Skill:
 		return &Skill{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), owner: owner, ref: ref}
 	case *Tool:
@@ -602,6 +639,23 @@ func cloneNode(node Node, owner *Index, ref string) Node {
 	}
 }
 
+func cloneRole(typed *Role, owner *Index, ref string) *Role {
+	clone := &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, PreProcess: typed.PreProcess, Children: append([]Factory(nil), typed.Children...), PostProcess: typed.PostProcess, Skills: append([]Factory(nil), typed.Skills...), Tools: append([]Factory(nil), typed.Tools...), Uses: append([]string(nil), typed.Uses...), owner: owner, ref: ref}
+	if typed.preProcess != nil && owner != nil {
+		processRef := typed.preProcess.ref
+		process := cloneNode(owner.byRef[processRef], owner, processRef).(*PreProcess)
+		clone.preProcess = (*Role)(process)
+		clone.PreProcess = func() *PreProcess { return process }
+	}
+	if typed.postProcess != nil && owner != nil {
+		processRef := typed.postProcess.ref
+		process := cloneNode(owner.byRef[processRef], owner, processRef).(*PostProcess)
+		clone.postProcess = (*Role)(process)
+		clone.PostProcess = func() *PostProcess { return process }
+	}
+	return clone
+}
+
 func nodeLocation(node Node) (*Index, string) {
 	switch typed := node.(type) {
 	case *Role:
@@ -609,7 +663,12 @@ func nodeLocation(node Node) (*Index, string) {
 			return nil, ""
 		}
 		return typed.owner, typed.ref
-	case *Publication:
+	case *PreProcess:
+		if typed == nil {
+			return nil, ""
+		}
+		return typed.owner, typed.ref
+	case *PostProcess:
 		if typed == nil {
 			return nil, ""
 		}

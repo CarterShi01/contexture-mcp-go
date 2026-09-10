@@ -43,10 +43,10 @@ func TestApplicationIsLazyAndRunsTheReferenceDiagnosis(t *testing.T) {
 
 func TestPublicDemoToolsPreserveReferenceEvidenceAndFailures(t *testing.T) {
 	for name, factory := range map[string]contexture.Factory{
-		"get_pod_status":      demo.GetPodStatus,
-		"get_pod_logs":        demo.GetPodLogs,
-		"get_pod_events":      demo.GetPodEvents,
-		"get_rollout_status":  demo.GetRolloutStatus,
+		"get_pod_status":       demo.GetPodStatus,
+		"get_pod_logs":         demo.GetPodLogs,
+		"get_pod_events":       demo.GetPodEvents,
+		"get_rollout_status":   demo.GetRolloutStatus,
 		"roll_back_deployment": demo.RollBackDeployment,
 	} {
 		node := factory()

@@ -19,7 +19,8 @@ type (
 	CompiledContext        = model.CompiledContext
 	View                   = model.View
 	Role                   = model.Role
-	Publication            = model.Publication
+	PreProcess             = model.PreProcess
+	PostProcess            = model.PostProcess
 	Skill                  = model.Skill
 	Tool                   = model.Tool
 	Application            = model.Application
@@ -276,6 +277,12 @@ func NewMemoryTelemetry() *MemoryTelemetry {
 // Runtime and Disclosure report their own framework observations automatically.
 func ReportTelemetry(telemetry Telemetry, ref string, failed bool) {
 	model.ReportTelemetry(telemetry, ref, failed)
+}
+
+// BindingInstruction marks one application-owned instruction block as a hard
+// rule. Action may be empty when the contract has no sequenced step.
+func BindingInstruction(source, body, action string) (string, error) {
+	return model.BindingInstruction(source, body, action)
 }
 
 // NewPrincipal snapshots Host-supplied identity facts for one request.

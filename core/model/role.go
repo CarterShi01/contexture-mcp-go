@@ -10,14 +10,16 @@ type Role struct {
 	Name         string
 	Description  string
 	Instructions string
+	PreProcess   func() *PreProcess
 	Children     []Factory
-	Publication  Factory
+	PostProcess  func() *PostProcess
 	Skills       []Factory
 	Tools        []Factory
 	Uses         []string
 	owner        *Index
 	ref          string
-	publication  *Role
+	preProcess   *Role
+	postProcess  *Role
 }
 
 func (*Role) nodeKind() Kind               { return RoleKind }
@@ -46,8 +48,8 @@ func (node *Role) Branches() ([]*Role, error) {
 	return branches, nil
 }
 
-// Members returns every direct member of this compiled Role in declaration
-// group order: child Roles, optional Publication, Skills, then Tools. A raw declaration deliberately
+// Members returns every direct member of this compiled Role in work order:
+// optional PreProcess, child Roles, optional PostProcess, Skills, then Tools. A raw declaration deliberately
 // has no members query because its fields contain lazy factories; use a
 // compiled Index (or Index.ChildrenOf) instead of evaluating factories during
 // declaration inspection.
@@ -58,29 +60,43 @@ func (node *Role) Members() ([]Node, error) {
 	return node.owner.ChildrenOf(node)
 }
 
-// Publication is a Role specialized as optional finishing procedure and
-// equipment. It remains kind "role" on the wire and is never an automatic
-// callback. Assign a factory returning *Publication to Role.Publication.
-type Publication Role
+// PreProcess is a Role specialized in preparing what its owner's work depends
+// on. It is an ordinary role on the wire and never an automatic callback.
+type PreProcess Role
 
-func (*Publication) nodeKind() Kind               { return RoleKind }
-func (node *Publication) nodeName() string        { return node.Name }
-func (node *Publication) nodeDescription() string { return node.Description }
-func (node *Publication) nodeUses() []string      { return append([]string(nil), node.Uses...) }
-func (node *Publication) Kind() Kind              { return node.nodeKind() }
-func (node *Publication) NodeName() string        { return node.nodeName() }
-func (node *Publication) NodeDescription() string { return node.nodeDescription() }
-func (node *Publication) NodeUses() []string      { return node.nodeUses() }
-func (node *Publication) Ref() (string, error)    { return nodeRef(node) }
+// PostProcess is a Role specialized in the procedure required to finish its
+// owner's work. It is an ordinary role on the wire and never an automatic callback.
+type PostProcess Role
 
-// Branches returns only alternative child Roles, excluding finishing equipment.
-func (node *Publication) Branches() ([]*Role, error) { return (*Role)(node).Branches() }
+func (*PreProcess) nodeKind() Kind                  { return RoleKind }
+func (node *PreProcess) nodeName() string           { return node.Name }
+func (node *PreProcess) nodeDescription() string    { return node.Description }
+func (node *PreProcess) nodeUses() []string         { return append([]string(nil), node.Uses...) }
+func (node *PreProcess) Kind() Kind                 { return node.nodeKind() }
+func (node *PreProcess) NodeName() string           { return node.nodeName() }
+func (node *PreProcess) NodeDescription() string    { return node.nodeDescription() }
+func (node *PreProcess) NodeUses() []string         { return node.nodeUses() }
+func (node *PreProcess) Ref() (string, error)       { return nodeRef(node) }
+func (node *PreProcess) Branches() ([]*Role, error) { return (*Role)(node).Branches() }
+func (node *PreProcess) Members() ([]Node, error)   { return (*Role)(node).Members() }
+func (node *PreProcess) Member(name string) (Node, error) {
+	return (*Role)(node).Member(name)
+}
 
-// Members returns every direct member in child, Publication, Skill, Tool order.
-func (node *Publication) Members() ([]Node, error) { return (*Role)(node).Members() }
-
-// Member resolves one direct member by its cross-kind-unique name.
-func (node *Publication) Member(name string) (Node, error) { return (*Role)(node).Member(name) }
+func (*PostProcess) nodeKind() Kind                  { return RoleKind }
+func (node *PostProcess) nodeName() string           { return node.Name }
+func (node *PostProcess) nodeDescription() string    { return node.Description }
+func (node *PostProcess) nodeUses() []string         { return append([]string(nil), node.Uses...) }
+func (node *PostProcess) Kind() Kind                 { return node.nodeKind() }
+func (node *PostProcess) NodeName() string           { return node.nodeName() }
+func (node *PostProcess) NodeDescription() string    { return node.nodeDescription() }
+func (node *PostProcess) NodeUses() []string         { return node.nodeUses() }
+func (node *PostProcess) Ref() (string, error)       { return nodeRef(node) }
+func (node *PostProcess) Branches() ([]*Role, error) { return (*Role)(node).Branches() }
+func (node *PostProcess) Members() ([]Node, error)   { return (*Role)(node).Members() }
+func (node *PostProcess) Member(name string) (Node, error) {
+	return (*Role)(node).Member(name)
+}
 
 // Member resolves one direct member by name across Role, Skill, and Tool
 // groups. A member name is unique within a compiled Role because it is the

@@ -21,6 +21,8 @@ func TestPublicAuthoringConceptsResolveThroughRootPackage(t *testing.T) {
 	var _ contexture.Prompt
 	var _ contexture.Resource
 	var _ contexture.Role
+	var _ contexture.PreProcess
+	var _ contexture.PostProcess
 	var _ contexture.Skill
 	var _ contexture.Tool
 	var _ contexture.Principal
@@ -40,6 +42,7 @@ func TestPublicAuthoringConceptsResolveThroughRootPackage(t *testing.T) {
 		"CurrentTelemetry":     contexture.CurrentTelemetry,
 		"NewControllerManager": contexture.NewControllerManager,
 		"NewMemoryTelemetry":   contexture.NewMemoryTelemetry,
+		"BindingInstruction":   contexture.BindingInstruction,
 		"AllRoots":             contexture.AllRoots,
 		"AllSurfaces":          contexture.AllSurfaces,
 		"Version":              contexture.Version,

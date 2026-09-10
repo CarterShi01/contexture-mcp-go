@@ -211,7 +211,9 @@ func EveryRef(disclosure *contexture.Disclosure) []string {
 			continue
 		}
 		if node.Kind() == contexture.RoleKind {
-			queue = append(queue, node.(*contexture.Role))
+			if role := asRole(node); role != nil {
+				queue = append(queue, role)
+			}
 		} else {
 			result = append(result, ref)
 		}
@@ -228,13 +230,28 @@ func EveryRef(disclosure *contexture.Disclosure) []string {
 				continue
 			}
 			if child.Kind() == contexture.RoleKind {
-				queue = append(queue, child.(*contexture.Role))
+				if role := asRole(child); role != nil {
+					queue = append(queue, role)
+				}
 			} else {
 				result = append(result, childRef)
 			}
 		}
 	}
 	return result
+}
+
+func asRole(node contexture.Node) *contexture.Role {
+	switch typed := node.(type) {
+	case *contexture.Role:
+		return typed
+	case *contexture.PreProcess:
+		return (*contexture.Role)(typed)
+	case *contexture.PostProcess:
+		return (*contexture.Role)(typed)
+	default:
+		return nil
+	}
 }
 
 // Replay produces connect, optional discovery, opens, and optional content reads.

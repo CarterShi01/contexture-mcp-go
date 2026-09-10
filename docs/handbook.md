@@ -167,6 +167,53 @@ The facade intentionally does not import the MCP SDK, `server`, or `web`.
 Import `server` or `web` only when the declaration is ready to be compiled for
 one of those Host surfaces.
 
+### Optional process members (0.16)
+
+`PreProcess` and `PostProcess` are distinct strong Go types that remain ordinary
+Roles on the wire. A `Role` may designate one through each matching lazy slot:
+
+```go
+PreProcess: func() *contexture.PreProcess {
+	return &contexture.PreProcess{
+		Name: "prepare", Description: "Prepare inputs.",
+		Instructions: "Check the workspace, then return to owner work.",
+	}
+},
+PostProcess: func() *contexture.PostProcess {
+	return &contexture.PostProcess{
+		Name: "preserve", Description: "Preserve results.",
+		Instructions: "Validate evidence and save the actual result.",
+	}
+},
+```
+
+The slot signatures reject ordinary Roles and the opposite process kind at
+compile time. Process nodes cannot be application roots. `Members` and Index
+walks use pre-process, children, post-process, Skills, Tools order; `Branches`
+and the bootstrap Role roster still include children only. The same uniqueness,
+cycle, canonical ref, complete-subtree selection, Channels, Binding, manager
+snapshot, Prompt ownership, and disclosure-only rules apply throughout each
+process subtree.
+
+ACTIVE owner disclosure places the fixed PreProcess contract before unchanged
+business instructions and PostProcess after them. `pre_process` and
+`post_process` are strings equal to the actual refs supplied by the view, and
+the corresponding ordinary Role cards must already be available. If either card
+is unavailable, the whole open is rejected without exposing a dangling ref.
+ROUTE and INSPECT contain neither designations nor contracts. Opening a process
+Role performs no work; only explicit Tool invocation has effects.
+
+This is a breaking replacement for framework-level `Publication` and
+`Role.Publication`; neither remains as an alias. Business classes may retain
+names such as `TaskPublication`, but must use `PostProcess` as their base and
+`Role.PostProcess` as their slot.
+
+Use `BindingInstruction(source, body, action)` only for an application-owned
+hard rule that cannot be enforced in a Tool. It preserves the supplied body,
+puts a non-empty action on a `>>> REQUIRED:` line, and rejects empty sources or
+sources beginning with `contexture`. The framework instruction composer is
+private so application text cannot claim framework authority.
+
 ### Typed Tool bindings and explicit schemas
 
 `NewTool` derives a schema from a tagged input struct. `NewToolWithSchema` is

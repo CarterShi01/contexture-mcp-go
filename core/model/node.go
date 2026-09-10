@@ -94,7 +94,7 @@ func BranchesOf(node Node) ([]Node, error) {
 
 // MembersOf returns a compiled node's direct containment members. Only a Role
 // has members; Skill and Tool deliberately return an empty result. Role member
-// order is child Roles, Skills, then Tools, matching declaration grouping.
+// order is PreProcess, child Roles, PostProcess, Skills, then Tools.
 func MembersOf(node Node) ([]Node, error) {
 	if nilNode(node) {
 		return nil, uncompiledNodeError()
@@ -104,7 +104,7 @@ func MembersOf(node Node) ([]Node, error) {
 		return []Node{}, nil
 	}
 	if role.owner == nil || role.ref == "" {
-		if len(role.Children) > 0 || role.Publication != nil || len(role.Skills) > 0 || len(role.Tools) > 0 {
+		if role.PreProcess != nil || len(role.Children) > 0 || role.PostProcess != nil || len(role.Skills) > 0 || len(role.Tools) > 0 {
 			return nil, uncompiledNodeError()
 		}
 		return []Node{}, nil
@@ -267,7 +267,9 @@ func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, err
 	switch typed := node.(type) {
 	case *Role:
 		instructions = typed.Instructions
-	case *Publication:
+	case *PreProcess:
+		instructions = typed.Instructions
+	case *PostProcess:
 		instructions = typed.Instructions
 	case *Skill:
 		instructions = typed.Instructions
@@ -291,7 +293,7 @@ func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, err
 		for key, value := range grouped {
 			card[key] = cloneCompiledValue(value)
 		}
-		if err := addPublicationDetails(card, role, view); err != nil {
+		if err := addProcessDetails(card, role, view); err != nil {
 			return nil, err
 		}
 	}
@@ -302,20 +304,42 @@ func roleNode(node Node) (*Role, bool) {
 	switch typed := node.(type) {
 	case *Role:
 		return typed, typed != nil
-	case *Publication:
+	case *PreProcess:
+		return (*Role)(typed), typed != nil
+	case *PostProcess:
 		return (*Role)(typed), typed != nil
 	default:
 		return nil, false
 	}
 }
 
-func addPublicationDetails(card CompiledContext, role *Role, view View) error {
-	if role == nil || role.publication == nil {
+func addProcessDetails(card CompiledContext, role *Role, view View) error {
+	if role == nil {
 		return nil
 	}
-	ref, err := view.RefOf(role.publication)
+	if role.preProcess != nil {
+		ref, err := disclosedProcessRef(card, role.preProcess, "PreProcess", view)
+		if err != nil {
+			return err
+		}
+		card["pre_process"] = ref
+		card["instructions"] = frameworkInstruction("PreProcess", "Opening it only discloses the preparation procedure; it does not execute it. Complete what it requires, then return to this role's own instructions below and carry on with its work. If the preparation is blocked or fails, report that state rather than continuing as though it had succeeded.", fmt.Sprintf("Call %s with ref='%s' before starting this role's work.", OpenGatewayName, ref)) + "\n\n" + card["instructions"].(string)
+	}
+	if role.postProcess != nil {
+		ref, err := disclosedProcessRef(card, role.postProcess, "PostProcess", view)
+		if err != nil {
+			return err
+		}
+		card["post_process"] = ref
+		card["instructions"] = card["instructions"].(string) + "\n\n" + frameworkInstruction("PostProcess", "Opening it only discloses the procedure; it does not execute it or establish success. Use its available capabilities as instructed, respect required approvals, and report the actual outcome. If it is blocked, fails, or awaits approval, report that state rather than claiming success or bypassing approval.", fmt.Sprintf("Call %s with ref='%s' before finishing this role's work.", OpenGatewayName, ref))
+	}
+	return nil
+}
+
+func disclosedProcessRef(card CompiledContext, process *Role, kind string, view View) (string, error) {
+	ref, err := view.RefOf(process)
 	if err != nil {
-		return err
+		return "", err
 	}
 	available := false
 	switch roles := card["roles"].(type) {
@@ -329,11 +353,9 @@ func addPublicationDetails(card CompiledContext, role *Role, view View) error {
 		}
 	}
 	if !available {
-		return errors.Join(ErrInvalidDeclaration, errors.New("the declared Publication is unavailable in this view; open the owning Role through a surface containing its complete publication subtree"))
+		return "", errors.Join(ErrInvalidDeclaration, fmt.Errorf("the declared %s is unavailable in this view; open the owning Role through a surface containing its complete %s subtree", kind, kind))
 	}
-	card["publication"] = ref
-	card["instructions"] = fmt.Sprintf("%s\n\nPublication (framework contract):\nBefore finishing this role's work, call contexture_open with ref=%q and follow that Publication's instructions using the work's results and evidence. Opening it only discloses the procedure; it does not execute it or establish success. Use its available capabilities as instructed, respect required approvals, and report the actual outcome. If publication is blocked, fails, or awaits approval, report that state rather than claiming success or bypassing approval.", role.Instructions, ref)
-	return nil
+	return ref, nil
 }
 
 func addCompiledUses(card CompiledContext, refs []string, view View) (CompiledContext, error) {
@@ -414,7 +436,9 @@ func nilNode(node Node) bool {
 	switch typed := node.(type) {
 	case *Role:
 		return typed == nil
-	case *Publication:
+	case *PreProcess:
+		return typed == nil
+	case *PostProcess:
 		return typed == nil
 	case *Skill:
 		return typed == nil

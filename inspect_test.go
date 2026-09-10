@@ -29,8 +29,8 @@ func inspectApplication(t *testing.T, collector contexture.Telemetry, calls *int
 					Children: []contexture.Factory{func() contexture.Node {
 						return &contexture.Role{Name: "candidate", Description: "Candidate role.", Instructions: "Act as candidate.", Uses: []string{"services/status"}}
 					}},
-					Publication: func() contexture.Node {
-						return &contexture.Publication{Name: "publish", Description: "Preserve results.", Instructions: "Publish evidence."}
+					PostProcess: func() *contexture.PostProcess {
+						return &contexture.PostProcess{Name: "publish", Description: "Preserve results.", Instructions: "Publish evidence."}
 					},
 					Skills: []contexture.Factory{func() contexture.Node {
 						return &contexture.Skill{Name: "diagnose", Description: "Diagnose incidents.", Instructions: "Follow diagnosis."}
@@ -92,7 +92,7 @@ func TestInspectReturnsOnlyDirectPureRoutingCardsWithoutEffects(t *testing.T) {
 	}
 }
 
-func TestInspectRolePreservesDeclarationGroupsAndPublicationIsPlain(t *testing.T) {
+func TestInspectRolePreservesDeclarationGroupsAndPostProcessIsPlain(t *testing.T) {
 	calls := 0
 	index, err := contexture.Compile(inspectApplication(t, nil, &calls))
 	if err != nil {
@@ -108,7 +108,7 @@ func TestInspectRolePreservesDeclarationGroupsAndPublicationIsPlain(t *testing.T
 	members := item["members"].(contexture.CompiledContext)
 	roles := members["roles"].([]contexture.CompiledContext)
 	if got := []any{roles[0]["ref"], roles[1]["ref"]}; !reflect.DeepEqual(got, []any{"team/candidate", "team/publish"}) {
-		t.Fatalf("Role/Publication declaration order = %#v", roles)
+		t.Fatalf("Role/PostProcess declaration order = %#v", roles)
 	}
 	if members["skills"].([]contexture.CompiledContext)[0]["ref"] != "team/diagnose" || len(members["tools"].([]contexture.CompiledContext)) != 0 {
 		t.Fatalf("member groups = %#v", members)

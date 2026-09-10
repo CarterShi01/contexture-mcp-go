@@ -167,7 +167,7 @@ func main() {
     if !strings.Contains(messages.Preamble, "contexture_open") || !strings.Contains(messages.RefRule, "never assemble") || messages.TruncatedCompletion(100, 103) != "... 3 more match; keep typing to narrow." { panic("public message contract is incomplete") }
     if instructions.InstructionsLimit != 2048 || instructions.RosterBudget != 1200 || instructions.SelfContainedPrefix != 512 || !strings.Contains(instructions.Neutral(), "request-specific") { panic("public instruction contract is incomplete") }
     if surface.PublishedName("", "operations/runbook") != "runbook" { panic("public surface facade is incomplete") }
-    if contexture.PackageName != "contexture" || contexture.Version != "0.15.0rc1" || contexture.ReferenceSeparator != "/" {
+    if contexture.PackageName != "contexture" || contexture.Version != "0.16.0rc1" || contexture.ReferenceSeparator != "/" {
         panic("public Contexture vocabulary has an unexpected spelling")
     }
     if contexture.DiscoverGatewayName != "contexture_discover" || contexture.InspectGatewayName != "contexture_inspect" || contexture.OpenGatewayName != "contexture_open" || contexture.InvokeReadOnlyGatewayName != "contexture_invoke_read_only" || contexture.InvokeGatewayName != "contexture_invoke" {
@@ -194,11 +194,12 @@ func main() {
     }
     manager := contexture.NewControllerManager()
     _, _ = manager.RegisterRole(func() *contexture.Role {
-        return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect.", Publication: func() contexture.Node { return &contexture.Publication{Name: "publish", Description: "Preserve.", Instructions: "Save evidence."} }}
+        return &contexture.Role{Name: "operations", Description: "Operate.", Instructions: "Inspect.", PreProcess: func() *contexture.PreProcess { return &contexture.PreProcess{Name: "prepare", Description: "Prepare.", Instructions: "Check inputs."} }, PostProcess: func() *contexture.PostProcess { return &contexture.PostProcess{Name: "publish", Description: "Preserve.", Instructions: "Save evidence."} }}
     })
     application, _ := manager.Application("consumer")
     index, _ := contexture.Compile(application)
-    publicationDisclosure, _ := contexture.NewDisclosure(index, contexture.AllRoots()); publicationOwner, _ := publicationDisclosure.Open("operations", contexture.AllRoots()); if publicationOwner["publication"] != "operations/publish" { panic("public Publication facade is incomplete") }
+    processDisclosure, _ := contexture.NewDisclosure(index, contexture.AllRoots()); processOwner, _ := processDisclosure.Open("operations", contexture.AllRoots()); if processOwner["pre_process"] != "operations/prepare" || processOwner["post_process"] != "operations/publish" { panic("public process facade is incomplete") }
+    marked, markedErr := contexture.BindingInstruction("consumer policy", "Follow the rule.", "Check it."); if markedErr != nil || !strings.Contains(marked, ">>> REQUIRED: Check it.") { panic("public BindingInstruction is incomplete") }
     _, missingErr := index.Find("missing")
     var missing *contexture.NodeNotFoundError
     if !errors.As(missingErr, &missing) || !errors.Is(missingErr, contexture.ErrNodeNotFound) || !errors.Is(missingErr, contexture.ErrContexture) || missing.Within("other") != missing {

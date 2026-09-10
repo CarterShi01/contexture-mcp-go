@@ -1,10 +1,10 @@
 {
   "$schema": "./specification.schema.json",
   "repository": "https://github.com/CarterShi01/contexture-mcp",
-  "revision": "471d0f75c6be0e5cff104f0d0c61f10957da792a",
-  "specificationVersion": "0.15",
+  "revision": "cda2721c7c40128cd0b7eef990e5909edabd3b17",
+  "specificationVersion": "0.16",
   "status": "conformant",
-  "implementedRules": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+  "implementedRules": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
   "rules": {
     "1": { "status": "implemented", "evidence": ["application_test.go"] },
     "2": { "status": "implemented", "evidence": ["compiler_test.go"] },
@@ -22,7 +22,8 @@
     "14": { "status": "implemented", "evidence": ["web/surface_test.go"] },
     "15": { "status": "implemented", "evidence": ["runtime_test.go"] },
     "16": { "status": "implemented", "evidence": ["architecture_test.go"] },
-    "17": { "status": "implemented", "evidence": ["inspect_test.go", "server/gateway_wire_test.go"] }
+    "17": { "status": "implemented", "evidence": ["inspect_test.go", "server/gateway_wire_test.go"] },
+    "18": { "status": "implemented", "evidence": ["process_test.go", "process_integration_test.go", "public_api_test.go", "internal/releasecheck/module_consumer_test.go"] }
   },
   "fixtures": [
     "disclosure-only-application.json",
@@ -43,5 +44,5 @@
     "resources.json",
     "tools.json"
   ],
-  "notes": "All Contexture 0.15 conformance rules, including non-activating batch inspection and optional Role Publications, have focused execution evidence. The module remains unreleased until separately authorized."
+  "notes": "All Contexture 0.16 conformance rules, including non-activating batch inspection and symmetric optional Role process members, have focused Go execution evidence. The module remains unreleased until separately authorized."
 }

@@ -55,7 +55,7 @@ func TestCompileCreatesFreshCanonicalForest(t *testing.T) {
 		t.Fatal(err)
 	}
 	parent, err := first.ParentOf(tool)
-	if err != nil || parent == nil || parent.Name != "operations" {
+	if err != nil || parent == nil || parent.NodeName() != "operations" {
 		t.Fatalf("ParentOf = %#v, %v", parent, err)
 	}
 }

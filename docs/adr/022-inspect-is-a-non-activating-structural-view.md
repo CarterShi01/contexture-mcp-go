@@ -9,9 +9,7 @@
 ## Context
 
 ROUTE supports broad candidate discovery and ACTIVE adopts a node's actionable
-instructions. Planning also needs a middle operation: compare a shortlist's
-immediate structure without mixing several competing procedures or creating a
-Publication finishing obligation for candidates that were only evaluated.
+instructions. Planning also needs a middle operation: compare a shortlist's immediate structure without mixing several competing procedures or creating a process-member obligation for candidates that were only evaluated.
 
 An authored details field is rejected because it would duplicate descriptions
 or instructions and become another source of drift.
@@ -38,10 +36,7 @@ Each item contains only:
 - pure routing cards for declared uses.
 
 A pure routing card is exactly kind, name, description, and canonical ref.
-INSPECT preserves request and declaration order. It never contains instructions,
-Tool schema or read-only classification, Publication designation or framework
-contract, content, invocation result, or recursive expansion. It invokes no
-business Tool.
+INSPECT preserves request and declaration order. It never contains instructions, Tool schema or read-only classification, process-member designation or framework contract, content, invocation result, or recursive expansion. It invokes no business Tool.
 
 Inspection telemetry is separate from ACTIVE Role/Skill use. Collectors may
 implement the inspection extension; exporter error or panic cannot change a
@@ -55,5 +50,4 @@ successful inspection.
   replay command remain unchanged.
 - Breadth uses one bounded batch; depth requires another explicit inspection of
   a returned ref.
-- Uses never widen the selected surface, and Publications appear only as plain
-  Role member cards.
+- Uses never widen the selected surface, and process members appear only as plain Role member cards.

@@ -356,21 +356,15 @@ func (view *Disclosure) active(node Node, selection RootSelection) (map[string]a
 	card := view.card(node, true)
 	switch typed := node.(type) {
 	case *Role:
-		card["instructions"] = typed.Instructions
-		card["roles"] = []map[string]any{}
-		card["skills"] = []map[string]any{}
-		card["tools"] = []map[string]any{}
-		children, _ := view.index.ChildrenOf(node)
-		for _, child := range children {
-			ref, _ := view.index.RefOf(child)
-			if !selection.ContainsRef(ref) {
-				continue
-			}
-			key := string(child.nodeKind()) + "s"
-			card[key] = append(card[key].([]map[string]any), view.card(child, true))
+		if err := view.activeRole(card, typed, node, selection); err != nil {
+			return nil, err
 		}
-		view.addUses(card, typed.Uses, selection)
-		if err := addPublicationDetails(card, typed, view); err != nil {
+	case *PreProcess:
+		if err := view.activeRole(card, (*Role)(typed), node, selection); err != nil {
+			return nil, err
+		}
+	case *PostProcess:
+		if err := view.activeRole(card, (*Role)(typed), node, selection); err != nil {
 			return nil, err
 		}
 	case *Skill:
@@ -380,6 +374,24 @@ func (view *Disclosure) active(node Node, selection RootSelection) (map[string]a
 		view.addUses(card, typed.Uses, selection)
 	}
 	return card, nil
+}
+
+func (view *Disclosure) activeRole(card map[string]any, role *Role, node Node, selection RootSelection) error {
+	card["instructions"] = role.Instructions
+	card["roles"] = []map[string]any{}
+	card["skills"] = []map[string]any{}
+	card["tools"] = []map[string]any{}
+	children, _ := view.index.ChildrenOf(node)
+	for _, child := range children {
+		ref, _ := view.index.RefOf(child)
+		if !selection.ContainsRef(ref) {
+			continue
+		}
+		key := string(child.nodeKind()) + "s"
+		card[key] = append(card[key].([]map[string]any), view.card(child, true))
+	}
+	view.addUses(card, role.Uses, selection)
+	return addProcessDetails(card, role, view)
 }
 
 // addUses projects declared dependency targets in declaration order. A
