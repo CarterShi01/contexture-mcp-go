@@ -114,8 +114,8 @@ the agent-facing next-action sentence.
 `contexture.PackageName` is framework metadata (`"contexture"`), never an
 application's MCP identity: the Host continues to publish the declared
 application name. `contexture.ReferenceSeparator` is the canonical `"/"`
-between reference segments. The four fixed model-facing names are typed
-`GatewayName` values: `DiscoverGatewayName`, `OpenGatewayName`,
+between reference segments. The five fixed model-facing names are typed
+`GatewayName` values: `DiscoverGatewayName`, `InspectGatewayName`, `OpenGatewayName`,
 `InvokeReadOnlyGatewayName`, and `InvokeGatewayName`. They share one
 foundation vocabulary with the model and MCP primitive layer. JSON-ready cards
 and schemas use Go's native `map[string]any`/`[]any`; Contexture intentionally
@@ -558,12 +558,13 @@ gateway instead.
 ## 8. Serve through an MCP Host
 
 The declaration does not change when it is served. The server adapter exposes
-four fixed Contexture gateway Tools; business Tools are progressively disclosed
+five fixed Contexture gateway Tools; business Tools are progressively disclosed
 behind them rather than registered at MCP top level.
 
 `GatewayTools()` exposes that immutable ordered inventory: `contexture_discover`,
-`contexture_open`, `contexture_invoke_read_only`, and `contexture_invoke`.
-`DisclosureGatewayTools()` is the first two for a navigation-only Host, while
+`contexture_inspect`, `contexture_open`, `contexture_invoke_read_only`, and
+`contexture_invoke`. `DisclosureGatewayTools()` is the first three for a
+navigation-only Host, while
 `ExecutionGatewayTools()` is the two invocation doors. They are framework
 controls, never business `Tool` nodes. A gateway lookup or wrong-door mistake
 returns a typed `RefusedError` with an agent-facing next action; its cause still
@@ -576,8 +577,11 @@ command rather than attempting a workaround.
 
 `NewDisclosureAPI(disclosure, reservedRefs...)` exposes the independently
 installable discovery half without a Runtime or transport dependency. Its
-`Discover` and `Open` methods take an explicit `RootSelection`; `Tools()` is
-always the ordered discover/open pair. `Open` returns progressive routing or
+`Discover`, `Inspect`, and `Open` take an explicit `RootSelection`; `Tools()` is
+always the ordered discover/inspect/open triple. `Inspect` first validates the
+entire 1–32 ref batch, then returns only pure routing cards for each target,
+direct members, and declared uses. It does not activate nodes or emit ordinary
+usage telemetry. `Open` returns progressive routing or
 active cards, turns ordinary typed lookup failure into a `RefusedError` with
 its `NodeNotFoundError` cause retained, and leaves
 `RootOutsideSelectionError` unchanged. `OpenForPerson` (and retained

@@ -80,7 +80,7 @@ func TestApplicationServerServesGatewayOverStreamableHTTP(t *testing.T) {
 		cancel()
 		t.Fatal(err)
 	}
-	if len(listed.Tools) != 4 {
+	if len(listed.Tools) != 5 {
 		cancel()
 		t.Fatalf("MCP tools = %#v", listed.Tools)
 	}

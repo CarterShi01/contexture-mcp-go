@@ -59,6 +59,8 @@ type (
 	Telemetry                 = model.Telemetry
 	CallEvent                 = model.CallEvent
 	NodeUsage                 = model.NodeUsage
+	InspectionUsage           = model.InspectionUsage
+	InspectionTelemetry       = model.InspectionTelemetry
 	MemoryTelemetry           = model.MemoryTelemetry
 	Runtime                   = model.Runtime
 	SelectedGraph             = model.SelectedGraph
@@ -76,8 +78,9 @@ const (
 	SkillKind = model.SkillKind
 	ToolKind  = model.ToolKind
 
-	RouteCompileLevel  = model.RouteCompileLevel
-	ActiveCompileLevel = model.ActiveCompileLevel
+	RouteCompileLevel   = model.RouteCompileLevel
+	InspectCompileLevel = model.InspectCompileLevel
+	ActiveCompileLevel  = model.ActiveCompileLevel
 
 	ModelMayOpen           = model.ModelMayOpen
 	ModelReservedForPerson = model.ModelReservedForPerson
@@ -89,6 +92,7 @@ const (
 	WrongKind     = foundation.WrongKind
 
 	DiscoverGatewayName       = model.DiscoverGatewayName
+	InspectGatewayName        = model.InspectGatewayName
 	OpenGatewayName           = model.OpenGatewayName
 	InvokeReadOnlyGatewayName = model.InvokeReadOnlyGatewayName
 	InvokeGatewayName         = model.InvokeGatewayName
@@ -140,9 +144,19 @@ func RouteOf(node Node) (CompiledContext, error) { return model.RouteOf(node) }
 // CardOf renders one openable routing card through its owning View.
 func CardOf(node Node, view View) (CompiledContext, error) { return model.CardOf(node, view) }
 
+// RoutingCardOf renders an openable card with no execution facets.
+func RoutingCardOf(node Node, view View) (CompiledContext, error) {
+	return model.RoutingCardOf(node, view)
+}
+
 // GroupCards renders one closed Role/Skill/Tool sibling shape.
 func GroupCards(nodes []Node, view View) (CompiledContext, error) {
 	return model.GroupCards(nodes, view)
+}
+
+// GroupRoutingCards renders a sibling set using only pure routing cards.
+func GroupRoutingCards(nodes []Node, view View) (CompiledContext, error) {
+	return model.GroupRoutingCards(nodes, view)
 }
 
 // CompileNode renders one Node at route or active disclosure level.
@@ -192,9 +206,10 @@ func NewRuntime(index *Index, selection, ceiling RootSelection, telemetry Teleme
 	return model.NewRuntime(index, selection, ceiling, telemetry)
 }
 
-// NewGateway connects progressive disclosure to an optional Runtime.
-func NewGateway(disclosure *Disclosure, runtime *Runtime) (*Gateway, error) {
-	return model.NewGateway(disclosure, runtime)
+// NewGateway connects progressive disclosure to an optional Runtime. Optional
+// refs reserve person-controlled Prompt targets at the model gateway itself.
+func NewGateway(disclosure *Disclosure, runtime *Runtime, reserved ...string) (*Gateway, error) {
+	return model.NewGateway(disclosure, runtime, reserved...)
 }
 
 // GatewayToolNames returns the fixed names-only gateway inventory.
@@ -209,7 +224,7 @@ func NewExecutionAPI(runtime *Runtime) (*ExecutionAPI, error) {
 // GatewayTools returns the complete fixed system-tool inventory.
 func GatewayTools() []GatewayTool { return model.GatewayTools() }
 
-// DisclosureGatewayTools returns only discover and open.
+// DisclosureGatewayTools returns discover, inspect, and open.
 func DisclosureGatewayTools() []GatewayTool { return model.DisclosureGatewayTools() }
 
 // ExecutionGatewayTools returns only the two fixed invocation doors.

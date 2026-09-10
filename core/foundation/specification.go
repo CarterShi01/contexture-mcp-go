@@ -2,8 +2,8 @@ package foundation
 
 const (
 	// SpecificationVersion is the Contexture contract targeted by this binding.
-	SpecificationVersion = "0.14"
+	SpecificationVersion = "0.15"
 
 	// SpecificationRevision is the immutable upstream revision used by tests.
-	SpecificationRevision = "a108b314bb3f37622fb082759f726468bbb09163"
+	SpecificationRevision = "471d0f75c6be0e5cff104f0d0c61f10957da792a"
 )

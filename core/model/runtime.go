@@ -17,6 +17,20 @@ type NodeUsage struct {
 	LastUsedAt string `json:"last_used_at,omitempty"`
 }
 
+// InspectionUsage is candidate-evaluation evidence kept apart from activation.
+type InspectionUsage struct {
+	Ref             string `json:"ref"`
+	CallCount       int    `json:"call_count"`
+	LastInspectedAt string `json:"last_inspected_at,omitempty"`
+}
+
+// InspectionTelemetry is the optional extension implemented by collectors
+// that keep INSPECT evidence separate from ordinary node use.
+type InspectionTelemetry interface {
+	RecordInspection(ref string) error
+	InspectionUsage(ref string) InspectionUsage
+}
+
 // Telemetry observes node usage and never changes business outcomes.
 type Telemetry interface {
 	Record(CallEvent) error
@@ -33,16 +47,44 @@ type CallEvent struct {
 
 // MemoryTelemetry is a race-safe, non-lossy process-local usage collector.
 type MemoryTelemetry struct {
-	mu     sync.RWMutex
-	usage  map[string]NodeUsage
-	events []CallEvent
+	mu          sync.RWMutex
+	usage       map[string]NodeUsage
+	inspections map[string]InspectionUsage
+	events      []CallEvent
 }
 
 // NewMemoryTelemetry creates a process-local collector. It retains every
 // event for diagnostics; applications that need bounded or remote retention
 // should provide their own Telemetry implementation.
 func NewMemoryTelemetry() *MemoryTelemetry {
-	return &MemoryTelemetry{usage: map[string]NodeUsage{}}
+	return &MemoryTelemetry{usage: map[string]NodeUsage{}, inspections: map[string]InspectionUsage{}}
+}
+
+// RecordInspection aggregates one non-activating candidate inspection.
+func (telemetry *MemoryTelemetry) RecordInspection(ref string) error {
+	if telemetry == nil {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	telemetry.mu.Lock()
+	defer telemetry.mu.Unlock()
+	previous := telemetry.inspections[ref]
+	telemetry.inspections[ref] = InspectionUsage{Ref: ref, CallCount: previous.CallCount + 1, LastInspectedAt: now}
+	return nil
+}
+
+// InspectionUsage returns a zero-count snapshot for an unseen ref.
+func (telemetry *MemoryTelemetry) InspectionUsage(ref string) InspectionUsage {
+	if telemetry == nil {
+		return InspectionUsage{Ref: ref}
+	}
+	telemetry.mu.RLock()
+	defer telemetry.mu.RUnlock()
+	usage, exists := telemetry.inspections[ref]
+	if !exists {
+		return InspectionUsage{Ref: ref}
+	}
+	return usage
 }
 
 // Record aggregates a call and retains a non-destructive event snapshot.
@@ -213,6 +255,15 @@ func reportTelemetry(telemetry Telemetry, event CallEvent) {
 // while the collector supplies the observation timestamp when needed.
 func ReportTelemetry(telemetry Telemetry, ref string, failed bool) {
 	reportTelemetry(telemetry, CallEvent{Ref: ref, Failed: failed})
+}
+
+func reportInspection(telemetry Telemetry, ref string) {
+	collector, ok := telemetry.(InspectionTelemetry)
+	if !ok {
+		return
+	}
+	defer func() { _ = recover() }()
+	_ = collector.RecordInspection(ref)
 }
 
 // Serve holds the Application's Channels open around one serving lifetime.

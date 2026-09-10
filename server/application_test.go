@@ -57,7 +57,7 @@ func TestCompileApplicationSharesOneBoundRuntimeSurface(t *testing.T) {
 	if first != second {
 		t.Fatal("Build() constructed more than one default MCP adapter")
 	}
-	if len(first.GatewayNames) != 4 || first.Gateway != second.Gateway || first.Server != second.Server {
+	if len(first.GatewayNames) != 5 || first.Gateway != second.Gateway || first.Server != second.Server {
 		t.Fatalf("sealed server adapter drifted: first=%#v second=%#v", first, second)
 	}
 }
@@ -97,7 +97,7 @@ func TestCompileDisclosureApplicationBuildsNavigationOnlyContainer(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(adapter.GatewayNames) != 2 || adapter.GatewayNames[0] != contexture.DiscoverGatewayName || adapter.GatewayNames[1] != contexture.OpenGatewayName {
+	if len(adapter.GatewayNames) != 3 || adapter.GatewayNames[0] != contexture.DiscoverGatewayName || adapter.GatewayNames[1] != contexture.InspectGatewayName || adapter.GatewayNames[2] != contexture.OpenGatewayName {
 		t.Fatalf("structural gateway = %#v", adapter.GatewayNames)
 	}
 	if _, err := contexture.NewRuntime(compiled.Index, contexture.AllRoots(), contexture.AllRoots(), nil); err == nil {

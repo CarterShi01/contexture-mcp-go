@@ -103,6 +103,9 @@ func completionHandler(publications *surface.Publications, selection contexture.
 
 func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool contexture.GatewayTool, selection contexture.RootSelection, publications *surface.Publications) {
 	definition := &mcp.Tool{Name: string(tool.Name), Description: tool.Description, InputSchema: gatewaySchema(tool.Name), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: tool.ReadOnly}}
+	if tool.Name == contexture.InspectGatewayName {
+		definition.OutputSchema = map[string]any{"type": "object", "additionalProperties": true, "title": "contexture_inspectDictOutput"}
+	}
 	server.AddTool(definition, func(ctx context.Context, request *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		value, err := callGateway(ctx, gateway, tool.Name, request.Params.Arguments, selection, publications)
 		if err != nil {
@@ -115,6 +118,11 @@ func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool c
 func gatewaySchema(name contexture.GatewayName) map[string]any {
 	if name == contexture.DiscoverGatewayName {
 		return map[string]any{"type": "object", "properties": map[string]any{}}
+	}
+	if name == contexture.InspectGatewayName {
+		return map[string]any{"type": "object", "title": "contexture_inspectArguments", "properties": map[string]any{
+			"refs": map[string]any{"type": "array", "title": "Refs", "items": map[string]any{"type": "string"}},
+		}, "required": []string{"refs"}}
 	}
 	properties := map[string]any{"ref": map[string]any{"type": "string"}}
 	if name == contexture.InvokeGatewayName || name == contexture.InvokeReadOnlyGatewayName {
@@ -132,6 +140,7 @@ func callGateway(ctx context.Context, gateway *contexture.Gateway, name contextu
 	}
 	var input struct {
 		Ref       string          `json:"ref"`
+		Refs      []string        `json:"refs"`
 		Arguments json.RawMessage `json:"arguments"`
 	}
 	if err := json.Unmarshal(raw, &input); err != nil {
@@ -140,6 +149,8 @@ func callGateway(ctx context.Context, gateway *contexture.Gateway, name contextu
 	switch name {
 	case contexture.DiscoverGatewayName:
 		return gateway.Discover(selection)
+	case contexture.InspectGatewayName:
+		return gateway.Inspect(input.Refs, selection)
 	case contexture.OpenGatewayName:
 		if publications != nil {
 			if err := publications.CheckModelOpen(input.Ref, selection); err != nil {

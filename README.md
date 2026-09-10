@@ -11,7 +11,7 @@ Implementations:
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **Status: all applicable 0.14 source and behavioral-test rows are verified;
+> **Status: all applicable 0.15 source and behavioral-test rows are verified;
 > release remains guarded.** This repository ships native project commands,
 > inspection, generated applications, real MCP transports, authenticated
 > request-local path selection, REST, and the maintained demo. Remaining parity
@@ -135,7 +135,12 @@ func main() {
 }
 ```
 
-Business Tools remain behind Contexture's four fixed gateway Tools. The root
+Business Tools remain behind Contexture's five fixed gateway Tools:
+`contexture_discover`, `contexture_inspect`, `contexture_open`,
+`contexture_invoke_read_only`, and `contexture_invoke`. `contexture_inspect`
+atomically compares 1–32 unique refs through pure routing cards for each target,
+its direct members, and declared uses. It activates nothing, invokes nothing,
+and discloses no instructions, execution facets, or Publication contract. The root
 package is SDK-neutral; `server` owns the official MCP Go SDK and `web` owns
 explicit `net/http` REST adapters. Request-local facts use `context.Context`, and
 application dependencies use `Channels` with reverse-order cleanup.
@@ -144,6 +149,10 @@ application dependencies use `Channels` with reverse-order cleanup.
 `contexture.DeclareApplication`; both create the same lazy application declaration.
 
 ## Inspect agent-visible context
+
+The MCP gateway method `Gateway.Inspect` is separate from the existing CLI
+command below. The CLI keeps replaying complete agent-visible sessions; its
+behavior and flags are unchanged.
 
 `contexture inspect` replays the exact instructions, discovery payload, and
 progressive-disclosure cards produced by the native implementation. It starts

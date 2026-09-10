@@ -10,12 +10,14 @@ import (
 // Factory constructs a fresh pointer-backed node during compilation.
 type Factory func() Node
 
-// CompileLevel is one of the two progressive-disclosure states for a Node.
+// CompileLevel is one of the three progressive-disclosure states for a Node.
 type CompileLevel string
 
 const (
 	// RouteCompileLevel carries only broad routing facts.
 	RouteCompileLevel CompileLevel = "route"
+	// InspectCompileLevel carries one non-activating structural level.
+	InspectCompileLevel CompileLevel = "inspect"
 	// ActiveCompileLevel carries the selected Node's actionable facts.
 	ActiveCompileLevel CompileLevel = "active"
 )
@@ -32,6 +34,11 @@ type View interface {
 	CardsFor([]string) ([]CompiledContext, error)
 	ExecutionOf(Node) (CompiledContext, error)
 	SchemaOf(Node) (map[string]any, error)
+}
+
+type inspectionView interface {
+	RoutingCardsOf([]Node) (CompiledContext, error)
+	RoutingCardsFor([]string) ([]CompiledContext, error)
 }
 
 // Node is the closed Contexture declaration set.
@@ -143,6 +150,23 @@ func CardOf(node Node, view View) (CompiledContext, error) {
 	return card, nil
 }
 
+// RoutingCardOf renders an openable card without Tool execution facets.
+func RoutingCardOf(node Node, view View) (CompiledContext, error) {
+	if nilNode(node) || nilView(view) {
+		return nil, uncompiledNodeError()
+	}
+	card, err := RouteOf(node)
+	if err != nil {
+		return nil, err
+	}
+	ref, err := view.RefOf(node)
+	if err != nil {
+		return nil, err
+	}
+	card["ref"] = ref
+	return card, nil
+}
+
 // GroupCards renders one closed sibling shape in declaration order.
 func GroupCards(nodes []Node, view View) (CompiledContext, error) {
 	if nilView(view) {
@@ -167,6 +191,23 @@ func GroupCards(nodes []Node, view View) (CompiledContext, error) {
 	return grouped, nil
 }
 
+// GroupRoutingCards renders one sibling shape using only pure routing cards.
+func GroupRoutingCards(nodes []Node, view View) (CompiledContext, error) {
+	if nilView(view) {
+		return nil, uncompiledNodeError()
+	}
+	grouped := CompiledContext{"roles": []CompiledContext{}, "skills": []CompiledContext{}, "tools": []CompiledContext{}}
+	for _, node := range nodes {
+		card, err := RoutingCardOf(node, view)
+		if err != nil {
+			return nil, err
+		}
+		key := string(node.nodeKind()) + "s"
+		grouped[key] = append(grouped[key].([]CompiledContext), cloneCompiledContext(card))
+	}
+	return grouped, nil
+}
+
 // CompileNode renders one Node at ROUTE or ACTIVE through an optional owning View.
 func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, error) {
 	if nilNode(node) {
@@ -177,6 +218,34 @@ func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, err
 	}
 	if level == RouteCompileLevel {
 		return RouteOf(node)
+	}
+	if level == InspectCompileLevel {
+		if view == nil {
+			view = aloneView{}
+		} else if nilView(view) {
+			return nil, uncompiledNodeError()
+		}
+		card, err := RoutingCardOf(node, view)
+		if err != nil {
+			return nil, err
+		}
+		members, err := MembersOf(node)
+		if err != nil {
+			return nil, err
+		}
+		projection, ok := view.(inspectionView)
+		if !ok {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("INSPECT requires a compiled forest view"))
+		}
+		grouped, err := projection.RoutingCardsOf(members)
+		if err != nil {
+			return nil, err
+		}
+		uses, err := projection.RoutingCardsFor(node.nodeUses())
+		if err != nil {
+			return nil, err
+		}
+		return CompiledContext{"node": card, "members": grouped, "uses": uses}, nil
 	}
 	if level != ActiveCompileLevel {
 		return nil, errors.Join(ErrInvalidDeclaration, fmt.Errorf("unknown Contexture compile level %q", level))
@@ -293,12 +362,20 @@ func (aloneView) RefOf(node Node) (string, error) {
 
 func (view aloneView) CardOf(node Node) (CompiledContext, error) { return CardOf(node, view) }
 
+func (view aloneView) RoutingCardOf(node Node) (CompiledContext, error) {
+	return RoutingCardOf(node, view)
+}
+
 func (aloneView) CardFor(ref string) (CompiledContext, error) {
 	return nil, errors.Join(ErrInvalidDeclaration, fmt.Errorf("nothing can resolve %q outside a compiled forest", ref))
 }
 
 func (view aloneView) CardsOf(nodes []Node) (CompiledContext, error) {
 	return GroupCards(nodes, view)
+}
+
+func (view aloneView) RoutingCardsOf(nodes []Node) (CompiledContext, error) {
+	return GroupRoutingCards(nodes, view)
 }
 
 func (view aloneView) CardsFor(refs []string) ([]CompiledContext, error) {
@@ -311,6 +388,13 @@ func (view aloneView) CardsFor(refs []string) ([]CompiledContext, error) {
 		cards = append(cards, card)
 	}
 	return cards, nil
+}
+
+func (view aloneView) RoutingCardsFor(refs []string) ([]CompiledContext, error) {
+	if len(refs) == 0 {
+		return []CompiledContext{}, nil
+	}
+	return nil, errors.Join(ErrInvalidDeclaration, errors.New("nothing can resolve uses outside a compiled forest"))
 }
 
 func (aloneView) ExecutionOf(node Node) (CompiledContext, error) {

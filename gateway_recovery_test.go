@@ -68,7 +68,7 @@ func TestGatewayHasFixedOrderedSurfaceAndActionableLookupRecoveries(t *testing.T
 	var calls atomic.Int32
 	gateway := recoveryGateway(t, &calls)
 	tools := contexture.GatewayTools()
-	want := []contexture.GatewayName{contexture.DiscoverGatewayName, contexture.OpenGatewayName, contexture.InvokeReadOnlyGatewayName, contexture.InvokeGatewayName}
+	want := []contexture.GatewayName{contexture.DiscoverGatewayName, contexture.InspectGatewayName, contexture.OpenGatewayName, contexture.InvokeReadOnlyGatewayName, contexture.InvokeGatewayName}
 	if got := contexture.GatewayToolNames(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("gateway tool names = %#v", got)
 	}
@@ -83,10 +83,10 @@ func TestGatewayHasFixedOrderedSurfaceAndActionableLookupRecoveries(t *testing.T
 			t.Fatalf("tool %q description is incomplete", name)
 		}
 	}
-	if !strings.Contains(tools[1].Description, "schema") || strings.Contains(tools[0].Description, "schema") {
+	if !strings.Contains(tools[2].Description, "schema") || strings.Contains(tools[0].Description, "schema") {
 		t.Fatal("gateway descriptions assign schema delivery to the wrong door")
 	}
-	if len(contexture.DisclosureGatewayTools()) != 2 || len(contexture.ExecutionGatewayTools()) != 2 {
+	if len(contexture.DisclosureGatewayTools()) != 3 || len(contexture.ExecutionGatewayTools()) != 2 {
 		t.Fatal("gateway halves are not fixed")
 	}
 	// All lookup facts become a recovery that names the one viable next call.

@@ -37,6 +37,7 @@ type GatewayName = foundation.GatewayName
 
 const (
 	DiscoverGatewayName       = foundation.DiscoverGatewayName
+	InspectGatewayName        = foundation.InspectGatewayName
 	OpenGatewayName           = foundation.OpenGatewayName
 	InvokeReadOnlyGatewayName = foundation.InvokeReadOnlyGatewayName
 	InvokeGatewayName         = foundation.InvokeGatewayName
@@ -54,12 +55,13 @@ type SystemTool = GatewayTool
 
 var gatewayTools = []GatewayTool{
 	{Name: DiscoverGatewayName, ReadOnly: true, Description: "List the top-level capabilities this server serves, as short routing cards. Most are roles: open the one that matches the task; its sub-roles arrive with it, one level at a time, so a large tree costs only the branch you enter. A role card is a name, a sentence, and the ref that opens it — instructions and what a role holds arrive on opening, never here."},
+	{Name: InspectGatewayName, ReadOnly: true, Description: "Inspect one or more refs without activating them. The response contains a fixed evaluation notice, each requested node's routing card, and one level of routing cards for direct members and declared uses. It never returns instructions, Tool execution facets, Publication contracts, or invocation results. Pass 1 through 32 unique refs from existing cards."},
 	{Name: OpenGatewayName, ReadOnly: true, Description: "Open one role, skill or tool by ref. Opening a role returns its instructions and a card for every skill, tool and sub-role it holds, each with the ref that opens it and each tool with the schema needed to call it. Opening a skill returns its complete procedure, available here and nowhere else. A tool's card is already complete, so run the tool rather than opening it. Pass a ref taken from a card; never assemble one."},
 	{Name: InvokeReadOnlyGatewayName, ReadOnly: true, Description: "Run a tool that leaves the world unchanged. Use this for every tool whose card says read_only: true. The ref and arguments come from that card. A tool that is not read-only is refused here."},
 	{Name: InvokeGatewayName, ReadOnly: false, Description: "Run a tool that changes something. Use this for every tool whose card says read_only: false. The ref and arguments come from that card. A read-only tool is refused here, so that a host can tell the two apart before a human is asked to approve anything."},
 }
 
-// GatewayTools returns the complete immutable four-tool system surface in
+// GatewayTools returns the complete immutable five-tool system surface in
 // registration order. Business tools are deliberately never entries here.
 func GatewayTools() []GatewayTool { return append([]GatewayTool(nil), gatewayTools...) }
 
@@ -73,10 +75,10 @@ func GatewayToolNames() []GatewayName {
 }
 
 // DisclosureGatewayTools returns the independently installable navigation half.
-func DisclosureGatewayTools() []GatewayTool { return append([]GatewayTool(nil), gatewayTools[:2]...) }
+func DisclosureGatewayTools() []GatewayTool { return append([]GatewayTool(nil), gatewayTools[:3]...) }
 
 // ExecutionGatewayTools returns the two fixed invocation doors.
-func ExecutionGatewayTools() []GatewayTool { return append([]GatewayTool(nil), gatewayTools[2:]...) }
+func ExecutionGatewayTools() []GatewayTool { return append([]GatewayTool(nil), gatewayTools[3:]...) }
 
 // Gateway is the transport-neutral fixed Contexture model plane.
 type Gateway struct {
@@ -84,12 +86,13 @@ type Gateway struct {
 	execution  *ExecutionAPI
 }
 
-// NewGateway connects navigation to an optional executable Runtime.
-func NewGateway(disclosure *Disclosure, runtime *Runtime) (*Gateway, error) {
+// NewGateway connects navigation to an optional executable Runtime. Optional
+// refs reserve person-controlled Prompt targets at the model gateway itself.
+func NewGateway(disclosure *Disclosure, runtime *Runtime, reserved ...string) (*Gateway, error) {
 	if disclosure == nil {
 		return nil, errors.New("Contexture Disclosure must not be nil")
 	}
-	navigation, err := NewDisclosureAPI(disclosure)
+	navigation, err := NewDisclosureAPI(disclosure, reserved...)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +109,7 @@ func NewGateway(disclosure *Disclosure, runtime *Runtime) (*Gateway, error) {
 
 // Tools returns the fixed navigation gateway, plus invoke doors when executable.
 func (gateway *Gateway) Tools() []GatewayTool {
-	limit := 2
+	limit := 3
 	if gateway.execution != nil {
 		limit = len(gatewayTools)
 	}
@@ -116,6 +119,12 @@ func (gateway *Gateway) Tools() []GatewayTool {
 // Discover lists selected model-controlled root cards.
 func (gateway *Gateway) Discover(selection RootSelection) (map[string][]map[string]any, error) {
 	result, err := gateway.disclosure.Discover(selection)
+	return result, gateway.recover(err)
+}
+
+// Inspect compares selected candidates without activating any node.
+func (gateway *Gateway) Inspect(refs []string, selection RootSelection) (CompiledContext, error) {
+	result, err := gateway.disclosure.Inspect(refs, selection)
 	return result, gateway.recover(err)
 }
 

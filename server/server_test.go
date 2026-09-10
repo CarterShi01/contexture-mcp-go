@@ -52,10 +52,10 @@ func TestNewContextureMCPServerExposesOnlyGatewayTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	adapter := server.NewContextureMCPServer(server.Identity{Name: "contexture-test", Version: "0.0.0"}, gateway)
-	if adapter.Server == nil || len(adapter.GatewayNames) != 4 {
+	if adapter.Server == nil || len(adapter.GatewayNames) != 5 {
 		t.Fatalf("adapter = %#v", adapter)
 	}
-	want := []contexture.GatewayName{contexture.DiscoverGatewayName, contexture.OpenGatewayName, contexture.InvokeReadOnlyGatewayName, contexture.InvokeGatewayName}
+	want := []contexture.GatewayName{contexture.DiscoverGatewayName, contexture.InspectGatewayName, contexture.OpenGatewayName, contexture.InvokeReadOnlyGatewayName, contexture.InvokeGatewayName}
 	for position, name := range want {
 		if adapter.GatewayNames[position] != name {
 			t.Fatalf("GatewayNames = %#v", adapter.GatewayNames)
@@ -78,7 +78,7 @@ func TestNewContextureMCPServerExposesOnlyGatewayTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Tools) != 4 {
+	if len(listed.Tools) != 5 {
 		t.Fatalf("MCP tools = %#v", listed.Tools)
 	}
 	seen := map[string]bool{}

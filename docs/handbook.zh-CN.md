@@ -436,12 +436,12 @@ application, err := contexture.DeclareApplication(contexture.ApplicationDeclarat
 
 ## 8. 通过 MCP Host 提供服务
 
-服务时不改变 declaration。server adapter 提供四个固定的 Contexture gateway Tool；业务 Tool
+服务时不改变 declaration。server adapter 提供五个固定的 Contexture gateway Tool；业务 Tool
 不会注册为 MCP 顶层 Tool，而是被渐进披露在 gateway 后面。
 
 `GatewayTools()` 暴露该不可变且有序的 inventory：`contexture_discover`、
-`contexture_open`、`contexture_invoke_read_only` 与 `contexture_invoke`。
-导航专用 Host 使用前两个的 `DisclosureGatewayTools()`；两个调用入口由
+`contexture_inspect`、`contexture_open`、`contexture_invoke_read_only` 与 `contexture_invoke`。
+导航专用 Host 使用前三个的 `DisclosureGatewayTools()`；两个调用入口由
 `ExecutionGatewayTools()` 提供。它们是 framework control，而不是业务 `Tool` node。gateway
 查找或调用错入口时会返回带有 agent 下一步操作说明的 `RefusedError`；其 cause 仍保留供 Host
 使用的 `NodeNotFoundError` facts。超出 selected root ceiling 的 ref 则刻意不同：它保持类型化
@@ -449,8 +449,9 @@ application, err := contexture.DeclareApplication(contexture.ApplicationDeclarat
 Prompt target 也会先检查同一 ceiling；随后只提示 agent 请用户运行 Host command，而不要绕过它。
 
 `NewDisclosureAPI(disclosure, reservedRefs...)` 暴露可独立安装的 discovery 半边，不依赖 Runtime
-或 transport。它的 `Discover` 与 `Open` 接收显式 `RootSelection`；`Tools()` 始终返回有序的
-discover/open pair。`Open` 返回渐进式 routing 或 active card，把普通 typed lookup failure 转换为
+或 transport。它的 `Discover`、`Inspect` 与 `Open` 接收显式 `RootSelection`；`Tools()` 始终返回有序的
+discover/inspect/open 三项。`Inspect` 会先原子校验完整的 1–32 ref batch，再仅返回每个目标、直接成员
+和声明 uses 的纯 routing card；它不会激活 node 或写入普通使用遥测。`Open` 返回渐进式 routing 或 active card，把普通 typed lookup failure 转换为
 `RefusedError`，同时保留其 `NodeNotFoundError` cause；`RootOutsideSelectionError` 则保持不变。
 `OpenForPerson`（保留的 `OpenForAPerson` 亦可）只绕过提供的 model reservation 与 Prompt-root
 visibility，绝不会扩大 selected root。`SelectedGraph` 返回与 navigation 相同的、request-selected 的

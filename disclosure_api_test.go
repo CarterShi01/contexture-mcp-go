@@ -56,7 +56,7 @@ func TestDisclosureAPIProjectsStatelessCardsAndSelectedGraph(t *testing.T) {
 	}
 	api, _ := disclosureAPIFixture(t, operations)
 	tools := api.Tools()
-	if len(tools) != 2 || tools[0].Name != contexture.DiscoverGatewayName || tools[1].Name != contexture.OpenGatewayName || !tools[0].ReadOnly || !tools[1].ReadOnly {
+	if len(tools) != 3 || tools[0].Name != contexture.DiscoverGatewayName || tools[1].Name != contexture.InspectGatewayName || tools[2].Name != contexture.OpenGatewayName || !tools[0].ReadOnly || !tools[1].ReadOnly || !tools[2].ReadOnly {
 		t.Fatalf("disclosure tools = %#v", tools)
 	}
 	tools[0].Name = "changed"

@@ -72,11 +72,12 @@ func TestOfficialSDKExposesOnlyFixedGatewayAndPreservesInvocationDoors(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Tools) != 4 {
+	if len(listed.Tools) != 5 {
 		t.Fatalf("tools = %#v", listed.Tools)
 	}
 	wantReadOnly := map[string]bool{
 		"contexture_discover":         true,
+		"contexture_inspect":          true,
 		"contexture_open":             true,
 		"contexture_invoke_read_only": true,
 		"contexture_invoke":           false,
@@ -103,6 +104,22 @@ func TestOfficialSDKExposesOnlyFixedGatewayAndPreservesInvocationDoors(t *testin
 	tools, ok := disclosed["tools"].([]any)
 	if !ok || len(tools) != 2 {
 		t.Fatalf("discover tools = %#v", disclosed["tools"])
+	}
+
+	inspected, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_inspect", Arguments: map[string]any{"refs": []string{"read-status", "restart"}}})
+	if err != nil || inspected.IsError {
+		t.Fatalf("inspect result = %#v, %v", inspected, err)
+	}
+	inspection, ok := inspected.StructuredContent.(map[string]any)
+	if !ok || len(inspection["items"].([]any)) != 2 {
+		t.Fatalf("inspect structured content = %#v", inspected.StructuredContent)
+	}
+	for _, item := range inspection["items"].([]any) {
+		rendered := item.(map[string]any)
+		node := rendered["node"].(map[string]any)
+		if _, exists := node["input_schema"]; exists {
+			t.Fatalf("inspect leaked Tool schema: %#v", rendered)
+		}
 	}
 
 	readResult, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_invoke_read_only", Arguments: map[string]any{"ref": "read-status", "arguments": map[string]any{}}})

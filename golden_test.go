@@ -345,7 +345,7 @@ func TestDisclosureOnlyOmitsSchemasAndExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(readOnlyGateway.Tools()) != 2 {
+	if len(readOnlyGateway.Tools()) != 3 {
 		t.Fatal("disclosure-only gateway exposes invoke doors")
 	}
 	if _, err := readOnlyGateway.InvokeReadOnly(context.Background(), "tool", nil, contexture.AllRoots()); err == nil {

@@ -11,8 +11,8 @@ import (
 func TestFoundationVocabularyHasOneCanonicalSpelling(t *testing.T) {
 	t.Parallel()
 
-	if contexture.PackageName != "contexture" || contexture.Version != "0.14.0rc1" {
-		t.Fatalf("root package vocabulary = (%q, %q), want Contexture 0.14 release facts", contexture.PackageName, contexture.Version)
+	if contexture.PackageName != "contexture" || contexture.Version != "0.15.0rc1" {
+		t.Fatalf("root package vocabulary = (%q, %q), want Contexture 0.15 release facts", contexture.PackageName, contexture.Version)
 	}
 	if contexture.ReferenceSeparator != foundation.ReferenceSeparator {
 		t.Fatalf("ReferenceSeparator = %q, want foundation value %q", contexture.ReferenceSeparator, foundation.ReferenceSeparator)
@@ -22,12 +22,14 @@ func TestFoundationVocabularyHasOneCanonicalSpelling(t *testing.T) {
 	}
 	want := []foundation.GatewayName{
 		foundation.DiscoverGatewayName,
+		foundation.InspectGatewayName,
 		foundation.OpenGatewayName,
 		foundation.InvokeReadOnlyGatewayName,
 		foundation.InvokeGatewayName,
 	}
 	got := []contexture.GatewayName{
 		contexture.DiscoverGatewayName,
+		contexture.InspectGatewayName,
 		contexture.OpenGatewayName,
 		contexture.InvokeReadOnlyGatewayName,
 		contexture.InvokeGatewayName,

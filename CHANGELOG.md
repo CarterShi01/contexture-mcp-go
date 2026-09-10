@@ -5,6 +5,13 @@ Versioning once public releases begin.
 
 ## Unreleased
 
+- Align with Contexture 0.15 non-activating `INSPECT` and the fifth fixed
+  `contexture_inspect` gateway over atomic batches of 1–32 unique trimmed refs.
+- Return only pure routing cards for inspected nodes, direct members, and
+  declared uses; omit instructions, execution facets, Publication contracts,
+  recursive expansion, and invocation results while invoking nothing.
+- Record inspection telemetry separately from Role/Skill activation and expose
+  discover/inspect/open on disclosure-only MCP applications.
 - Align with Contexture 0.14 optional Role Publications as strongly typed,
   lazily constructed finishing procedure and equipment.
 - Include Publication subtrees in containment, selection, inspection, runtime,

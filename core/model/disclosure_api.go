@@ -2,6 +2,8 @@ package model
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 )
 
 // DisclosureAPI is the model-facing progressive-navigation half of
@@ -32,7 +34,7 @@ func NewDisclosureAPI(disclosure *Disclosure, reserved ...string) (*DisclosureAP
 	return &DisclosureAPI{disclosure: disclosure, reserved: entries}, nil
 }
 
-// Tools returns the immutable ordered pair of fixed discovery and open doors.
+// Tools returns the immutable ordered disclosure gateway.
 func (*DisclosureAPI) Tools() []GatewayTool { return DisclosureGatewayTools() }
 
 // Index returns the immutable compiled graph underlying this disclosure view.
@@ -65,6 +67,59 @@ func (api *DisclosureAPI) Discover(requested RootSelection) (map[string][]map[st
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("DisclosureAPI must not be nil"))
 	}
 	return api.disclosure.Discover(requested)
+}
+
+// Inspect atomically validates and projects 1 through 32 unique trimmed refs.
+func (api *DisclosureAPI) Inspect(refs []string, requested RootSelection) (CompiledContext, error) {
+	if api == nil || api.disclosure == nil {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("DisclosureAPI must not be nil"))
+	}
+	invalidBatch := func() error {
+		return &RefusedError{Message: fmt.Sprintf("%s requires from 1 through 32 unique non-empty refs.", InspectGatewayName)}
+	}
+	if len(refs) < 1 || len(refs) > 32 {
+		return nil, invalidBatch()
+	}
+	selection, err := api.disclosure.EffectiveSelection(requested)
+	if err != nil {
+		return nil, err
+	}
+	normalized := make([]string, 0, len(refs))
+	seen := make(map[string]struct{}, len(refs))
+	for _, value := range refs {
+		ref := strings.TrimSpace(value)
+		if ref == "" {
+			return nil, invalidBatch()
+		}
+		if _, duplicate := seen[ref]; duplicate {
+			return nil, &RefusedError{Message: fmt.Sprintf("%s names a ref more than once: %q.", InspectGatewayName, ref)}
+		}
+		seen[ref] = struct{}{}
+		normalized = append(normalized, ref)
+	}
+	// Prevalidate the complete batch before rendering or reporting any item.
+	for _, ref := range normalized {
+		if err := selection.RequireRef(ref); err != nil {
+			return nil, err
+		}
+		root := strings.Split(canonicalRef(ref), "/")[0]
+		_, prompt := api.disclosure.promptRoots[root]
+		_, reserved := api.reserved[canonicalRef(ref)]
+		if prompt || reserved {
+			return nil, &RefusedError{Message: TakenByPersonMessage(ref)}
+		}
+		if _, err := api.disclosure.index.Find(ref); err != nil {
+			return nil, recoverDisclosureError(err)
+		}
+	}
+	payload, err := api.disclosure.Inspect(normalized, requested)
+	if err != nil {
+		return nil, recoverDisclosureError(err)
+	}
+	for _, ref := range normalized {
+		reportInspection(api.disclosure.telemetry, ref)
+	}
+	return payload, nil
 }
 
 // Open progressively discloses one node through the model door. Ordinary

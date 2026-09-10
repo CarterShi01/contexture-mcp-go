@@ -112,6 +112,8 @@ var _ contexture.WrongDoorError
 var _ contexture.NodeRef
 var _ contexture.SignpostLevel
 var _ contexture.ReferenceCrossing
+var _ contexture.InspectionUsage
+var _ contexture.InspectionTelemetry
 var _ contexture.Prompt = contexture.Prompt{Opens: "operations", ModelOpen: contexture.ModelReservedForPerson}
 var _ contexture.Resource = contexture.Resource{Opens: "operations/status", URI: "contexture://operations/status"}
 var _ = inspection.Replay
@@ -165,10 +167,10 @@ func main() {
     if !strings.Contains(messages.Preamble, "contexture_open") || !strings.Contains(messages.RefRule, "never assemble") || messages.TruncatedCompletion(100, 103) != "... 3 more match; keep typing to narrow." { panic("public message contract is incomplete") }
     if instructions.InstructionsLimit != 2048 || instructions.RosterBudget != 1200 || instructions.SelfContainedPrefix != 512 || !strings.Contains(instructions.Neutral(), "request-specific") { panic("public instruction contract is incomplete") }
     if surface.PublishedName("", "operations/runbook") != "runbook" { panic("public surface facade is incomplete") }
-    if contexture.PackageName != "contexture" || contexture.Version != "0.14.0rc1" || contexture.ReferenceSeparator != "/" {
+    if contexture.PackageName != "contexture" || contexture.Version != "0.15.0rc1" || contexture.ReferenceSeparator != "/" {
         panic("public Contexture vocabulary has an unexpected spelling")
     }
-    if contexture.DiscoverGatewayName != "contexture_discover" || contexture.OpenGatewayName != "contexture_open" || contexture.InvokeReadOnlyGatewayName != "contexture_invoke_read_only" || contexture.InvokeGatewayName != "contexture_invoke" {
+    if contexture.DiscoverGatewayName != "contexture_discover" || contexture.InspectGatewayName != "contexture_inspect" || contexture.OpenGatewayName != "contexture_open" || contexture.InvokeReadOnlyGatewayName != "contexture_invoke_read_only" || contexture.InvokeGatewayName != "contexture_invoke" {
         panic("public fixed gateway vocabulary has an unexpected spelling")
     }
     optionsAuth := &server.Auth{Verifier: consumerVerifier{}, Issuer: "https://issuer.example", Resource: "https://mcp.example/mcp"}
@@ -209,11 +211,11 @@ func main() {
     if pathApplicationErr != nil { panic(pathApplicationErr) }
     structuralApplication, structuralApplicationErr := server.CompileDisclosureApplication(pathApplication)
     structuralServer, structuralServerErr := structuralApplication.Server()
-    if structuralApplicationErr != nil || structuralServerErr != nil || structuralApplication.Index.Bound() || len(structuralServer.GatewayNames) != 2 { panic("public disclosure-only server container is incomplete") }
+    if structuralApplicationErr != nil || structuralServerErr != nil || structuralApplication.Index.Bound() || len(structuralServer.GatewayNames) != 3 { panic("public disclosure-only server container is incomplete") }
     activeServer, activeServerErr := server.BuildServer(pathApplication)
     activeAdapter, activeAdapterErr := activeServer.Build()
     activeAdapterAgain, activeAdapterAgainErr := activeServer.Build()
-    if activeServerErr != nil || activeAdapterErr != nil || activeAdapterAgainErr != nil || activeAdapter != activeAdapterAgain || len(activeAdapter.GatewayNames) != 4 { panic("public sealed runtime server container is incomplete") }
+    if activeServerErr != nil || activeAdapterErr != nil || activeAdapterAgainErr != nil || activeAdapter != activeAdapterAgain || len(activeAdapter.GatewayNames) != 5 { panic("public sealed runtime server container is incomplete") }
     pathIndex, _ := contexture.Compile(pathApplication)
     pathSelection, _ := contexture.OnlySurfaces("team/*")
     pathGraph, pathGraphErr := contexture.NewSelectedGraph(pathIndex, pathSelection)
@@ -281,10 +283,10 @@ func main() {
     skillDisclosure, disclosureErr := contexture.NewDisclosure(graphIndex, contexture.AllRoots())
     if disclosureErr != nil { panic(disclosureErr) }
     navigation, navigationErr := contexture.NewDisclosureAPI(skillDisclosure, "graph/check")
-    if navigationErr != nil || len(navigation.Tools()) != 2 || navigation.Tools()[0].Name != contexture.DiscoverGatewayName {
+    if navigationErr != nil || len(navigation.Tools()) != 3 || navigation.Tools()[0].Name != contexture.DiscoverGatewayName || navigation.Tools()[1].Name != contexture.InspectGatewayName {
         panic("public DisclosureAPI did not expose the fixed navigation surface")
     }
-    if names := contexture.GatewayToolNames(); len(names) != 4 || names[0] != contexture.DiscoverGatewayName || names[3] != contexture.InvokeGatewayName { panic("public names-only gateway inventory is incomplete") }
+    if names := contexture.GatewayToolNames(); len(names) != 5 || names[0] != contexture.DiscoverGatewayName || names[4] != contexture.InvokeGatewayName { panic("public names-only gateway inventory is incomplete") }
     navigationRoots, navigationRootsErr := navigation.Discover(contexture.AllRoots())
     if navigationRootsErr != nil || len(navigationRoots["roles"]) != 1 || navigationRoots["roles"][0]["ref"] != "graph" {
         panic("public DisclosureAPI did not project root routing cards")

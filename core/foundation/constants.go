@@ -7,7 +7,7 @@ const PackageName = "contexture"
 // PackageVersion is the Go binding release version. It is deliberately
 // distinct from SpecificationVersion: one binding release targets one pinned
 // Contexture contract, while an application has its own host identity.
-const PackageVersion = "0.14.0rc1"
+const PackageVersion = "0.15.0rc1"
 
 // ReferenceSeparator separates one segment of a Contexture reference from
 // the next. References are paths; empty segments are normalized by Index
@@ -19,10 +19,11 @@ const ReferenceSeparator = "/"
 // the same closed vocabulary without depending on one another.
 type GatewayName string
 
-// The four fixed model-facing entry points. Business capabilities travel in
+// The five fixed model-facing entry points. Business capabilities travel in
 // their payloads and are never registered as top-level MCP tools.
 const (
 	DiscoverGatewayName       GatewayName = "contexture_discover"
+	InspectGatewayName        GatewayName = "contexture_inspect"
 	OpenGatewayName           GatewayName = "contexture_open"
 	InvokeReadOnlyGatewayName GatewayName = "contexture_invoke_read_only"
 	InvokeGatewayName         GatewayName = "contexture_invoke"

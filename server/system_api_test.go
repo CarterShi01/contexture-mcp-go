@@ -50,6 +50,14 @@ func TestGatewayWithPublicationsPreservesGatewayRecoveryAndReservationTypes(t *t
 	if !errors.As(err, &reserved) || !errors.Is(err, contexture.ErrNodeNotFound) && reserved.Cause != nil {
 		t.Fatalf("reserved publication open = %#v; want typed RefusedError without lookup failure", err)
 	}
+	_, err = gateway.Inspect([]string{"operations/change"}, contexture.AllRoots())
+	if !errors.As(err, &reserved) || !strings.Contains(reserved.Error(), "opened by a person") {
+		t.Fatalf("reserved publication inspect = %#v", err)
+	}
+	_, err = callGateway(context.Background(), gateway, contexture.InspectGatewayName, json.RawMessage(`{"refs":[" "]}`), contexture.AllRoots(), compiled.Publications)
+	if !errors.As(err, &reserved) || !strings.Contains(reserved.Error(), "1 through 32 unique non-empty refs") {
+		t.Fatalf("inspect validation must precede publication authorization: %#v", err)
+	}
 	_, err = callGateway(context.Background(), gateway, contexture.InvokeReadOnlyGatewayName, json.RawMessage(`{"ref":"operations/change","arguments":{}}`), contexture.AllRoots(), compiled.Publications)
 	if !errors.As(err, &reserved) || !strings.Contains(reserved.Error(), "opened by a person") || called {
 		t.Fatalf("reserved publication invocation = %#v; called=%t", err, called)

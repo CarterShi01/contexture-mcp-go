@@ -86,7 +86,7 @@ func (application *DisclosureApplication) Server() (*ContextureMCPServer, error)
 	if application == nil || application.Disclosure == nil || application.Publications == nil {
 		return nil, fmt.Errorf("Contexture disclosure application is incomplete")
 	}
-	gateway, err := contexture.NewGateway(application.Disclosure, nil)
+	gateway, err := contexture.NewGateway(application.Disclosure, nil, reservedPromptRefs(application.Application)...)
 	if err != nil {
 		return nil, err
 	}
@@ -98,5 +98,18 @@ func (application *RuntimeApplication) Gateway() (*contexture.Gateway, error) {
 	if application == nil || application.Disclosure == nil || application.Runtime == nil {
 		return nil, fmt.Errorf("Contexture runtime application is incomplete")
 	}
-	return contexture.NewGateway(application.Disclosure, application.Runtime)
+	return contexture.NewGateway(application.Disclosure, application.Runtime, reservedPromptRefs(application.Application)...)
+}
+
+func reservedPromptRefs(application *contexture.Application) []string {
+	if application == nil {
+		return nil
+	}
+	refs := []string{}
+	for _, prompt := range application.Prompts() {
+		if !prompt.AllowsModelOpen() {
+			refs = append(refs, prompt.Opens)
+		}
+	}
+	return refs
 }

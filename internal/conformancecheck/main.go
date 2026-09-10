@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	expectedRevision = "a108b314bb3f37622fb082759f726468bbb09163"
-	expectedVersion  = "0.14"
+	expectedRevision = "471d0f75c6be0e5cff104f0d0c61f10957da792a"
+	expectedVersion  = "0.15"
 )
 
 var expectedFixtures = []string{
@@ -117,8 +117,8 @@ func run() error {
 		}
 	}
 
-	implemented := make([]int, 0, 16)
-	for number := 1; number <= 16; number++ {
+	implemented := make([]int, 0, 17)
+	for number := 1; number <= 17; number++ {
 		entry, ok := current.Rules[fmt.Sprint(number)]
 		if !ok {
 			return fmt.Errorf("rule %d is missing", number)
@@ -148,8 +148,8 @@ func run() error {
 			implemented = append(implemented, number)
 		}
 	}
-	if len(current.Rules) != 16 {
-		return errors.New("rules must contain exactly 1 through 16")
+	if len(current.Rules) != 17 {
+		return errors.New("rules must contain exactly 1 through 17")
 	}
 	if !slices.Equal(current.ImplementedRules, implemented) {
 		return errors.New("implementedRules disagrees with rule statuses")
@@ -157,7 +157,7 @@ func run() error {
 	expectedStatus := "partial"
 	if slices.Equal(implemented, []int{1}) {
 		expectedStatus = "scaffold"
-	} else if len(implemented) == 16 {
+	} else if len(implemented) == 17 {
 		expectedStatus = "conformant"
 	}
 	if current.Status != expectedStatus {
@@ -168,7 +168,7 @@ func run() error {
 	if !slices.Equal(schema.Required, expectedRequired) {
 		return errors.New("vendored schema required fields drifted")
 	}
-	expectedRuleKeys := make([]string, 16)
+	expectedRuleKeys := make([]string, 17)
 	for index := range expectedRuleKeys {
 		expectedRuleKeys[index] = fmt.Sprint(index + 1)
 	}

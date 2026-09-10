@@ -94,6 +94,11 @@ func (view *Disclosure) CardOf(node Node) (CompiledContext, error) {
 	return CardOf(node, view)
 }
 
+// RoutingCardOf renders one pure openable card without execution facts.
+func (view *Disclosure) RoutingCardOf(node Node) (CompiledContext, error) {
+	return RoutingCardOf(node, view)
+}
+
 // CardFor renders one selected, model-visible dependency by canonical ref.
 func (view *Disclosure) CardFor(ref string) (CompiledContext, error) {
 	if !view.selection.ContainsRef(ref) {
@@ -128,6 +133,24 @@ func (view *Disclosure) CardsOf(nodes []Node) (CompiledContext, error) {
 	return GroupCards(visible, view)
 }
 
+// RoutingCardsOf renders selected model-visible siblings without execution facts.
+func (view *Disclosure) RoutingCardsOf(nodes []Node) (CompiledContext, error) {
+	visible := make([]Node, 0, len(nodes))
+	for _, node := range nodes {
+		ref, err := view.index.RefOf(node)
+		if err != nil {
+			return nil, err
+		}
+		root := strings.Split(ref, foundation.ReferenceSeparator)[0]
+		if view.selection.ContainsRef(ref) {
+			if _, prompt := view.promptRoots[root]; !prompt {
+				visible = append(visible, node)
+			}
+		}
+	}
+	return GroupRoutingCards(visible, view)
+}
+
 // CardsFor renders selected model-visible dependency cards in declaration order.
 func (view *Disclosure) CardsFor(refs []string) ([]CompiledContext, error) {
 	cards := make([]CompiledContext, 0, len(refs))
@@ -146,6 +169,59 @@ func (view *Disclosure) CardsFor(refs []string) ([]CompiledContext, error) {
 		cards = append(cards, card)
 	}
 	return cards, nil
+}
+
+// RoutingCardsFor renders selected uses as pure, non-executable cards.
+func (view *Disclosure) RoutingCardsFor(refs []string) ([]CompiledContext, error) {
+	cards := make([]CompiledContext, 0, len(refs))
+	for _, ref := range refs {
+		if !view.selection.ContainsRef(ref) {
+			continue
+		}
+		root := strings.Split(canonicalRef(ref), foundation.ReferenceSeparator)[0]
+		if _, prompt := view.promptRoots[root]; prompt {
+			continue
+		}
+		node, err := view.index.Find(ref)
+		if err != nil {
+			return nil, err
+		}
+		card, err := view.RoutingCardOf(node)
+		if err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	return cards, nil
+}
+
+// Inspect compares an already validated shortlist without activating nodes.
+func (view *Disclosure) Inspect(refs []string, requested RootSelection) (CompiledContext, error) {
+	selection, err := view.EffectiveSelection(requested)
+	if err != nil {
+		return nil, err
+	}
+	projection := *view
+	projection.selection = selection
+	items := make([]CompiledContext, 0, len(refs))
+	for _, ref := range refs {
+		if err := selection.RequireRef(ref); err != nil {
+			return nil, err
+		}
+		node, err := view.resolve(ref, selection, view.index.ModelRoots())
+		if err != nil {
+			return nil, err
+		}
+		item, err := CompileNode(node, InspectCompileLevel, &projection)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return CompiledContext{
+		"notice": "These are routing cards for candidate evaluation. No Role or Skill has been activated, no instructions or execution facets are disclosed, and no Tool has been invoked.",
+		"items":  items,
+	}, nil
 }
 
 // ExecutionOf exposes callable Tool facts only for a bound Index.

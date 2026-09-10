@@ -27,7 +27,7 @@ func TestGatewayPublishesOnlyFixedSystemTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	tools := gateway.Tools()
-	if len(tools) != 2 || tools[0].Name != contexture.DiscoverGatewayName || tools[1].Name != contexture.OpenGatewayName {
+	if len(tools) != 3 || tools[0].Name != contexture.DiscoverGatewayName || tools[1].Name != contexture.InspectGatewayName || tools[2].Name != contexture.OpenGatewayName {
 		t.Fatalf("disclosure gateway tools = %#v", tools)
 	}
 	if _, err := gateway.InvokeReadOnly(nil, "business", nil, contexture.AllRoots()); err == nil {
