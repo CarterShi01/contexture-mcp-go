@@ -407,6 +407,10 @@ Index, Disclosure, Runtime, Publications, and telemetry. The independent
 Prompts, with no Runtime, invocation doors, or Resources. Python's temporary
 parts helpers map to `DeclareApplication` followed by the appropriate compiler,
 and `serve(app)` maps to `BuildServer(app).Start(ctx, options)`.
+`BuildServer` seals identity and one compiled runtime container before serving;
+it has no capability-registration API, and repeated `Build()` calls return the
+same default official-SDK adapter. Transport options remain a separate startup
+concern.
 
 ## 3. Choose the right node
 

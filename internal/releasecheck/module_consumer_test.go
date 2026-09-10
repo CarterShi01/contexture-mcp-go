@@ -205,6 +205,10 @@ func main() {
     structuralApplication, structuralApplicationErr := server.CompileDisclosureApplication(pathApplication)
     structuralServer, structuralServerErr := structuralApplication.Server()
     if structuralApplicationErr != nil || structuralServerErr != nil || structuralApplication.Index.Bound() || len(structuralServer.GatewayNames) != 2 { panic("public disclosure-only server container is incomplete") }
+    activeServer, activeServerErr := server.BuildServer(pathApplication)
+    activeAdapter, activeAdapterErr := activeServer.Build()
+    activeAdapterAgain, activeAdapterAgainErr := activeServer.Build()
+    if activeServerErr != nil || activeAdapterErr != nil || activeAdapterAgainErr != nil || activeAdapter != activeAdapterAgain || len(activeAdapter.GatewayNames) != 4 { panic("public sealed runtime server container is incomplete") }
     pathIndex, _ := contexture.Compile(pathApplication)
     pathSelection, _ := contexture.OnlySurfaces("team/*")
     pathGraph, pathGraphErr := contexture.NewSelectedGraph(pathIndex, pathSelection)

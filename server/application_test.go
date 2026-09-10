@@ -57,6 +57,9 @@ func TestCompileApplicationSharesOneBoundRuntimeSurface(t *testing.T) {
 	if first != second {
 		t.Fatal("Build() constructed more than one default MCP adapter")
 	}
+	if len(first.GatewayNames) != 4 || first.Gateway != second.Gateway || first.Server != second.Server {
+		t.Fatalf("sealed server adapter drifted: first=%#v second=%#v", first, second)
+	}
 }
 
 func TestCompileDisclosureApplicationBuildsNavigationOnlyContainer(t *testing.T) {

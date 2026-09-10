@@ -315,6 +315,9 @@ selector、telemetry assembly、launch config、logging 以及 compile/build hel
 `Server()` 只安装 discover/open 与 Prompts，没有 Runtime、invoke door 或 Resource。Python 临时 parts
 helper 映射为 `DeclareApplication` 后调用相应 compiler，`serve(app)` 映射为
 `BuildServer(app).Start(ctx, options)`。
+`BuildServer` 会在 serving 前封存 identity 与一个 compiled runtime container；它不提供 capability
+registration API，重复调用 `Build()` 会返回同一个默认 official-SDK adapter。transport option 仍是独立的
+startup concern。
 
 ## 3. 选择正确的节点
 
