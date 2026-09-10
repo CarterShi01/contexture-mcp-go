@@ -106,7 +106,7 @@ func (publications *Publications) PromptCards(selection contexture.RootSelection
 	result := []PromptCard{}
 	for _, entry := range publications.prompts {
 		if effective.ContainsRef(entry.Opens) {
-			result = append(result, PromptCard{Name: publicationName(entry.Name, entry.Opens), Description: messages.CommandDescription(entry.Opens, entry.Description), Arguments: []PromptArgument{}})
+			result = append(result, PromptCard{Name: PublishedName(entry.Name, entry.Opens), Description: messages.CommandDescription(entry.Opens, entry.Description), Arguments: []PromptArgument{}})
 		}
 	}
 	result = append(result, PromptCard{Name: messages.GotoPrompt, Description: messages.GotoDescription, Arguments: []PromptArgument{{Name: messages.GotoArgument, Required: true}}})
@@ -124,7 +124,7 @@ func (publications *Publications) ResourceCards(selection contexture.RootSelecti
 		if !effective.ContainsRef(entry.Opens) {
 			continue
 		}
-		result = append(result, ResourceCard{Name: publicationName(entry.Name, entry.Opens), URI: entry.URI, Description: entry.Description, MIMEType: entry.MIMEType})
+		result = append(result, ResourceCard{Name: PublishedName(entry.Name, entry.Opens), URI: entry.URI, Description: entry.Description, MIMEType: entry.MIMEType})
 	}
 	return result
 }
@@ -132,7 +132,7 @@ func (publications *Publications) ResourceCards(selection contexture.RootSelecti
 // Command opens the node reserved by a named person-controlled Prompt.
 func (publications *Publications) Command(name string, selection contexture.RootSelection) (string, error) {
 	for _, entry := range publications.prompts {
-		if publicationName(entry.Name, entry.Opens) == name {
+		if PublishedName(entry.Name, entry.Opens) == name {
 			return publications.openForPerson(entry.Opens, selection)
 		}
 	}
@@ -415,7 +415,7 @@ func (publications *Publications) validate() error {
 		if _, err := publications.disclosure.Index().Find(entry.Opens); err != nil {
 			return err
 		}
-		name := publicationName(entry.Name, entry.Opens)
+		name := PublishedName(entry.Name, entry.Opens)
 		if promptNames[name] {
 			return fmt.Errorf("Contexture Prompt %q is declared more than once.", name)
 		}
@@ -448,7 +448,7 @@ func (publications *Publications) validate() error {
 		if len(properties) != 0 {
 			return fmt.Errorf("Resource %q must target an argument-free Tool.", entry.URI)
 		}
-		name := publicationName(entry.Name, entry.Opens)
+		name := PublishedName(entry.Name, entry.Opens)
 		if resourceNames[name] || resourceURIs[entry.URI] {
 			return fmt.Errorf("Contexture Resource %q is declared more than once.", name)
 		}
@@ -457,7 +457,8 @@ func (publications *Publications) validate() error {
 	return nil
 }
 
-func publicationName(name, ref string) string {
+// PublishedName returns the Host-visible name, defaulting to the final ref segment.
+func PublishedName(name, ref string) string {
 	if name != "" {
 		return name
 	}

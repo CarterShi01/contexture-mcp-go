@@ -57,6 +57,9 @@ func TestPublicationsProjectPromptResourceCompletionAndInstructions(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	if surface.PublishedName("", "operations/runbook") != "runbook" || surface.PublishedName("named", "operations/runbook") != "named" {
+		t.Fatal("PublishedName did not preserve explicit or derived publication names")
+	}
 	prompts, err := publications.PromptCards(contexture.AllRoots())
 	if err != nil || len(prompts) != 2 || prompts[0].Name != "show-command" || prompts[1].Name != "goto" {
 		t.Fatalf("PromptCards = %#v, %v", prompts, err)

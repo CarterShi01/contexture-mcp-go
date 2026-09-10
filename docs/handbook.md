@@ -411,6 +411,9 @@ and `serve(app)` maps to `BuildServer(app).Start(ctx, options)`.
 it has no capability-registration API, and repeated `Build()` calls return the
 same default official-SDK adapter. Transport options remain a separate startup
 concern.
+The importable `server/surface` package exposes the validated `Publications`
+composite and `PublishedName` mapping used by Prompt and Resource doors;
+declarations are fully checked before an SDK server is built.
 
 ## 3. Choose the right node
 

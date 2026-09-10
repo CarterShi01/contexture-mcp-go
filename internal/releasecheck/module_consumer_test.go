@@ -38,6 +38,7 @@ import (
     "github.com/CarterShi01/contexture-mcp-go/server"
     "github.com/CarterShi01/contexture-mcp-go/server/instructions"
     "github.com/CarterShi01/contexture-mcp-go/server/messages"
+    "github.com/CarterShi01/contexture-mcp-go/server/surface"
     "github.com/CarterShi01/contexture-mcp-go/web"
 )
 
@@ -132,6 +133,8 @@ var _ = messages.TruncatedCompletion
 var _ = messages.CommandDescription
 var _ = instructions.Build
 var _ = instructions.Neutral
+var _ = surface.NewPublications
+var _ = surface.PublishedName
 var _ = server.CompileApplication
 var _ = server.CompileDisclosureApplication
 var _ = server.BuildServer
@@ -161,6 +164,7 @@ func main() {
     if !errors.Is(&contexturecli.UsageError{Message: "usage"}, contexture.ErrContexture) { panic("public CLI UsageError is not classifiable") }
     if !strings.Contains(messages.Preamble, "contexture_open") || !strings.Contains(messages.RefRule, "never assemble") || messages.TruncatedCompletion(100, 103) != "... 3 more match; keep typing to narrow." { panic("public message contract is incomplete") }
     if instructions.InstructionsLimit != 2048 || instructions.RosterBudget != 1200 || instructions.SelfContainedPrefix != 512 || !strings.Contains(instructions.Neutral(), "request-specific") { panic("public instruction contract is incomplete") }
+    if surface.PublishedName("", "operations/runbook") != "runbook" { panic("public surface facade is incomplete") }
     if contexture.PackageName != "contexture" || contexture.Version != "0.12.0rc1" || contexture.ReferenceSeparator != "/" {
         panic("public Contexture vocabulary has an unexpected spelling")
     }

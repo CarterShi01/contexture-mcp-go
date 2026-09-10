@@ -318,6 +318,8 @@ helper 映射为 `DeclareApplication` 后调用相应 compiler，`serve(app)` �
 `BuildServer` 会在 serving 前封存 identity 与一个 compiled runtime container；它不提供 capability
 registration API，重复调用 `Build()` 会返回同一个默认 official-SDK adapter。transport option 仍是独立的
 startup concern。
+可导入的 `server/surface` package 公开经过校验的 `Publications` composite 与 Prompt、Resource door
+共用的 `PublishedName` 映射；所有 declaration 都会在 SDK server 构建前完成校验。
 
 ## 3. 选择正确的节点
 
