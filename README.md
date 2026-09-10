@@ -11,12 +11,16 @@ Implementations:
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **Status: active 0.12 product port; not yet a release-ready replacement for
-> Python.** The kernel has focused execution evidence, and this repository now
-> has native project commands, inspection, a generated application, a real MCP
-> launcher, authenticated request-local root selection, and the maintained demo.
-> Remaining parity work includes complete documentation and scenario mapping, and
-> a clean-checkout release audit. Do not treat this branch as full product parity.
+> **Status: all applicable 0.12 source and behavioral-test rows are verified;
+> release remains guarded.** This repository ships native project commands,
+> inspection, generated applications, real MCP transports, authenticated
+> request-local path selection, REST, and the maintained demo. Remaining parity
+> work is documentation and release-asset review plus a clean-checkout release
+> audit. Do not create the first module tag until those gates pass.
+
+Public packages are the module root, `core/model`, `server`, `server/surface`,
+`web`, `demo`, `inspection`, and `cli`. The release check creates a separate Go
+module and imports each package through a local module replacement.
 
 ## Node model
 

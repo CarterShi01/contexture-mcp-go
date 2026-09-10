@@ -11,10 +11,13 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [跨语言规范](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **当前状态：正在推进的 0.12 产品移植，尚不是 Python 的可发布替代品。** 内核已有
-> 定向执行证据；本仓库现已具备原生项目命令、inspection、可生成的应用、真实 MCP
-> launcher、经过认证的请求级根选择与维护中的 demo。完整文档和场景映射、以及干净
-> 检出环境的发布审计仍待完成；请勿将当前分支视为完整产品等价。
+> **当前状态：所有适用的 0.12 源码与行为测试条目均已验证，但发布仍受保护。** 本仓库已具备
+> 原生项目命令、inspection、可生成的应用、真实 MCP transport、经过认证的请求级 path
+> selection、REST 与维护中的 demo。剩余 parity 工作是文档、发布资产审查以及干净检出环境的
+> 发布审计；这些门禁通过前不要创建首个 module tag。
+
+公开 package 包括 module root、`core/model`、`server`、`server/surface`、`web`、`demo`、
+`inspection` 与 `cli`。发布检查会创建独立 Go module，并通过本地 module replacement 导入每个 package。
 
 ## 节点模型
 
