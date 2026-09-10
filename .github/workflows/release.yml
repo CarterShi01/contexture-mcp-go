@@ -7,6 +7,10 @@ on:
         description: Candidate semantic version, including leading v
         required: true
         type: string
+      authorization:
+        description: Type RELEASE APPROVED after separate maintainer authorization
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -29,6 +33,10 @@ jobs:
         with:
           go-version: "1.27.x"
           cache: false
+      - name: Require explicit release authorization
+        env:
+          RELEASE_AUTHORIZATION: ${{ inputs.authorization }}
+        run: test "$RELEASE_AUTHORIZATION" = "RELEASE APPROVED"
       - run: go mod download
       - run: go run ./internal/conformancecheck
       - run: go test -race ./...
