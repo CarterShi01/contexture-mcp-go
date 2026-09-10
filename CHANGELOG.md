@@ -11,4 +11,8 @@ Versioning once public releases begin.
   clone can execute the conformance suite.
 - Make compiled Index nodes defensive snapshots, bind Channels to Application
   serving, and enforce runtime/disclosure-only separation.
+- Document and verify the public core/model, server/surface, demo, and web
+  package facades from an external Go module.
+- Complete fixed/request-selected server assembly, Prompt/Resource projection,
+  and exported Kubernetes demo Tool factories.
 - Keep the first Go module tag guarded pending final release review.
