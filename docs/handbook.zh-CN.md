@@ -342,7 +342,9 @@ Prompts 与 Resources，取代 Python dynamic project target 与 legacy config k
 
 可导入的 `demo` package 是 deterministic、fixture-driven 的 Kubernetes incident-response reference
 application。它公开 lazy `KubernetesPlatform`、`IncidentResponse`、`DeploymentOps` role factory、一个
-rollback Prompt、两个 Markdown Resource declaration、`Application()` 与不启动 transport 的 `Build()`
+rollback Prompt、五个 fixture-backed Tool factory（`GetPodStatus`、`GetPodLogs`、`GetPodEvents`、
+`GetRolloutStatus`、`RollBackDeployment`）及其 result type、两个 Markdown Resource declaration、
+`Application()` 与不启动 transport 的 `Build()`
 helper。CLI 消费同一个 Application。import/build 不会打开 connection 或 transport，demo 也不会连接真实 cluster。
 
 ## 4. 启动 Host 前先在本地工作

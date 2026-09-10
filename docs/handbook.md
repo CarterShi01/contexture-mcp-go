@@ -443,6 +443,9 @@ project targets and legacy configuration keys.
 The importable `demo` package is the deterministic, fixture-driven Kubernetes
 incident-response reference application. It exposes lazy
 `KubernetesPlatform`, `IncidentResponse`, and `DeploymentOps` role factories;
+the five fixture-backed `GetPodStatus`, `GetPodLogs`, `GetPodEvents`,
+`GetRolloutStatus`, and `RollBackDeployment` Tool factories and their result
+types;
 one rollback Prompt; two Markdown Resource declarations; `Application()`; and
 a non-starting `Build()` helper. The CLI consumes the same Application. Import
 and build open no connection or transport, and the demo never contacts a real

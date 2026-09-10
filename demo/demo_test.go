@@ -41,6 +41,47 @@ func TestApplicationIsLazyAndRunsTheReferenceDiagnosis(t *testing.T) {
 	}
 }
 
+func TestPublicDemoToolsPreserveReferenceEvidenceAndFailures(t *testing.T) {
+	for name, factory := range map[string]contexture.Factory{
+		"get_pod_status":      demo.GetPodStatus,
+		"get_pod_logs":        demo.GetPodLogs,
+		"get_pod_events":      demo.GetPodEvents,
+		"get_rollout_status":  demo.GetRolloutStatus,
+		"roll_back_deployment": demo.RollBackDeployment,
+	} {
+		node := factory()
+		if node.NodeName() != name {
+			t.Fatalf("factory %s returned %q", name, node.NodeName())
+		}
+	}
+	application, err := demo.Application()
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := server.CompileApplication(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	podInput, _ := json.Marshal(map[string]any{"namespace": demo.Namespace, "pod": demo.Pod, "previous": true})
+	logs, err := compiled.Runtime.InvokeReadOnly(context.Background(), "kubernetes-platform/incident-response/get_pod_logs", podInput, contexture.AllRoots())
+	if err != nil || !strings.Contains(logs.(string), "DB_URL is missing") {
+		t.Fatalf("logs = %#v, %v", logs, err)
+	}
+	events, err := compiled.Runtime.InvokeReadOnly(context.Background(), "kubernetes-platform/incident-response/get_pod_events", podInput, contexture.AllRoots())
+	if err != nil || len(events.([]demo.PodEvent)) != 4 {
+		t.Fatalf("events = %#v, %v", events, err)
+	}
+	deploymentInput, _ := json.Marshal(map[string]string{"namespace": demo.Namespace, "deployment": demo.Deployment})
+	rollout, err := compiled.Runtime.InvokeReadOnly(context.Background(), "kubernetes-platform/deployment-ops/get_rollout_status", deploymentInput, contexture.AllRoots())
+	if err != nil || rollout.(demo.RolloutStatus).PreviousRevision != 8 {
+		t.Fatalf("rollout = %#v, %v", rollout, err)
+	}
+	unknownInput, _ := json.Marshal(map[string]string{"namespace": demo.Namespace, "pod": "unknown"})
+	if _, err := compiled.Runtime.InvokeReadOnly(context.Background(), "kubernetes-platform/incident-response/get_pod_status", unknownInput, contexture.AllRoots()); err == nil || !strings.Contains(err.Error(), "single fixed incident") {
+		t.Fatalf("unknown Pod error = %v", err)
+	}
+}
+
 func TestDemoPreservesTheCompleteReferenceProceduresAndDocuments(t *testing.T) {
 	application, err := demo.Application()
 	if err != nil {
