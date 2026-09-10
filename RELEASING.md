@@ -5,9 +5,14 @@ conformance status is `scaffold`; the release workflow enforces this gate.
 
 ## First public candidate
 
-1. Complete the release scope and tests.
+1. Start from current `master` with a clean worktree. Complete the release
+   scope, move user-visible changes into a dated changelog section, and update
+   both READMEs and handbooks.
 2. Set `conformance/specification.json` to the honestly achieved status.
-3. Run `gofmt`, `go test -race ./...`, `go vet ./...`, and `go mod tidy`.
+3. Run `go mod tidy`, `go run ./internal/conformancecheck`, `gofmt`,
+   `go test -race ./...`, and `go vet ./...`. Confirm the external-module
+   release check imports every documented public package from a temporary
+   module and the worktree remains clean.
 4. Trigger the `Release Go module` workflow with a version such as
    `v0.1.0-rc.1`.
 5. Approve the protected `go-module` environment. The workflow rechecks the
