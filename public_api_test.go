@@ -5,12 +5,19 @@ import (
 	"testing"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
+	coremodel "github.com/CarterShi01/contexture-mcp-go/core/model"
 	"github.com/CarterShi01/contexture-mcp-go/server"
 )
 
 func TestPublicAuthoringConceptsResolveThroughRootPackage(t *testing.T) {
+	var _ coremodel.Channels
+	var _ coremodel.ControllerManager
+	var _ coremodel.RootSelection
+	var _ coremodel.Telemetry
 	var _ contexture.Channels
+	var _ contexture.ControllerManager
 	var _ contexture.Factory
+	var _ contexture.Index
 	var _ contexture.Prompt
 	var _ contexture.Resource
 	var _ contexture.Role
@@ -20,13 +27,22 @@ func TestPublicAuthoringConceptsResolveThroughRootPackage(t *testing.T) {
 	var _ *contexture.NodeNotFoundError
 	var _ contexture.Telemetry
 	var _ contexture.NodeUsage
+	var _ contexture.RootSelection
+	var _ contexture.SurfaceSelection
+	var _ contexture.WrongDoorError
 	values := map[string]any{
-		"Contexture":       contexture.Contexture,
-		"NewPrincipal":     contexture.NewPrincipal,
-		"CurrentGraph":     contexture.CurrentGraph,
-		"CurrentPrincipal": contexture.CurrentPrincipal,
-		"CurrentTelemetry": contexture.CurrentTelemetry,
-		"Version":          contexture.Version,
+		"CoreCurrentGraph":     coremodel.CurrentGraph,
+		"CoreCurrentTelemetry": coremodel.CurrentTelemetry,
+		"Contexture":           contexture.Contexture,
+		"NewPrincipal":         contexture.NewPrincipal,
+		"CurrentGraph":         contexture.CurrentGraph,
+		"CurrentPrincipal":     contexture.CurrentPrincipal,
+		"CurrentTelemetry":     contexture.CurrentTelemetry,
+		"NewControllerManager": contexture.NewControllerManager,
+		"NewMemoryTelemetry":   contexture.NewMemoryTelemetry,
+		"AllRoots":             contexture.AllRoots,
+		"AllSurfaces":          contexture.AllSurfaces,
+		"Version":              contexture.Version,
 	}
 	for name, value := range values {
 		if value == nil {

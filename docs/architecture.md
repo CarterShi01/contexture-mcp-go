@@ -19,6 +19,12 @@ The SDK-neutral layers own declaration validation, canonical refs, immutable
 Index facts, root-selected views, disclosure, execution bindings, and lifecycle
 protocols. They cannot import MCP, HTTP, CLI, or framework-specific packages.
 
+`core/model` is the native equivalent of Python's lazy `contexture.core`
+facade, while the root package re-exports its public authoring concepts. Go
+resolves package symbols at compile time rather than resolving attributes on
+first access; importing either SDK-neutral package does not load a Host
+adapter.
+
 The `server` package maps compiled APIs to the official MCP SDK. Its `surface`
 package projects Prompts and Resources. The independent `web` package maps an
 explicit route allowlist to `net/http`. Business Tools never become top-level

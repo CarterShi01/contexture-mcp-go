@@ -33,6 +33,7 @@ import (
     contexture "github.com/CarterShi01/contexture-mcp-go"
     "github.com/CarterShi01/contexture-mcp-go/inspection"
     contexturecli "github.com/CarterShi01/contexture-mcp-go/cli"
+    coremodel "github.com/CarterShi01/contexture-mcp-go/core/model"
     "github.com/CarterShi01/contexture-mcp-go/demo"
     "github.com/CarterShi01/contexture-mcp-go/server"
     "github.com/CarterShi01/contexture-mcp-go/server/instructions"
@@ -41,6 +42,18 @@ import (
 )
 
 var _ = contexture.NewPrincipal
+var _ coremodel.Channels
+var _ coremodel.ControllerManager
+var _ coremodel.RootSelection
+var _ coremodel.Telemetry
+var _ = coremodel.CurrentGraph
+var _ = coremodel.CurrentTelemetry
+var _ contexture.Channels
+var _ contexture.ControllerManager
+var _ contexture.RootSelection
+var _ contexture.SurfaceSelection
+var _ contexture.Telemetry
+var _ contexture.WrongDoorError
 var _ = contexturecli.RunApplication
 var _ *contexturecli.UsageError
 var _ = contexture.CurrentPrincipal

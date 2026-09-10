@@ -16,6 +16,10 @@ server MCP adapter ── server/surface     web HTTP adapter
 
 SDK-neutral 层负责声明校验、规范 ref、不可变 Index、root-selected view、disclosure、execution binding 和 lifecycle；它们不能导入 MCP、HTTP、CLI 或框架相关 package。
 
+`core/model` 是 Python lazy `contexture.core` facade 的原生等价物，root package 则 re-export
+其公开 authoring 概念。Go 在编译期解析 package symbol，而不是首次访问时解析 attribute；导入任一
+SDK-neutral package 都不会加载 Host adapter。
+
 `server` 使用官方 MCP Go SDK，`surface` 投影 Prompt 和 Resource，独立 `web` package 将显式 route allowlist 映射到 `net/http`。业务 Tool 不会成为顶层 MCP Tool；Contexture 只暴露固定导航与调用 gateway。
 
 ## 已实现区域
