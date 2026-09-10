@@ -36,6 +36,14 @@ func TestConfigureLoggingWritesContextureRecordsToStderr(t *testing.T) {
 }
 
 func TestContextureOptionsPreserveSafeDefaultsAndRejectPublicStartup(t *testing.T) {
+	stdio, err := server.NewContextureOptions(server.ContextureOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdio, err = server.NewContextureOptions(*stdio)
+	if err != nil || stdio.Transport != server.StdioTransport {
+		t.Fatalf("revalidated stdio defaults = %#v, %v", stdio, err)
+	}
 	local, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport})
 	if err != nil {
 		t.Fatal(err)

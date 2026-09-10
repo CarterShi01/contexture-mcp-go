@@ -170,7 +170,13 @@ func toolSuccess(value any) *mcp.CallToolResult {
 	if err != nil {
 		return toolFailure(err)
 	}
-	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}, StructuredContent: value}
+	structured := map[string]any{}
+	if len(raw) == 0 || raw[0] != '{' {
+		structured["result"] = value
+	} else if err := json.Unmarshal(raw, &structured); err != nil {
+		return toolFailure(err)
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}, StructuredContent: structured}
 }
 
 func toolFailure(err error) *mcp.CallToolResult {

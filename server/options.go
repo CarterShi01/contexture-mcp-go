@@ -41,9 +41,10 @@ type ContextureOptions struct {
 	// than silently disabling a network safety boundary.
 	MaxRequestBodyBytes int64
 
-	hostSet bool
-	portSet bool
-	pathSet bool
+	hostSet   bool
+	portSet   bool
+	pathSet   bool
+	validated bool
 }
 
 // NewContextureOptions applies safe local defaults and rejects silent no-op options.
@@ -55,9 +56,18 @@ func NewContextureOptions(options ContextureOptions) (*ContextureOptions, error)
 		copied.RequiredScopes = append([]string(nil), options.Auth.RequiredScopes...)
 		options.Auth = &copied
 	}
-	options.hostSet = options.Host != ""
-	options.portSet = options.Port != 0
-	options.pathSet = options.Path != ""
+	if options.validated {
+		// A validated value already contains effective defaults. Preserve whether
+		// those fields were originally stated, while still noticing a caller that
+		// changes one before asking a second boundary to validate it.
+		options.hostSet = options.hostSet || (options.Host != "" && options.Host != DefaultHost)
+		options.portSet = options.portSet || (options.Port != 0 && options.Port != DefaultPort)
+		options.pathSet = options.pathSet || (options.Path != "" && options.Path != DefaultPath)
+	} else {
+		options.hostSet = options.Host != ""
+		options.portSet = options.Port != 0
+		options.pathSet = options.Path != ""
+	}
 	if options.Transport == "" {
 		options.Transport = StdioTransport
 	}
@@ -73,6 +83,7 @@ func NewContextureOptions(options ContextureOptions) (*ContextureOptions, error)
 	if options.Path == "" {
 		options.Path = DefaultPath
 	}
+	options.validated = true
 	if options.Transport == StdioTransport {
 		if _, ok := slogLevel(options.LogLevel); !ok {
 			return nil, &ServeError{Message: fmt.Sprintf("unknown Contexture log level %q", options.LogLevel)}

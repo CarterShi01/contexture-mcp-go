@@ -58,7 +58,7 @@ func TestCompiledServerSharesTelemetryAcrossGatewayOpenAndInvoke(t *testing.T) {
 		t.Fatalf("gateway open = %#v, %v", opened, err)
 	}
 	invoked, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: string(contexture.InvokeReadOnlyGatewayName), Arguments: map[string]any{"ref": "operations/status", "arguments": map[string]any{}}})
-	if err != nil || invoked.IsError || invoked.StructuredContent != "healthy" {
+	if err != nil || invoked.IsError || structuredResult(invoked) != "healthy" {
 		t.Fatalf("gateway invocation = %#v, %v", invoked, err)
 	}
 	for _, ref := range []string{"operations", "operations/status"} {

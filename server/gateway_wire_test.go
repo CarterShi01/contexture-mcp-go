@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -108,14 +109,14 @@ func TestOfficialSDKExposesOnlyFixedGatewayAndPreservesInvocationDoors(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if readResult.IsError || readResult.StructuredContent != "healthy" {
+	if readResult.IsError || structuredResult(readResult) != "healthy" {
 		t.Fatalf("read result = %#v", readResult)
 	}
 	writeResult, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_invoke", Arguments: map[string]any{"ref": "restart", "arguments": map[string]any{"service": "api"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if writeResult.IsError || writeResult.StructuredContent != "restarted api" {
+	if writeResult.IsError || structuredResult(writeResult) != "restarted api" {
 		t.Fatalf("write result = %#v", writeResult)
 	}
 	wrongDoor, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_invoke", Arguments: map[string]any{"ref": "read-status", "arguments": map[string]any{}}})
@@ -130,6 +131,59 @@ func TestOfficialSDKExposesOnlyFixedGatewayAndPreservesInvocationDoors(t *testin
 	missing, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_open", Arguments: map[string]any{"ref": "missing"}})
 	if err != nil || !missing.IsError || len(missing.Content) != 1 || !strings.Contains(textOf(missing.Content[0]), "contexture_discover") {
 		t.Fatalf("missing-ref recovery = %#v, %v", missing, err)
+	}
+}
+
+func TestOfficialSDKWrapsScalarAndArrayResultsAsStructuredObjects(t *testing.T) {
+	text, err := contexture.NewTool("text", "Return text.", true, func(context.Context, struct{}) (string, error) {
+		return "healthy", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := contexture.NewTool("list", "Return a list.", true, func(context.Context, struct{}) ([]string, error) {
+		return []string{"one", "two"}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
+		Name: "structured-results",
+		Roots: []contexture.Factory{
+			func() contexture.Node { return text },
+			func() contexture.Node { return list },
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := server.CompileApplication(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway, err := compiled.Gateway()
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter := server.NewContextureMCPServer(server.Identity{Name: "structured-results", Version: "0.0.0"}, gateway)
+	ctx := context.Background()
+	client := mcp.NewClient(&mcp.Implementation{Name: "structured-result-client", Version: "0.0.0"}, nil)
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := adapter.Server.Connect(ctx, serverTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer serverSession.Close()
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clientSession.Close()
+	for ref, want := range map[string]any{"text": "healthy", "list": []any{"one", "two"}} {
+		result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: string(contexture.InvokeReadOnlyGatewayName), Arguments: map[string]any{"ref": ref, "arguments": map[string]any{}}})
+		if err != nil || result.IsError || !reflect.DeepEqual(structuredResult(result), want) {
+			t.Fatalf("%s result = %#v, %v; want %#v", ref, result, err, want)
+		}
 	}
 }
 
@@ -200,7 +254,7 @@ func TestOfficialSDKCarriesExplicitToolSchemaIntoDisclosureAndRuntime(t *testing
 	}
 
 	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_invoke_read_only", Arguments: map[string]any{"ref": "operations/lookup", "arguments": map[string]any{"name": "Ada"}}})
-	if err != nil || result.IsError || result.StructuredContent != "Ada:" {
+	if err != nil || result.IsError || structuredResult(result) != "Ada:" {
 		t.Fatalf("valid invocation = %#v, %v", result, err)
 	}
 	invalid, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "contexture_invoke_read_only", Arguments: map[string]any{"ref": "operations/lookup", "arguments": map[string]any{"name": "Ada", "unknown": true}}})
@@ -340,4 +394,12 @@ func textOf(content mcp.Content) string {
 		return text.Text
 	}
 	return ""
+}
+
+func structuredResult(result *mcp.CallToolResult) any {
+	structured, ok := result.StructuredContent.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return structured["result"]
 }
