@@ -45,6 +45,7 @@ MCP tools; Contexture exposes a fixed navigation and invocation gateway.
    resources, prompt publication, and runtime integration tests.
 
 Every applicable 0.12 source and behavioral-test row now has focused native
-evidence; maintained English and Simplified Chinese product documentation is
-also mapped. Release remains intentionally closed until the Host verification
-records, module metadata, and clean-checkout release audit are complete.
+evidence; maintained English and Simplified Chinese product documentation and
+real Claude Code Host verification are also recorded. Release remains
+intentionally closed until module metadata and the clean-checkout release audit
+are complete; Codex is separately blocked by local account login.

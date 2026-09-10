@@ -15,4 +15,7 @@ Versioning once public releases begin.
   package facades from an external Go module.
 - Complete fixed/request-selected server assembly, Prompt/Resource projection,
   and exported Kubernetes demo Tool factories.
+- Fix repeated validation of default stdio options and encode scalar/array MCP
+  Tool results as object-shaped structured content, both found by real Claude
+  Code Host verification.
 - Keep the first Go module tag guarded pending final release review.

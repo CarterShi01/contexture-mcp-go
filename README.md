@@ -233,7 +233,8 @@ checks validate implemented behavior, not a full-product release claim.
 
 Read the [Go handbook](docs/handbook.md), its
 [Simplified Chinese translation](docs/handbook.zh-CN.md), and the
-[architecture document](docs/architecture.md).
+[architecture document](docs/architecture.md). Real Host evidence and
+reproduction steps are recorded in [Host verification](docs/verification/hosts.md).
 
 ```text
 facade.go        public declaration-facing SDK-neutral facade
