@@ -8,6 +8,7 @@ Use Go 1.25 or newer:
 
 ```bash
 go mod download
+go run ./internal/conformancecheck
 go test -race ./...
 go vet ./...
 ```
@@ -28,3 +29,6 @@ commit credentials, local environment files, coverage output, or binaries.
 
 Public API changes require tests and a changelog entry. Wire-level changes also
 require a conformance-fixture review in the reference repository.
+Describe the user-visible problem, chosen boundary, tests, and compatibility
+effect in each pull request. Report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md), never in a public issue.
