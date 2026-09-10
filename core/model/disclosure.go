@@ -225,7 +225,10 @@ func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]an
 	if err != nil {
 		return nil, err
 	}
-	result := view.active(node, selection)
+	result, err := view.active(node, selection)
+	if err != nil {
+		return nil, err
+	}
 	view.reportOpen(ref, node)
 	return result, nil
 }
@@ -243,7 +246,10 @@ func (view *Disclosure) OpenForPerson(ref string, requested RootSelection) (map[
 	if err != nil {
 		return nil, err
 	}
-	result := view.active(node, selection)
+	result, err := view.active(node, selection)
+	if err != nil {
+		return nil, err
+	}
 	view.reportOpen(ref, node)
 	return result, nil
 }
@@ -270,7 +276,7 @@ func (view *Disclosure) card(node Node, bound bool) map[string]any {
 	return card
 }
 
-func (view *Disclosure) active(node Node, selection RootSelection) map[string]any {
+func (view *Disclosure) active(node Node, selection RootSelection) (map[string]any, error) {
 	card := view.card(node, true)
 	switch typed := node.(type) {
 	case *Role:
@@ -288,13 +294,16 @@ func (view *Disclosure) active(node Node, selection RootSelection) map[string]an
 			card[key] = append(card[key].([]map[string]any), view.card(child, true))
 		}
 		view.addUses(card, typed.Uses, selection)
+		if err := addPublicationDetails(card, typed, view); err != nil {
+			return nil, err
+		}
 	case *Skill:
 		card["instructions"] = typed.Instructions
 		view.addUses(card, typed.Uses, selection)
 	case *Tool:
 		view.addUses(card, typed.Uses, selection)
 	}
-	return card
+	return card, nil
 }
 
 // addUses projects declared dependency targets in declaration order. A

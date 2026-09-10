@@ -44,7 +44,7 @@ MCP tools; Contexture exposes a fixed navigation and invocation gateway.
 7. The maintained Kubernetes demo, including complete reference procedures,
    resources, prompt publication, and runtime integration tests.
 
-Every applicable 0.13 source and behavioral-test row now has focused native
+Every applicable 0.14 source and behavioral-test row now has focused native
 evidence; maintained English and Simplified Chinese product documentation and
 real Claude Code Host verification are also recorded. Release remains
 intentionally closed until module metadata and the clean-checkout release audit

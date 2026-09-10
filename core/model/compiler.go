@@ -24,6 +24,7 @@ type Index struct {
 	dependents  map[string][]string
 	order       []string
 	byKind      map[Kind][]Node
+	branchRefs  map[string][]string
 }
 
 // Compile builds one fresh canonical forest from a lazy Application.
@@ -35,7 +36,7 @@ func compile(application *Application, bindTools bool) (*Index, error) {
 	if application == nil {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("application must not be nil"))
 	}
-	state := compiler{index: &Index{name: application.name, channels: application.channels, bound: bindTools, byRef: map[string]Node{}, refByNode: map[Node]string{}, parent: map[Node]*Role{}, dependents: map[string][]string{}, byKind: map[Kind][]Node{}}, active: map[uintptr]bool{}, seen: map[Node]bool{}}
+	state := compiler{index: &Index{name: application.name, channels: application.channels, bound: bindTools, byRef: map[string]Node{}, refByNode: map[Node]string{}, parent: map[Node]*Role{}, dependents: map[string][]string{}, byKind: map[Kind][]Node{}, branchRefs: map[string][]string{}}, active: map[uintptr]bool{}, seen: map[Node]bool{}}
 	for _, factory := range application.roots {
 		node, err := state.build(factory, nil, nil)
 		if err != nil {
@@ -94,6 +95,10 @@ type compiler struct {
 }
 
 func (state *compiler) build(factory Factory, parent *Role, path []string) (Node, error) {
+	return state.buildExpected(factory, parent, path, false)
+}
+
+func (state *compiler) buildExpected(factory Factory, parent *Role, path []string, publication bool) (Node, error) {
 	if factory == nil {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("node factory must not be nil"))
 	}
@@ -106,6 +111,16 @@ func (state *compiler) build(factory Factory, parent *Role, path []string) (Node
 	declaration := factory()
 	if declaration == nil || (reflect.ValueOf(declaration).Kind() == reflect.Ptr && reflect.ValueOf(declaration).IsNil()) {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("node factory returned nil"))
+	}
+	if !publication && parent == nil {
+		if _, isPublication := declaration.(*Publication); isPublication {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Publication is finishing equipment and cannot be an application root"))
+		}
+	}
+	if publication {
+		if _, ok := declaration.(*Publication); !ok {
+			return nil, errors.Join(ErrInvalidDeclaration, errors.New("Role Publication factory must return a constructed *Publication"))
+		}
 	}
 	if state.seen[declaration] {
 		return nil, fmt.Errorf("%w: node %q was reused", ErrDuplicate, declaration.nodeName())
@@ -133,8 +148,15 @@ func (state *compiler) build(factory Factory, parent *Role, path []string) (Node
 	if !isRole {
 		return node, nil
 	}
-	if err := state.buildGroup(role.Children, role, ref, RoleKind); err != nil {
+	if err := state.buildBranches(role.Children, role, ref); err != nil {
 		return nil, err
+	}
+	if role.Publication != nil {
+		published, err := state.buildExpected(role.Publication, role, strings.Split(ref, foundation.ReferenceSeparator), true)
+		if err != nil {
+			return nil, err
+		}
+		role.publication = published.(*Role)
 	}
 	if err := state.buildGroup(role.Skills, role, ref, SkillKind); err != nil {
 		return nil, err
@@ -143,6 +165,20 @@ func (state *compiler) build(factory Factory, parent *Role, path []string) (Node
 		return nil, err
 	}
 	return node, nil
+}
+
+func (state *compiler) buildBranches(factories []Factory, parent *Role, ref string) error {
+	for _, factory := range factories {
+		child, err := state.build(factory, parent, strings.Split(ref, foundation.ReferenceSeparator))
+		if err != nil {
+			return err
+		}
+		if child.nodeKind() != RoleKind {
+			return fmt.Errorf("%w: role %q contains %s in %s group", ErrInvalidDeclaration, parent.Name, child.nodeKind(), RoleKind)
+		}
+		state.index.branchRefs[ref] = append(state.index.branchRefs[ref], state.index.refByNode[child])
+	}
+	return nil
 }
 
 func (state *compiler) buildGroup(factories []Factory, parent *Role, ref string, expected Kind) error {
@@ -165,8 +201,15 @@ func validateNode(node Node) error {
 	if strings.TrimSpace(node.nodeDescription()) == "" {
 		return errors.Join(ErrInvalidDeclaration, errors.New("node description must not be empty"))
 	}
-	if role, ok := node.(*Role); ok && strings.TrimSpace(role.Instructions) == "" {
-		return errors.Join(ErrInvalidDeclaration, errors.New("role instructions must not be empty"))
+	switch role := node.(type) {
+	case *Role:
+		if strings.TrimSpace(role.Instructions) == "" {
+			return errors.Join(ErrInvalidDeclaration, errors.New("role instructions must not be empty"))
+		}
+	case *Publication:
+		if strings.TrimSpace(role.Instructions) == "" {
+			return errors.Join(ErrInvalidDeclaration, errors.New("Publication instructions must not be empty"))
+		}
 	}
 	if skill, ok := node.(*Skill); ok && strings.TrimSpace(skill.Instructions) == "" {
 		return errors.Join(ErrInvalidDeclaration, errors.New("skill instructions must not be empty"))
@@ -458,12 +501,7 @@ func (index *Index) RolesByLevel() []NodeRef {
 		queue = queue[1:]
 		role := index.byRef[ref].(*Role)
 		result = append(result, NodeRef{Ref: ref, Node: cloneNode(role, index, ref)})
-		for _, child := range index.order {
-			node := index.byRef[child]
-			if index.parent[node] == role && node.nodeKind() == RoleKind {
-				queue = append(queue, child)
-			}
-		}
+		queue = append(queue, index.branchRefs[ref]...)
 	}
 	return result
 }
@@ -493,20 +531,7 @@ func (index *Index) Signpost(ref string) ([]SignpostLevel, error) {
 	result := make([]SignpostLevel, 0, len(parts)-1)
 	for depth := 1; depth < len(parts); depth++ {
 		ancestor := strings.Join(parts[:depth], foundation.ReferenceSeparator)
-		node, err := index.Find(ancestor)
-		if err != nil {
-			return nil, err
-		}
-		children, err := index.ChildrenOf(node)
-		if err != nil {
-			return nil, err
-		}
-		count := 0
-		for _, child := range children {
-			if child.nodeKind() == RoleKind {
-				count++
-			}
-		}
+		count := len(index.branchRefs[ancestor])
 		result = append(result, SignpostLevel{Ref: ancestor, SubRoleCount: count})
 	}
 	return result, nil
@@ -560,7 +585,14 @@ func (index *Index) internalNode(node Node) (Node, bool) {
 func cloneNode(node Node, owner *Index, ref string) Node {
 	switch typed := node.(type) {
 	case *Role:
-		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Children: append([]Factory(nil), typed.Children...), Skills: append([]Factory(nil), typed.Skills...), Tools: append([]Factory(nil), typed.Tools...), Uses: append([]string(nil), typed.Uses...), owner: owner, ref: ref}
+		clone := &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Children: append([]Factory(nil), typed.Children...), Publication: typed.Publication, Skills: append([]Factory(nil), typed.Skills...), Tools: append([]Factory(nil), typed.Tools...), Uses: append([]string(nil), typed.Uses...), owner: owner, ref: ref}
+		if typed.publication != nil && owner != nil {
+			publicationRef := owner.refByNode[typed.publication]
+			clone.publication = cloneNode(typed.publication, owner, publicationRef).(*Role)
+		}
+		return clone
+	case *Publication:
+		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Children: append([]Factory(nil), typed.Children...), Publication: typed.Publication, Skills: append([]Factory(nil), typed.Skills...), Tools: append([]Factory(nil), typed.Tools...), Uses: append([]string(nil), typed.Uses...), owner: owner, ref: ref}
 	case *Skill:
 		return &Skill{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), owner: owner, ref: ref}
 	case *Tool:
@@ -573,6 +605,11 @@ func cloneNode(node Node, owner *Index, ref string) Node {
 func nodeLocation(node Node) (*Index, string) {
 	switch typed := node.(type) {
 	case *Role:
+		if typed == nil {
+			return nil, ""
+		}
+		return typed.owner, typed.ref
+	case *Publication:
 		if typed == nil {
 			return nil, ""
 		}

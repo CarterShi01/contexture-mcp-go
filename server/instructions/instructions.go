@@ -109,14 +109,17 @@ func siblingGroups(disclosure *contexture.Disclosure, selection contexture.RootS
 	for len(queue) > 0 {
 		role := queue[0]
 		queue = queue[1:]
-		children, _ := disclosure.Index().ChildrenOf(role)
+		children, err := role.Branches()
+		if err != nil {
+			return nil, err
+		}
 		roles := []contexture.Node{}
 		for _, child := range children {
-			if child.Kind() != contexture.RoleKind || !visible(child) {
+			if !visible(child) {
 				continue
 			}
 			roles = append(roles, child)
-			queue = append(queue, child.(*contexture.Role))
+			queue = append(queue, child)
 		}
 		if len(roles) > 0 {
 			groups = append(groups, roles)

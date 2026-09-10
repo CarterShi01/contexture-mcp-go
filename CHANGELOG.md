@@ -5,6 +5,12 @@ Versioning once public releases begin.
 
 ## Unreleased
 
+- Align with Contexture 0.14 optional Role Publications as strongly typed,
+  lazily constructed finishing procedure and equipment.
+- Include Publication subtrees in containment, selection, inspection, runtime,
+  and disclosure-only views while excluding them from alternative branches.
+- Compose the framework closing contract only when opening an owning Role;
+  opening never executes Publication Tools or establishes success.
 - Align with Contexture 0.13 path-selected capability surfaces: direct paths
   and terminal wildcards can promote descendants to request-local surface roots.
 - Resolve wildcard selectors before applying runtime and identity ceilings, and

@@ -5,13 +5,13 @@ These instructions apply to the entire Go repository.
 - English is the first language for code, identifiers, comments, errors, API
   documentation, release notes, and authoritative documentation. Simplified
   Chinese documents are translations.
-- The normative contract is Contexture 0.13 at the revision pinned in
+- The normative contract is Contexture 0.14 at the revision pinned in
   `conformance/specification.json`. The reference repository's
   `spec/porting/FULL_PRODUCT_PARITY_PLAN.md` is the governing completion
   plan. The older kernel ledger remains evidence, not the product-completion
   criterion; specification, fixtures, and golden files outrank Python
   mechanisms.
-- This repository is a guarded 0.13 implementation with focused conformance
+- This repository is a guarded 0.14 implementation with focused conformance
   evidence. Do not claim parity beyond the verified incremental manifest,
   create a release tag, or publish a module until separately authorized.
 - Never update expected golden bytes, weaken assertions, skip tests, or delete

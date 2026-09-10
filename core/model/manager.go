@@ -117,6 +117,9 @@ func (manager *ControllerManager) register(factory Factory, expected Kind) (Node
 	if err != nil {
 		return nil, err
 	}
+	if _, publication := declaration.(*Publication); publication {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Publication is finishing equipment and cannot be registered as an application root"))
+	}
 	if expected != "" && declaration.nodeKind() != expected {
 		return nil, fmt.Errorf("%w: Register%s received a %s, not a %s", ErrInvalidDeclaration, kindTitle(expected), declaration.nodeKind(), expected)
 	}
@@ -193,6 +196,10 @@ func captureRegisteredNode(node Node, path string, seen map[Node]string, active 
 		if err != nil {
 			return nil, err
 		}
+		publication, err := captureRegisteredPublication(typed.Publication, path, seen, active, addresses)
+		if err != nil {
+			return nil, err
+		}
 		skills, err := captureGroup(typed.Skills, SkillKind, path, seen, active, addresses)
 		if err != nil {
 			return nil, err
@@ -201,7 +208,26 @@ func captureRegisteredNode(node Node, path string, seen map[Node]string, active 
 		if err != nil {
 			return nil, err
 		}
-		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), Children: frozenFactories(children), Skills: frozenFactories(skills), Tools: frozenFactories(tools)}, nil
+		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), Children: frozenFactories(children), Publication: frozenFactory(publication), Skills: frozenFactories(skills), Tools: frozenFactories(tools)}, nil
+	case *Publication:
+		role := (*Role)(typed)
+		children, err := captureGroup(role.Children, RoleKind, path, seen, active, addresses)
+		if err != nil {
+			return nil, err
+		}
+		publication, err := captureRegisteredPublication(role.Publication, path, seen, active, addresses)
+		if err != nil {
+			return nil, err
+		}
+		skills, err := captureGroup(role.Skills, SkillKind, path, seen, active, addresses)
+		if err != nil {
+			return nil, err
+		}
+		tools, err := captureGroup(role.Tools, ToolKind, path, seen, active, addresses)
+		if err != nil {
+			return nil, err
+		}
+		return &Publication{Name: role.Name, Description: role.Description, Instructions: role.Instructions, Uses: append([]string(nil), role.Uses...), Children: frozenFactories(children), Publication: frozenFactory(publication), Skills: frozenFactories(skills), Tools: frozenFactories(tools)}, nil
 	case *Skill:
 		return &Skill{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...)}, nil
 	case *Tool:
@@ -209,6 +235,27 @@ func captureRegisteredNode(node Node, path string, seen map[Node]string, active 
 	default:
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("registration root must be a Contexture Role, Skill, or Tool"))
 	}
+}
+
+func captureRegisteredPublication(factory Factory, parent string, seen map[Node]string, active map[Node]bool, addresses map[string]Node) (Node, error) {
+	if factory == nil {
+		return nil, nil
+	}
+	publication, err := registrationNode(factory)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := publication.(*Publication); !ok {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("Role Publication factory must return a constructed *Publication"))
+	}
+	return captureRegisteredNode(publication, parent+foundation.ReferenceSeparator+publication.nodeName(), seen, active, addresses)
+}
+
+func frozenFactory(node Node) Factory {
+	if node == nil {
+		return nil
+	}
+	return func() Node { return node }
 }
 
 func captureGroup(factories []Factory, expected Kind, parent string, seen map[Node]string, active map[Node]bool, addresses map[string]Node) ([]Node, error) {
@@ -371,7 +418,9 @@ func (manager *ControllerManager) Compile(name string) (*Index, error) {
 func snapshotNode(node Node) Node {
 	switch typed := node.(type) {
 	case *Role:
-		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), Children: snapshotFactories(typed.Children), Skills: snapshotFactories(typed.Skills), Tools: snapshotFactories(typed.Tools)}
+		return &Role{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), Children: snapshotFactories(typed.Children), Publication: snapshotFactory(typed.Publication), Skills: snapshotFactories(typed.Skills), Tools: snapshotFactories(typed.Tools)}
+	case *Publication:
+		return &Publication{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...), Children: snapshotFactories(typed.Children), Publication: snapshotFactory(typed.Publication), Skills: snapshotFactories(typed.Skills), Tools: snapshotFactories(typed.Tools)}
 	case *Skill:
 		return &Skill{Name: typed.Name, Description: typed.Description, Instructions: typed.Instructions, Uses: append([]string(nil), typed.Uses...)}
 	case *Tool:
@@ -379,6 +428,14 @@ func snapshotNode(node Node) Node {
 	default:
 		panic("unreachable Contexture node kind")
 	}
+}
+
+func snapshotFactory(factory Factory) Factory {
+	if factory == nil {
+		return nil
+	}
+	node := factory()
+	return func() Node { return snapshotNode(node) }
 }
 
 func snapshotFactories(factories []Factory) []Factory {

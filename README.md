@@ -11,7 +11,7 @@ Implementations:
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **Status: all applicable 0.13 source and behavioral-test rows are verified;
+> **Status: all applicable 0.14 source and behavioral-test rows are verified;
 > release remains guarded.** This repository ships native project commands,
 > inspection, generated applications, real MCP transports, authenticated
 > request-local path selection, REST, and the maintained demo. Remaining parity
@@ -31,6 +31,27 @@ split by responsibility under `core/model/`:
 - `Skill` is procedure followed by a model.
 - `Tool` is an executable capability with one typed Binding.
 - `Node` is the sealed interface implemented by their pointer types.
+
+### Optional Publication
+
+Set `Role.Publication` to a lazy factory returning `*contexture.Publication`
+when finishing that Role requires separately disclosed procedure and equipment:
+
+```go
+Publication: func() contexture.Node {
+	return &contexture.Publication{
+		Name: "publish", Description: "Preserve the result.",
+		Instructions: "Review evidence, obtain approval, then save the result.",
+	}
+},
+```
+
+A Publication remains kind `role` on the wire and can hold ordinary Roles,
+Skills, Tools, and an explicitly nested Publication. It is finishing equipment,
+not an alternative child branch or automatic callback. Opening the owner adds
+its card and the framework closing contract; opening the Publication only
+discloses procedure. Only explicit Tool invocation has effects, and blocked,
+failed, or approval-pending publication must be reported honestly.
 
 `NewTool` and `NewToolWithSchema` are backed by `core/model/binding.go`. The
 root facade intentionally exposes declarations only; MCP and web adapters are
@@ -231,7 +252,7 @@ go test -race ./...
 go vet ./...
 ```
 
-The port targets Contexture Specification 0.13 at the immutable revision in
+The port targets Contexture Specification 0.14 at the immutable revision in
 [`conformance/specification.json`](conformance/specification.json). Pinned
 fixtures and golden outputs are stored under `conformance/`; tests construct and
 run the Go implementation before comparing its observations with them. These

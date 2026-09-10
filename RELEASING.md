@@ -14,7 +14,7 @@ conformance status is `scaffold`; the release workflow enforces this gate.
    release check imports every documented public package from a temporary
    module and the worktree remains clean.
 4. Only after a maintainer separately authorizes public release, trigger the
-   `Release Go module` workflow with `v0.13.0-rc.1` and the exact authorization
+   `Release Go module` workflow with `v0.14.0-rc.1` and the exact authorization
    phrase `RELEASE APPROVED`. Its metadata check requires a pre-1.0 semantic
    tag and a module path without a `/v2` suffix.
 5. Approve the protected `go-module` environment. The workflow rechecks the
@@ -23,7 +23,7 @@ conformance status is `scaffold`; the release workflow enforces this gate.
 
    ```bash
    GOPROXY=https://proxy.golang.org go list -m \
-      github.com/CarterShi01/contexture-mcp-go@v0.13.0-rc.1
+      github.com/CarterShi01/contexture-mcp-go@v0.14.0-rc.1
    ```
 
 7. Verify the module page on `pkg.go.dev`.

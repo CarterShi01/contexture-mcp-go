@@ -64,7 +64,7 @@ func BranchesOf(node Node) ([]Node, error) {
 	if nilNode(node) {
 		return nil, uncompiledNodeError()
 	}
-	role, ok := node.(*Role)
+	role, ok := roleNode(node)
 	if !ok {
 		return []Node{}, nil
 	}
@@ -92,12 +92,12 @@ func MembersOf(node Node) ([]Node, error) {
 	if nilNode(node) {
 		return nil, uncompiledNodeError()
 	}
-	role, ok := node.(*Role)
+	role, ok := roleNode(node)
 	if !ok {
 		return []Node{}, nil
 	}
 	if role.owner == nil || role.ref == "" {
-		if len(role.Children) > 0 || len(role.Skills) > 0 || len(role.Tools) > 0 {
+		if len(role.Children) > 0 || role.Publication != nil || len(role.Skills) > 0 || len(role.Tools) > 0 {
 			return nil, uncompiledNodeError()
 		}
 		return []Node{}, nil
@@ -198,6 +198,8 @@ func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, err
 	switch typed := node.(type) {
 	case *Role:
 		instructions = typed.Instructions
+	case *Publication:
+		instructions = typed.Instructions
 	case *Skill:
 		instructions = typed.Instructions
 	default:
@@ -208,6 +210,7 @@ func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, err
 	}
 	card["instructions"] = instructions
 	if node.nodeKind() == RoleKind {
+		role, _ := roleNode(node)
 		members, err := MembersOf(node)
 		if err != nil {
 			return nil, err
@@ -219,8 +222,49 @@ func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, err
 		for key, value := range grouped {
 			card[key] = cloneCompiledValue(value)
 		}
+		if err := addPublicationDetails(card, role, view); err != nil {
+			return nil, err
+		}
 	}
 	return addCompiledUses(card, node.nodeUses(), view)
+}
+
+func roleNode(node Node) (*Role, bool) {
+	switch typed := node.(type) {
+	case *Role:
+		return typed, typed != nil
+	case *Publication:
+		return (*Role)(typed), typed != nil
+	default:
+		return nil, false
+	}
+}
+
+func addPublicationDetails(card CompiledContext, role *Role, view View) error {
+	if role == nil || role.publication == nil {
+		return nil
+	}
+	ref, err := view.RefOf(role.publication)
+	if err != nil {
+		return err
+	}
+	available := false
+	switch roles := card["roles"].(type) {
+	case []CompiledContext:
+		for _, candidate := range roles {
+			available = available || candidate["ref"] == ref
+		}
+	case []map[string]any:
+		for _, candidate := range roles {
+			available = available || candidate["ref"] == ref
+		}
+	}
+	if !available {
+		return errors.Join(ErrInvalidDeclaration, errors.New("the declared Publication is unavailable in this view; open the owning Role through a surface containing its complete publication subtree"))
+	}
+	card["publication"] = ref
+	card["instructions"] = fmt.Sprintf("%s\n\nPublication (framework contract):\nBefore finishing this role's work, call contexture_open with ref=%q and follow that Publication's instructions using the work's results and evidence. Opening it only discloses the procedure; it does not execute it or establish success. Use its available capabilities as instructed, respect required approvals, and report the actual outcome. If publication is blocked, fails, or awaits approval, report that state rather than claiming success or bypassing approval.", role.Instructions, ref)
+	return nil
 }
 
 func addCompiledUses(card CompiledContext, refs []string, view View) (CompiledContext, error) {
@@ -285,6 +329,8 @@ func nilNode(node Node) bool {
 	}
 	switch typed := node.(type) {
 	case *Role:
+		return typed == nil
+	case *Publication:
 		return typed == nil
 	case *Skill:
 		return typed == nil

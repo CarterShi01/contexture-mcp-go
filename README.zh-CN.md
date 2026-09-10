@@ -11,7 +11,7 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [跨语言规范](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **当前状态：所有适用的 0.13 源码与行为测试条目均已验证，但发布仍受保护。** 本仓库已具备
+> **当前状态：所有适用的 0.14 源码与行为测试条目均已验证，但发布仍受保护。** 本仓库已具备
 > 原生项目命令、inspection、可生成的应用、真实 MCP transport、经过认证的请求级 path
 > selection、REST 与维护中的 demo。剩余 parity 工作是文档、发布资产审查以及干净检出环境的
 > 发布审计；这些门禁通过前不要创建首个 module tag。
@@ -28,6 +28,15 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 - `Skill`：由模型遵循的操作过程；
 - `Tool`：拥有一份强类型 Binding 的可执行能力；
 - `Node`：只能由上述指针类型实现的封闭接口。
+
+### 可选 Publication
+
+当 Role 的收尾工作需要单独披露的流程和设备时，把 `Role.Publication` 设为返回
+`*contexture.Publication` 的惰性 factory。Publication 在线上仍是 kind `role`，可包含
+普通 Role、Skill、Tool 以及显式嵌套的 Publication。它是收尾设备，不是可替代的 child
+branch，也不是自动 callback。打开 owner 会加入其卡片和框架收尾合约；打开 Publication
+本身只披露流程。只有显式 Tool 调用才会产生副作用；blocked、failed 或等待 approval 的
+状态必须如实报告。
 
 `NewTool` 和 `NewToolWithSchema` 由 `core/model/binding.go` 支持。根 facade
 只暴露声明；MCP 与 web 适配器需要显式单独导入。
@@ -216,7 +225,7 @@ go vet ./...
 ```
 
 该移植锁定 `conformance/specification.json` 中记录的 Contexture Specification
-0.13 提交。固定 fixtures 和 golden 输出保存在 `conformance/`；测试会先通过
+0.14 提交。固定 fixtures 和 golden 输出保存在 `conformance/`；测试会先通过
 Go 实现生成真实观察结果，再与这些资产比较。上述命令验证的是已实现的内核，
 不是完整产品的发布 gate。
 

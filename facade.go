@@ -19,6 +19,7 @@ type (
 	CompiledContext        = model.CompiledContext
 	View                   = model.View
 	Role                   = model.Role
+	Publication            = model.Publication
 	Skill                  = model.Skill
 	Tool                   = model.Tool
 	Application            = model.Application
