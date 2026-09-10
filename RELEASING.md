@@ -13,8 +13,9 @@ conformance status is `scaffold`; the release workflow enforces this gate.
    `go test -race ./...`, and `go vet ./...`. Confirm the external-module
    release check imports every documented public package from a temporary
    module and the worktree remains clean.
-4. Trigger the `Release Go module` workflow with a version such as
-   `v0.1.0-rc.1`.
+4. Trigger the `Release Go module` workflow with `v0.12.0-rc.1`. Its metadata
+   check requires a pre-1.0 semantic tag and a module path without a `/v2`
+   suffix.
 5. Approve the protected `go-module` environment. The workflow rechecks the
    source and creates an annotated tag on the exact verified commit.
 6. Ask the public Go proxy to resolve the immutable version:
