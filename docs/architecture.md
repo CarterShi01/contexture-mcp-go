@@ -44,8 +44,7 @@ MCP tools; Contexture exposes a fixed navigation and invocation gateway.
 7. The maintained Kubernetes demo, including complete reference procedures,
    resources, prompt publication, and runtime integration tests.
 
-The first five areas have focused kernel-conformance evidence; the last two
-have native product-workflow tests. This is still not a parity or release
-claim. The full documentation and scenario inventory, and the clean-checkout
-release audit remain open. They must be finished with direct evidence rather
-than treated as a language-native substitution.
+Every applicable 0.12 source and behavioral-test row now has focused native
+evidence; maintained English and Simplified Chinese product documentation is
+also mapped. Release remains intentionally closed until the Host verification
+records, module metadata, and clean-checkout release audit are complete.

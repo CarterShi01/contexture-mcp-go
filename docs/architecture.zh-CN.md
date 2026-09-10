@@ -30,4 +30,6 @@ SDK-neutral package 都不会加载 Host adapter。
 4. 原生 CLI、项目生成/发现、inspection、demo 和 stdio/streamable-HTTP launcher；
 5. 外部 Go module 消费者与竞态测试。
 
-这仍不是 parity 或 release 声明：完整文档/场景 inventory 和干净检出环境的 release audit 仍待完成。
+所有适用的 0.12 源码与行为测试条目现在都具备定向原生证据；维护中的英文与简体中文产品文档
+也已完成映射。Host 验证记录、module metadata 与干净检出环境的 release audit 完成前，发布仍会
+刻意保持关闭。
