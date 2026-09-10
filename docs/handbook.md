@@ -360,7 +360,9 @@ root-projected graphs.
 request. It accepts the case-insensitive legacy `Contexture-Roots` spelling
 only when the new header is absent, rejects requests that send both, validates
 paths without listing unrelated refs, and intersects them with the authenticated
-principal's ceiling. `HeaderRootSelector` remains an alias.
+principal's ceiling. `FixedSurfaceSelector` resolves one transport-independent
+selection for hosts that do not derive it from HTTP request facts;
+`FixedRootSelector` and `HeaderRootSelector` remain aliases.
 
 `Disclosure.Unrestricted()` removes Prompt-only model ownership for a person or
 Host path while retaining the exact selected surface. It never widens a root or

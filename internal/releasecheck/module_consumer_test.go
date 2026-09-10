@@ -147,6 +147,7 @@ var _ = (*server.ApplicationServer).BuildForSurfaces
 var _ = (*server.ApplicationServer).StartWithAuthAndSurfaceSelector
 var _ = (*server.ApplicationServer).ServeListenerWithAuthAndSurfaceSelector
 var _ = server.Auth{}
+var _ = server.FixedRootSelector{}
 var _ = server.HeaderRootSelector{}
 var _ = server.HeaderSurfaceSelector{}
 var _ = server.SelectHeader
@@ -217,7 +218,9 @@ func main() {
     if _, unrestrictedOutsideErr := pathDisclosure.Unrestricted().Open("team", contexture.AllSurfaces()); !errors.Is(unrestrictedOutsideErr, contexture.ErrRootOutsideSelection) { panic("public unrestricted disclosure widened its selected surface") }
     headerSelection, headerSelectionErr := (server.HeaderSurfaceSelector{}).Select(pathIndex, map[string]string{server.SelectHeader: "team/editor"}, nil)
     legacySelection, legacySelectionErr := (server.HeaderRootSelector{}).Select(pathIndex, map[string]string{server.RootsHeader: "team"}, nil)
-    if headerSelectionErr != nil || legacySelectionErr != nil || headerSelection.Names()[0] != "team/editor" || legacySelection.Names()[0] != "team" { panic("public current and legacy selection headers failed") }
+    fixedRoot, fixedRootErr := contexture.OnlyRoots("team")
+    fixedSelection, fixedSelectionErr := (server.FixedRootSelector{Selection: fixedRoot}).Select(pathIndex, nil, nil)
+    if headerSelectionErr != nil || legacySelectionErr != nil || fixedRootErr != nil || fixedSelectionErr != nil || headerSelection.Names()[0] != "team/editor" || legacySelection.Names()[0] != "team" || fixedSelection.Names()[0] != "team" { panic("public current, legacy, or fixed selection failed") }
     _ = index.Count()
     _ = index.Has("operations")
     _ = index.NodesWithRefs()

@@ -247,7 +247,8 @@ Host 的 immutable principal，但不会被 caller-supplied graph 扩大。Tool 
 其唯一的 `CurrentGraph`；并发 call 会得到彼此独立的 root-projected graph。
 `HeaderSurfaceSelector` 仅将 `Contexture-Select` 当作 attenuation request；只有新 header 缺失时才接受
 大小写不敏感的 legacy `Contexture-Roots`，同时发送两者会被拒绝。它校验 path 时不会列出无关 ref，
-并与经过认证的 principal ceiling 求交。`HeaderRootSelector` 保留为 alias。
+并与经过认证的 principal ceiling 求交。`FixedSurfaceSelector` 为不从 HTTP request fact 派生 selection 的
+Host 解析一个 transport-independent selection；`FixedRootSelector` 与 `HeaderRootSelector` 保留为 alias。
 
 `Disclosure.Unrestricted()` 会为 person 或 Host path 移除 Prompt-only model ownership，同时保留
 完全相同的 selected surface。它绝不会扩大 root 或 path ceiling；selection 外的 ref 仍不可用。

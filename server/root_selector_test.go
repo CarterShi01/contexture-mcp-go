@@ -83,6 +83,17 @@ func TestHeaderRootSelectorDefaultsToAllAndNormalizesHeaderRoots(t *testing.T) {
 	}
 }
 
+func TestFixedRootSelectorResolvesOneTransportIndependentSurface(t *testing.T) {
+	selection, err := contexture.OnlyRoots("diagnose")
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := (server.FixedRootSelector{Selection: selection}).Select(selectorIndex(t), nil, nil)
+	if err != nil || !reflect.DeepEqual(selected.Names(), []string{"diagnose"}) || !selected.ContainsRef("diagnose/service") || selected.ContainsRef("release") {
+		t.Fatalf("fixed selection = %#v, %v", selected.Names(), err)
+	}
+}
+
 func TestHeaderRootSelectorRejectsMalformedAndOversizedRequests(t *testing.T) {
 	index := selectorIndex(t)
 	selector := server.HeaderRootSelector{MaxLength: 4, MaxRoots: 1}
