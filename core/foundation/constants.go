@@ -7,7 +7,7 @@ const PackageName = "contexture"
 // PackageVersion is the Go binding release version. It is deliberately
 // distinct from SpecificationVersion: one binding release targets one pinned
 // Contexture contract, while an application has its own host identity.
-const PackageVersion = "0.12.0rc1"
+const PackageVersion = "0.13.0rc1"
 
 // ReferenceSeparator separates one segment of a Contexture reference from
 // the next. References are paths; empty segments are normalized by Index

@@ -171,6 +171,10 @@ func (view *Disclosure) SchemaOf(node Node) (map[string]any, error) {
 
 // EffectiveSelection applies the view's ceiling to one requested root selection.
 func (view *Disclosure) EffectiveSelection(requested RootSelection) (RootSelection, error) {
+	requested, err := requested.Resolve(view.index)
+	if err != nil {
+		return RootSelection{}, err
+	}
 	selection, err := view.selection.Intersect(requested)
 	if err != nil {
 		return RootSelection{}, err
@@ -180,11 +184,7 @@ func (view *Disclosure) EffectiveSelection(requested RootSelection) (RootSelecti
 
 // Discover returns routing cards for model-visible selected roots only.
 func (view *Disclosure) Discover(requested RootSelection) (map[string][]map[string]any, error) {
-	selection, err := view.selection.Intersect(requested)
-	if err != nil {
-		return nil, err
-	}
-	selection, err = selection.Resolve(view.index)
+	selection, err := view.EffectiveSelection(requested)
 	if err != nil {
 		return nil, err
 	}
@@ -207,11 +207,7 @@ func (view *Disclosure) Discover(requested RootSelection) (map[string][]map[stri
 
 // Open discloses one model-reachable node and one sibling level.
 func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]any, error) {
-	selection, err := view.selection.Intersect(requested)
-	if err != nil {
-		return nil, err
-	}
-	selection, err = selection.Resolve(view.index)
+	selection, err := view.EffectiveSelection(requested)
 	if err != nil {
 		return nil, err
 	}
@@ -236,11 +232,7 @@ func (view *Disclosure) Open(ref string, requested RootSelection) (map[string]an
 
 // OpenForPerson resolves through both ordinary and Prompt roots.
 func (view *Disclosure) OpenForPerson(ref string, requested RootSelection) (map[string]any, error) {
-	selection, err := view.selection.Intersect(requested)
-	if err != nil {
-		return nil, err
-	}
-	selection, err = selection.Resolve(view.index)
+	selection, err := view.EffectiveSelection(requested)
 	if err != nil {
 		return nil, err
 	}

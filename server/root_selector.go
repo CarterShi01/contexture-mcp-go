@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 )
@@ -74,16 +75,12 @@ func (selector HeaderSurfaceSelector) Select(index *contexture.Index, headers ma
 	}
 	requested := contexture.AllSurfaces()
 	if present {
-		if len(raw) > maxLength {
+		if utf8.RuneCountInString(raw) > maxLength {
 			return contexture.SurfaceSelection{}, &contexture.SurfaceSelectionError{Message: fmt.Sprintf("%s exceeds the %d-character limit", usedHeader, maxLength)}
 		}
 		parts := strings.Split(raw, ",")
 		if len(parts) > maxSelectors {
-			label := "selector"
-			if strings.EqualFold(usedHeader, RootsHeader) {
-				label = "root"
-			}
-			return contexture.SurfaceSelection{}, &contexture.SurfaceSelectionError{Message: fmt.Sprintf("%s exceeds the %d-%s limit", usedHeader, maxSelectors, label)}
+			return contexture.SurfaceSelection{}, &contexture.SurfaceSelectionError{Message: fmt.Sprintf("%s exceeds the %d-selector limit", usedHeader, maxSelectors)}
 		}
 		var err error
 		requested, err = contexture.OnlySurfaces(parts...)

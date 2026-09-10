@@ -101,13 +101,20 @@ func TestHeaderRootSelectorRejectsMalformedAndOversizedRequests(t *testing.T) {
 		t.Fatalf("length error = %v", err)
 	}
 	selector.MaxLength = 100
-	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "diagnose,release"}, nil); err == nil || !strings.Contains(err.Error(), "root limit") {
+	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "diagnose,release"}, nil); err == nil || !strings.Contains(err.Error(), "selector limit") {
 		t.Fatalf("count error = %v", err)
 	}
 	if _, err := selector.Select(index, map[string]string{server.RootsHeader: "missing"}, nil); err == nil || !strings.Contains(err.Error(), "unknown or empty Contexture selector") {
 		t.Fatalf("unknown root error = %v", err)
 	} else if strings.Contains(err.Error(), "diagnose") || strings.Contains(err.Error(), "release") {
 		t.Fatalf("unknown root selection leaked undisclosed roots: %v", err)
+	}
+}
+
+func TestSurfaceHeaderLengthCountsUnicodeCodePoints(t *testing.T) {
+	selector := server.HeaderSurfaceSelector{MaxLength: 1}
+	if _, err := selector.Select(selectorIndex(t), map[string]string{server.SelectHeader: "𐀀"}, nil); err == nil || strings.Contains(err.Error(), "character limit") {
+		t.Fatalf("Unicode selector should pass the character limit and fail resolution: %v", err)
 	}
 }
 

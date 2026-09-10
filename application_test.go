@@ -13,8 +13,8 @@ import (
 func TestSpecificationIdentity(t *testing.T) {
 	t.Parallel()
 
-	if contexture.SpecificationVersion != "0.12" {
-		t.Fatalf("SpecificationVersion = %q, want 0.12", contexture.SpecificationVersion)
+	if contexture.SpecificationVersion != "0.13" {
+		t.Fatalf("SpecificationVersion = %q, want 0.13", contexture.SpecificationVersion)
 	}
 }
 

@@ -11,7 +11,7 @@ Implementations:
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **Status: all applicable 0.12 source and behavioral-test rows are verified;
+> **Status: all applicable 0.13 source and behavioral-test rows are verified;
 > release remains guarded.** This repository ships native project commands,
 > inspection, generated applications, real MCP transports, authenticated
 > request-local path selection, REST, and the maintained demo. Remaining parity
@@ -182,6 +182,14 @@ fmt.Print(server.CodexConfig(launch))      // stanza for ~/.codex/config.toml
 mcp add` commands. The same API works for applications with a custom stdio
 entry point.
 
+For streamable HTTP, `HeaderSurfaceSelector` reads the canonical
+`Contexture-Select` header. A comma-separated direct path such as
+`team/notebook-editor`, or a terminal wildcard such as `team/*`, promotes each
+resolved match to a request-local surface root. Selection never widens runtime
+or identity ceilings. The legacy `Contexture-Roots` header remains supported,
+but new integrations should send `Contexture-Select`. Invalid selectors return
+a safe JSON-RPC `-32602` response with the request ID preserved.
+
 ## Run a project
 
 The Go CLI runs the static application declared by a project's
@@ -223,7 +231,7 @@ go test -race ./...
 go vet ./...
 ```
 
-The port targets Contexture Specification 0.12 at the immutable revision in
+The port targets Contexture Specification 0.13 at the immutable revision in
 [`conformance/specification.json`](conformance/specification.json). Pinned
 fixtures and golden outputs are stored under `conformance/`; tests construct and
 run the Go implementation before comparing its observations with them. These

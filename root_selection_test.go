@@ -167,6 +167,40 @@ func TestDisclosureDiscoversAndOpensPromotedSurfaceRoot(t *testing.T) {
 	}
 }
 
+func TestDisclosureResolvesWildcardBeforeApplyingPathCeiling(t *testing.T) {
+	index := selectionIndex(t, false)
+	ceiling, _ := contexture.OnlySurfaces("alpha")
+	requested, _ := contexture.OnlySurfaces("alpha/*")
+	disclosure, err := contexture.NewDisclosure(index, ceiling)
+	if err != nil {
+		t.Fatal(err)
+	}
+	discovered, err := disclosure.Discover(requested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(discovered["roles"]) != 1 || discovered["roles"][0]["ref"] != "alpha/child" || len(discovered["skills"]) != 1 || discovered["skills"][0]["ref"] != "alpha/inspect" {
+		t.Fatalf("wildcard discovery = %#v", discovered)
+	}
+}
+
+func TestRuntimeResolvesWildcardBeforeApplyingPathCeiling(t *testing.T) {
+	index := selectionIndex(t, true)
+	ceiling, _ := contexture.OnlySurfaces("alpha")
+	requested, _ := contexture.OnlySurfaces("alpha/*")
+	runtime, err := contexture.NewRuntime(index, contexture.AllSurfaces(), ceiling, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := runtime.InvokeReadOnly(context.Background(), "alpha/scope", json.RawMessage("{}"), requested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := value.([]string); !reflect.DeepEqual(got, []string{"alpha/child", "alpha/inspect", "alpha/scope", "alpha/child", "alpha/inspect", "alpha/scope"}) {
+		t.Fatalf("wildcard runtime projection = %#v", got)
+	}
+}
+
 func TestSelectedGraphProjectsEveryGraphOperationWithoutCrossRootLeakage(t *testing.T) {
 	index := selectionIndex(t, false)
 	alpha, _ := contexture.OnlyRoots("alpha")

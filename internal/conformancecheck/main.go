@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	expectedRevision = "3b274421360d5569a23922bfc72b71d5828cf995"
-	expectedVersion  = "0.12"
+	expectedRevision = "1deeb6b87be905edf1ba9b83d8d431def0af702c"
+	expectedVersion  = "0.13"
 )
 
 var expectedFixtures = []string{

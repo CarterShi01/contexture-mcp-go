@@ -9,7 +9,7 @@
     "$schema": { "type": "string" },
     "repository": { "type": "string", "format": "uri" },
     "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "specificationVersion": { "const": "0.12" },
+    "specificationVersion": { "const": "0.13" },
     "status": { "enum": ["scaffold", "partial", "conformant"] },
     "implementedRules": {
       "type": "array",

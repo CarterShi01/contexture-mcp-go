@@ -22,7 +22,7 @@ const (
 
 // Neutral returns bootstrap text for a request-selected server without a roster.
 func Neutral() string {
-	return "This Contexture server exposes a request-specific set of complete root capabilities. Call contexture_discover for the roots available to this request, open the one that fits the task, and continue one level at a time using refs exactly as returned. Run a disclosed tool through the read-only or writing Contexture invoke door named on its card."
+	return "This Contexture server exposes a request-specific set of complete capability subtrees. Call contexture_discover for the surface roots available to this request, open the one that fits the task, and continue one level at a time using refs exactly as returned. Run a disclosed tool through the read-only or writing Contexture invoke door named on its card."
 }
 
 // Build returns contract-first bootstrap instructions and a breadth-first roster.
@@ -38,7 +38,11 @@ func Build(disclosure *contexture.Disclosure, requested contexture.RootSelection
 		return "", err
 	}
 	roster, spent, dropped, full := []string{}, 0, 0, false
-	for index, group := range siblingGroups(disclosure, effective) {
+	groups, err := siblingGroups(disclosure, effective)
+	if err != nil {
+		return "", err
+	}
+	for index, group := range groups {
 		entries := make([]string, 0, len(group))
 		cost := 0
 		for _, node := range group {
@@ -80,13 +84,17 @@ func assemble(roster []string) string {
 	return strings.Join(append([]string{messages.Preamble, "", "Capabilities:"}, append(roster, "", messages.RefRule)...), "\n")
 }
 
-func siblingGroups(disclosure *contexture.Disclosure, selection contexture.RootSelection) [][]contexture.Node {
+func siblingGroups(disclosure *contexture.Disclosure, selection contexture.RootSelection) ([][]contexture.Node, error) {
 	visible := func(node contexture.Node) bool {
 		ref, _ := disclosure.Index().RefOf(node)
 		return selection.ContainsRef(ref)
 	}
+	graph, err := contexture.NewSelectedGraph(disclosure.Index(), selection)
+	if err != nil {
+		return nil, err
+	}
 	roots := []contexture.Node{}
-	for _, node := range disclosure.Index().ModelRoots() {
+	for _, node := range graph.Roots() {
 		if visible(node) {
 			roots = append(roots, node)
 		}
@@ -114,5 +122,5 @@ func siblingGroups(disclosure *contexture.Disclosure, selection contexture.RootS
 			groups = append(groups, roles)
 		}
 	}
-	return groups
+	return groups, nil
 }

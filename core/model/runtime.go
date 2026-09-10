@@ -176,6 +176,10 @@ func (runtime *Runtime) invoke(ctx context.Context, ref string, arguments json.R
 // effectiveSelection is the single runtime authorization calculation shared
 // by direct Runtime calls and the model-facing ExecutionAPI facade.
 func (runtime *Runtime) effectiveSelection(requested RootSelection) (RootSelection, error) {
+	requested, err := requested.Resolve(runtime.index)
+	if err != nil {
+		return RootSelection{}, err
+	}
 	selection, err := runtime.ceiling.Intersect(runtime.selection)
 	if err != nil {
 		return RootSelection{}, err

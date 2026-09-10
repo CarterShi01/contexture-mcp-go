@@ -11,7 +11,7 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [跨语言规范](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **当前状态：所有适用的 0.12 源码与行为测试条目均已验证，但发布仍受保护。** 本仓库已具备
+> **当前状态：所有适用的 0.13 源码与行为测试条目均已验证，但发布仍受保护。** 本仓库已具备
 > 原生项目命令、inspection、可生成的应用、真实 MCP transport、经过认证的请求级 path
 > selection、REST 与维护中的 demo。剩余 parity 工作是文档、发布资产审查以及干净检出环境的
 > 发布审计；这些门禁通过前不要创建首个 module tag。
@@ -169,6 +169,12 @@ fmt.Print(server.CodexConfig(launch))      // ~/.codex/config.toml 的 stanza
 `server.CLICommands(launch)` 会返回经过安全 shell 引用的 `claude mcp add` 与
 `codex mcp add` 命令。使用自定义 stdio 入口的应用也可复用同一 API。
 
+对于 streamable HTTP，`HeaderSurfaceSelector` 读取规范的 `Contexture-Select`
+请求头。逗号分隔的直接路径（如 `team/notebook-editor`）或末尾通配符（如
+`team/*`）会把每个解析结果提升为请求级 surface root。selection 不会扩大 runtime
+或 identity ceiling。旧的 `Contexture-Roots` 请求头仍受支持，但新集成应发送
+`Contexture-Select`。无效 selector 会返回安全的 JSON-RPC `-32602` 响应，并保留请求 ID。
+
 ## 运行项目
 
 Go CLI 运行项目 `cmd/assistant/main.go` 中静态声明的 application；它不会依据字符串
@@ -210,7 +216,7 @@ go vet ./...
 ```
 
 该移植锁定 `conformance/specification.json` 中记录的 Contexture Specification
-0.12 提交。固定 fixtures 和 golden 输出保存在 `conformance/`；测试会先通过
+0.13 提交。固定 fixtures 和 golden 输出保存在 `conformance/`；测试会先通过
 Go 实现生成真实观察结果，再与这些资产比较。上述命令验证的是已实现的内核，
 不是完整产品的发布 gate。
 

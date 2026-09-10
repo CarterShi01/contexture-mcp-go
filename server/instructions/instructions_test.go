@@ -58,11 +58,25 @@ func TestBuildCutsRootsAndExposesNeutralRequestSelectedText(t *testing.T) {
 	if !strings.Contains(text, "more root role(s); call contexture_discover") {
 		t.Fatalf("root truncation was not explicit: %q", text)
 	}
-	if !strings.Contains(instructions.Neutral(), "request-specific set of complete root capabilities") {
+	if !strings.Contains(instructions.Neutral(), "request-specific set of complete capability subtrees") || !strings.Contains(instructions.Neutral(), "surface roots available to this request") {
 		t.Fatal("neutral instructions lost their request-selection contract")
 	}
 	if instructions.RosterBudget != 1200 || instructions.InstructionsLimit != 2048 || instructions.SelfContainedPrefix != 512 {
 		t.Fatal("instruction budget constants drifted")
+	}
+}
+
+func TestBuildStartsRosterAtPromotedSurfaceRoots(t *testing.T) {
+	selected, err := contexture.OnlySurfaces("operations/incidents")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err := instructions.Build(disclosure(t), selected, instructions.RosterBudget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, "- operations/incidents: Diagnose incidents.") || strings.Contains(text, "- operations: Operate services.") || strings.Contains(text, "- security:") {
+		t.Fatalf("promoted surface roster = %q", text)
 	}
 }
 

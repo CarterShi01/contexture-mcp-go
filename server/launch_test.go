@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -20,6 +21,15 @@ import (
 type rootHeaderTransport struct {
 	root  string
 	token string
+}
+
+type surfaceHeaderTransport struct{ surface string }
+
+func (transport surfaceHeaderTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	clone := request.Clone(request.Context())
+	clone.Header = request.Header.Clone()
+	clone.Header.Set(server.SelectHeader, transport.surface)
+	return http.DefaultTransport.RoundTrip(clone)
 }
 
 func (transport rootHeaderTransport) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -232,6 +242,92 @@ func TestApplicationServerSelectsIndependentRootsPerAuthenticatedHTTPClient(t *t
 	if !strings.Contains(beta.instructions, "beta") || strings.Contains(beta.instructions, "alpha") {
 		t.Fatalf("beta instructions = %s", beta.instructions)
 	}
+	cancel()
+	select {
+	case err := <-errs:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("streamable HTTP server did not stop after context cancellation")
+	}
+}
+
+func TestApplicationServerPromotesDeepHTTPSurfaceAndReportsInvalidParams(t *testing.T) {
+	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{Name: "selected-surface", Roots: []contexture.Factory{func() contexture.Node {
+		return &contexture.Role{Name: "team", Description: "Team root.", Instructions: "Route work.", Children: []contexture.Factory{
+			func() contexture.Node {
+				return &contexture.Role{Name: "editor", Description: "Edit documents.", Instructions: "Edit carefully."}
+			},
+			func() contexture.Node {
+				return &contexture.Role{Name: "reviewer", Description: "Review documents.", Instructions: "Review carefully."}
+			},
+		}}
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assembly, err := server.BuildServer(application)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options, err := server.NewContextureOptions(server.ContextureOptions{Transport: server.StreamableHTTPTransport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errs := make(chan error, 1)
+	go func() {
+		errs <- assembly.ServeListenerWithAuthAndSurfaceSelector(ctx, listener, options, nil, server.HeaderSurfaceSelector{})
+	}()
+	endpoint := "http://" + listener.Addr().String() + "/mcp"
+	client := mcp.NewClient(&mcp.Implementation{Name: "surface-client", Version: "0.0.0"}, nil)
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: endpoint, HTTPClient: &http.Client{Transport: surfaceHeaderTransport{surface: "team/editor"}}, DisableStandaloneSSE: true}, nil)
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	initialized := session.InitializeResult()
+	if initialized == nil || !strings.Contains(initialized.Instructions, "team/editor: Edit documents.") || strings.Contains(initialized.Instructions, "Team root") || strings.Contains(initialized.Instructions, "team/reviewer") {
+		_ = session.Close()
+		cancel()
+		t.Fatalf("promoted instructions = %#v", initialized)
+	}
+	_ = session.Close()
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(`{"jsonrpc":"2.0","id":202,"method":"initialize","params":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set(server.SelectHeader, "missing")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var body struct {
+		ID    any `json:"id"`
+		Error struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusOK || body.ID != float64(202) || body.Error.Code != -32602 || !strings.Contains(body.Error.Message, "unknown or empty Contexture selector") || strings.Contains(body.Error.Message, "team") {
+		cancel()
+		t.Fatalf("invalid selector response = status %d body %#v", response.StatusCode, body)
+	}
+
 	cancel()
 	select {
 	case err := <-errs:

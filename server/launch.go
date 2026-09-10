@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -299,10 +300,34 @@ func selectedSurfaces(next http.Handler, index *contexture.Index, selector Surfa
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		selection, err := selector.Select(index, requestHeaders(request.Header), PrincipalOf(request.Context()))
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			var selectionError *contexture.SurfaceSelectionError
+			if errors.As(err, &selectionError) {
+				writeInvalidParams(writer, request, selectionError.Error())
+				return
+			}
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		next.ServeHTTP(writer, request.WithContext(context.WithValue(request.Context(), rootSelectionContextKey{}, selection)))
+	})
+}
+
+func writeInvalidParams(writer http.ResponseWriter, request *http.Request, message string) {
+	var envelope struct {
+		ID any `json:"id"`
+	}
+	if request.Body != nil && request.ContentLength >= 0 && request.ContentLength <= 64*1024 {
+		_ = json.NewDecoder(request.Body).Decode(&envelope)
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(writer).Encode(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      envelope.ID,
+		"error": map[string]any{
+			"code":    -32602,
+			"message": message,
+		},
 	})
 }
 
