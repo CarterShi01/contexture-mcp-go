@@ -11,16 +11,30 @@ Implementations:
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **Status: all applicable 0.16 source and behavioral-test rows are verified;
-> release remains guarded.** This repository ships native project commands,
-> inspection, generated applications, real MCP transports, authenticated
-> request-local path selection, REST, and the maintained demo. Remaining parity
-> work is documentation and release-asset review plus a clean-checkout release
-> audit. Do not create the first module tag until those gates pass.
+> **Status: v1.0.0 is prepared as the first public stable Go release.** The
+> documented public packages make a source-compatibility commitment for the v1
+> line. Verified evidence covers the pinned Contexture 0.16 contract and all
+> applicable product rows; the public equivalence claim remains conditioned on
+> current Host and release gates, and creating the immutable `v1.0.0` tag still
+> requires separate maintainer authorization.
 
 Public packages are the module root, `core/model`, `server`, `server/surface`,
 `web`, `demo`, `inspection`, and `cli`. The release check creates a separate Go
 module and imports each package through a local module replacement.
+
+## Install v1
+
+After the `v1.0.0` tag is published, add the library to an application with:
+
+```bash
+go get github.com/CarterShi01/contexture-mcp-go@v1.0.0
+```
+
+Install the project CLI with:
+
+```bash
+go install github.com/CarterShi01/contexture-mcp-go/cmd/contexture@v1.0.0
+```
 
 ## Node model
 
@@ -272,11 +286,10 @@ go test -race ./...
 go vet ./...
 ```
 
-The port targets Contexture Specification 0.14 at the immutable revision in
+The binding targets Contexture Specification 0.16 at the immutable revision in
 [`conformance/specification.json`](conformance/specification.json). Pinned
 fixtures and golden outputs are stored under `conformance/`; tests construct and
-run the Go implementation before comparing its observations with them. These
-checks validate implemented behavior, not a full-product release claim.
+run the Go implementation before comparing its observations with them.
 
 ## Repository map
 

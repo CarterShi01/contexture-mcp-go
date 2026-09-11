@@ -11,13 +11,27 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [跨语言规范](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **当前状态：所有适用的 0.16 源码与行为测试条目均已验证，但发布仍受保护。** 本仓库已具备
-> 原生项目命令、inspection、可生成的应用、真实 MCP transport、经过认证的请求级 path
-> selection、REST 与维护中的 demo。剩余 parity 工作是文档、发布资产审查以及干净检出环境的
-> 发布审计；这些门禁通过前不要创建首个 module tag。
+> **当前状态：`v1.0.0` 已作为首个公开稳定 Go 版本准备完毕。** 已记录的公开 package
+> 对 v1 版本线作出 source-compatibility 承诺。已验证证据覆盖固定的 Contexture 0.16
+> 合同及全部适用产品条目；公开的产品等价声明仍以当前 Host 和发布 gate 为条件，
+> 创建不可变的 `v1.0.0` tag 仍须单独获得维护者授权。
 
 公开 package 包括 module root、`core/model`、`server`、`server/surface`、`web`、`demo`、
 `inspection` 与 `cli`。发布检查会创建独立 Go module，并通过本地 module replacement 导入每个 package。
+
+## 安装 v1
+
+在 `v1.0.0` tag 发布后，使用下列命令将 library 加入 application：
+
+```bash
+go get github.com/CarterShi01/contexture-mcp-go@v1.0.0
+```
+
+使用下列命令安装项目 CLI：
+
+```bash
+go install github.com/CarterShi01/contexture-mcp-go/cmd/contexture@v1.0.0
+```
 
 ## 节点模型
 
@@ -235,10 +249,9 @@ go test -race ./...
 go vet ./...
 ```
 
-该移植锁定 `conformance/specification.json` 中记录的 Contexture Specification
-0.14 提交。固定 fixtures 和 golden 输出保存在 `conformance/`；测试会先通过
-Go 实现生成真实观察结果，再与这些资产比较。上述命令验证的是已实现的内核，
-不是完整产品的发布 gate。
+本实现锁定 `conformance/specification.json` 中记录的 Contexture Specification
+0.16 提交。固定 fixtures 和 golden 输出保存在 `conformance/`；测试会先通过
+Go 实现生成真实观察结果，再与这些资产比较。
 
 ## 仓库结构
 

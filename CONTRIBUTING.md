@@ -25,7 +25,8 @@ commit credentials, local environment files, coverage output, or binaries.
   pinned Contexture specification and golden fixtures.
 - Update `conformance/specification.json` only after reviewing the upstream
   specification diff and proving newly claimed rules with tests.
-- Do not create a version tag while conformance status remains `scaffold`.
+- Do not create a version tag while conformance status remains `scaffold`; the
+  stable v1 API commitment applies to the documented public packages.
 
 Public API changes require tests and a changelog entry. Wire-level changes also
 require a conformance-fixture review in the reference repository.

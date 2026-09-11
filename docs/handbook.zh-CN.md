@@ -592,13 +592,17 @@ ASGI lifespan。Python 还允许用零参数 `Route` subclass 作为简写；Go 
 提出改动前运行完整 repository gate：
 
 ```bash
+go mod tidy
+test -z "$(gofmt -l $(git ls-files '*.go'))"
 go run ./internal/conformancecheck
 go test -race ./...
 go vet ./...
+go run ./internal/releasecheck v1.0.0
 ```
 
 不要为了让 binding 通过而修改 golden output：这些文件是跨语言 protocol contract。
 
 请阅读 [architecture.md](architecture.md) 了解依赖边界，阅读
 [CONTRIBUTING.md](../CONTRIBUTING.md) 了解贡献规则，阅读 [RELEASING.md](../RELEASING.md)
-了解刻意保持关闭的发布流程。只有全部 product-parity 和 release gate 确实满足后，模块才会发布。
+了解稳定 v1 发布流程。`v1.0.0` 承诺已记录的公开 API 在 v1 内保持 source compatibility；它不会在
+已有定向 conformance 证据之外声称完整产品 parity。

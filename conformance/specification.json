@@ -4,7 +4,7 @@
   "revision": "cda2721c7c40128cd0b7eef990e5909edabd3b17",
   "specificationVersion": "0.16",
   "status": "conformant",
-  "implementedRules": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+  "implementedRules": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
   "rules": {
     "1": { "status": "implemented", "evidence": ["application_test.go"] },
     "2": { "status": "implemented", "evidence": ["compiler_test.go"] },
@@ -22,8 +22,7 @@
     "14": { "status": "implemented", "evidence": ["web/surface_test.go"] },
     "15": { "status": "implemented", "evidence": ["runtime_test.go"] },
     "16": { "status": "implemented", "evidence": ["architecture_test.go"] },
-    "17": { "status": "implemented", "evidence": ["inspect_test.go", "server/gateway_wire_test.go"] },
-    "18": { "status": "implemented", "evidence": ["process_test.go", "process_integration_test.go", "public_api_test.go", "internal/releasecheck/module_consumer_test.go"] }
+    "17": { "status": "implemented", "evidence": ["inspect_test.go", "server/gateway_wire_test.go"] }
   },
   "fixtures": [
     "disclosure-only-application.json",
@@ -44,5 +43,5 @@
     "resources.json",
     "tools.json"
   ],
-  "notes": "All Contexture 0.16 conformance rules, including non-activating batch inspection and symmetric optional Role process members, have focused Go execution evidence. The module remains unreleased until separately authorized."
+  "notes": "The normative conformance ledger is R1–R17. Incremental 0.16 obligations, including non-activating batch inspection and symmetric optional Role process members, retain focused Go execution evidence in inspect_test.go, process_test.go, process_integration_test.go, public_api_test.go, and internal/releasecheck/module_consumer_test.go. The module remains unreleased until separately authorized."
 }

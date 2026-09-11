@@ -1,6 +1,6 @@
 # Host verification
 
-## Contexture 0.12 Go candidate
+## Historical Go candidate verification
 
 Recorded 2026-09-10 with Claude Code 2.1.133 against commit `23cc42f`.
 
@@ -39,6 +39,9 @@ called Pod status, previous logs, events, and `crash_loop_runbook`, and reported
 
 The successful result used seven model turns, returned no permission denial,
 and used no repository, shell, filesystem, or web evidence.
+
+This is historical Host evidence from the recorded candidate run, not a
+v1.0.0 Host-release verification.
 
 Codex CLI was available through the pinned ephemeral npm package, but
 `codex login status` returned `Not logged in`. No model request was made and no

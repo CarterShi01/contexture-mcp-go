@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-The project has no published versions yet. Security fixes apply to current
-`master` until the first release line is declared.
+The first public stable line is v1. Until `v1.0.0` is tagged, security fixes
+apply to current `master`; after publication, supported-version notices will
+name the applicable v1 release.
 
 ## Report a vulnerability
 

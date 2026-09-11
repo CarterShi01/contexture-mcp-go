@@ -9,9 +9,16 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
 )
 
-var versionPattern = regexp.MustCompile(`^v0\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$`)
+// versionPattern accepts stable v1 module tags. The first public release
+// establishes the v1 compatibility line, so release candidates and pre-1.0
+// tags are intentionally not accepted here.
+var versionPattern = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
+
+var majorVersionModulePathPattern = regexp.MustCompile(`/v[0-9]+$`)
 
 type conformanceStatus struct {
 	Status string `json:"status"`
@@ -54,16 +61,30 @@ func modulePath() (string, error) {
 	return "", errors.New("go.mod does not declare a module path")
 }
 
+func validateRelease(version, path, status string) error {
+	expectedVersion := "v" + foundation.PackageVersion
+	if !versionPattern.MatchString(expectedVersion) {
+		return fmt.Errorf("package version %q is not a stable v1 semantic version", foundation.PackageVersion)
+	}
+	if version != expectedVersion {
+		return fmt.Errorf("release version must equal package version %s", expectedVersion)
+	}
+	if majorVersionModulePathPattern.MatchString(path) {
+		return fmt.Errorf("v1 release %s must use an unsuffixed module path, got %q", version, path)
+	}
+	if status != "conformant" {
+		return fmt.Errorf("refusing to release while conformance status is %q; want %q", status, "conformant")
+	}
+	return nil
+}
+
 func run(arguments []string) error {
-	if len(arguments) != 1 || !versionPattern.MatchString(arguments[0]) {
-		return errors.New("version must be a pre-1.0 semantic version such as v0.1.0-rc.1")
+	if len(arguments) != 1 {
+		return errors.New("releasecheck requires exactly one version argument")
 	}
 	path, err := modulePath()
 	if err != nil {
 		return err
-	}
-	if strings.HasSuffix(path, "/v2") {
-		return fmt.Errorf("pre-1.0 release %s cannot use major-version module path %q", arguments[0], path)
 	}
 
 	root, err := moduleRoot()
@@ -78,14 +99,7 @@ func run(arguments []string) error {
 	if err := json.Unmarshal(data, &conformance); err != nil {
 		return fmt.Errorf("decode conformance status: %w", err)
 	}
-	if conformance.Status == "scaffold" {
-		return errors.New("refusing to release while conformance status is scaffold")
-	}
-	if conformance.Status != "partial" && conformance.Status != "conformant" {
-		return fmt.Errorf("unknown conformance status %q", conformance.Status)
-	}
-
-	return nil
+	return validateRelease(arguments[0], path, conformance.Status)
 }
 
 func main() {

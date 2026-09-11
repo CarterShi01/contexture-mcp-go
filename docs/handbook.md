@@ -776,9 +776,12 @@ same 401 behavior.
 Run the full repository gate before proposing a change:
 
 ```bash
+go mod tidy
+test -z "$(gofmt -l $(git ls-files '*.go'))"
 go run ./internal/conformancecheck
 go test -race ./...
 go vet ./...
+go run ./internal/releasecheck v1.0.0
 ```
 
 Do not change golden outputs merely to make a binding pass: those files are a
@@ -786,6 +789,6 @@ cross-language protocol contract.
 
 Read [architecture.md](architecture.md) for dependency boundaries,
 [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution rules, and
-[RELEASING.md](../RELEASING.md) for the intentionally closed release process.
-The module remains unpublished until all product-parity and release gates are
-actually satisfied.
+[RELEASING.md](../RELEASING.md) for the stable v1 release process. `v1.0.0`
+commits the documented public API to source compatibility across v1; it does
+not claim full-product parity beyond the focused conformance evidence.

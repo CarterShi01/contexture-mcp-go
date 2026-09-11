@@ -1,9 +1,10 @@
 # Architecture
 
 This binding follows the Python reference's product boundaries while using Go
-packages and `context.Context` where the language requires them. It is not yet
-full-product equivalent; this document distinguishes the implemented kernel
-from the remaining product work.
+packages and `context.Context` where the language requires them. Version 1
+commits the documented public Go API to source compatibility throughout the v1
+line; it does not claim full-product equivalence beyond the focused native
+evidence described here.
 
 ## Dependency direction
 
@@ -44,8 +45,10 @@ MCP tools; Contexture exposes a fixed navigation and invocation gateway.
 7. The maintained Kubernetes demo, including complete reference procedures,
    resources, prompt publication, and runtime integration tests.
 
-Every applicable 0.14 source and behavioral-test row now has focused native
+Every applicable 0.16 source and behavioral-test row now has focused native
 evidence; maintained English and Simplified Chinese product documentation and
-real Claude Code Host verification are also recorded. Release remains
-intentionally closed until module metadata and the clean-checkout release audit
-are complete; Codex is separately blocked by local account login.
+real Claude Code Host verification are also recorded. The normative conformance
+ledger remains R1–R17; the 0.16 inspection and symmetric process-member work
+is retained as separately focused incremental evidence, rather than invented
+normative rules. The first stable Go release is `v1.0.0`; its tag remains an
+explicit maintainer action, not an automatic consequence of these checks.

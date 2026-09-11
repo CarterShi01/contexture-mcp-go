@@ -38,6 +38,12 @@ jobs:
           RELEASE_AUTHORIZATION: ${{ inputs.authorization }}
         run: test "$RELEASE_AUTHORIZATION" = "RELEASE APPROVED"
       - run: go mod download
+      - name: Verify module metadata is tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Verify Go formatting
+        run: test -z "$(gofmt -l $(git ls-files '*.go'))"
       - run: go run ./internal/conformancecheck
       - run: go test -race ./...
       - run: go vet ./...

@@ -1,17 +1,23 @@
 # Changelog
 
 All notable changes will be documented here. This project follows Semantic
-Versioning once public releases begin.
+Versioning beginning with its public v1 release.
 
-## Unreleased
+## 1.0.0 (planned stable release)
+
+This first public release establishes the stable Go API commitment for the v1
+line. The documented public packages remain source-compatible within v1 except
+for explicitly documented, SemVer-compatible deprecations or additions. This
+entry is release preparation, not evidence that the immutable `v1.0.0` tag has
+already been created.
 
 - Align with Contexture 0.16 symmetric optional Role process members:
   `PreProcess` / `PreProcess` and `PostProcess` / `PostProcess` are distinct
   strong Go types and slots with ordinary containment, selection, Channels,
   Tool Binding, manager snapshots, and disclosure-only behavior.
 - Replace the framework-level `Publication` type and `Role.Publication` field
-  without an alias. This is a breaking pre-1.0 change; application subclass
-  names may still use publication as business vocabulary.
+  without an alias before the v1 API commitment; application subclass names
+  may still use publication as business vocabulary.
 - Compose exact fixed framework instruction blocks before and after unchanged
   business instructions, using the actual disclosed refs and refusing owners
   atomically when either process card is unavailable.
@@ -49,4 +55,5 @@ Versioning once public releases begin.
 - Fix repeated validation of default stdio options and encode scalar/array MCP
   Tool results as object-shaped structured content, both found by real Claude
   Code Host verification.
-- Keep the first Go module tag guarded pending final release review.
+- Prepare the first stable Go module release at `v1.0.0`, with an unsuffixed
+  v1 module path and explicit maintainer authorization for the immutable tag.

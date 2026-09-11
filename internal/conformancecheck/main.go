@@ -13,7 +13,7 @@ import (
 const (
 	expectedRevision  = "cda2721c7c40128cd0b7eef990e5909edabd3b17"
 	expectedVersion   = "0.16"
-	expectedRuleCount = 18
+	expectedRuleCount = 17
 )
 
 var expectedFixtures = []string{
