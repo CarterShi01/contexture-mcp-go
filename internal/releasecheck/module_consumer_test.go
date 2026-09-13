@@ -167,7 +167,7 @@ func main() {
     if !strings.Contains(messages.Preamble, "contexture_open") || !strings.Contains(messages.RefRule, "never assemble") || messages.TruncatedCompletion(100, 103) != "... 3 more match; keep typing to narrow." { panic("public message contract is incomplete") }
     if instructions.InstructionsLimit != 2048 || instructions.RosterBudget != 1200 || instructions.SelfContainedPrefix != 512 || !strings.Contains(instructions.Neutral(), "request-specific") { panic("public instruction contract is incomplete") }
     if surface.PublishedName("", "operations/runbook") != "runbook" { panic("public surface facade is incomplete") }
-    if contexture.PackageName != "contexture" || contexture.Version != "1.0.0" || contexture.ReferenceSeparator != "/" {
+    if contexture.PackageName != "contexture" || contexture.Version != "1.0.1" || contexture.ReferenceSeparator != "/" {
         panic("public Contexture vocabulary has an unexpected spelling")
     }
     if contexture.DiscoverGatewayName != "contexture_discover" || contexture.InspectGatewayName != "contexture_inspect" || contexture.OpenGatewayName != "contexture_open" || contexture.InvokeReadOnlyGatewayName != "contexture_invoke_read_only" || contexture.InvokeGatewayName != "contexture_invoke" {

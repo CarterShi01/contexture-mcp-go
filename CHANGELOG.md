@@ -3,13 +3,19 @@
 All notable changes will be documented here. This project follows Semantic
 Versioning beginning with its public v1 release.
 
-## 1.0.0 (planned stable release)
+## 1.0.1 (2026-09-13)
+
+- Align the Go README and translated product introduction with the Python
+  implementation while documenting Go-specific APIs and installation.
+- Publish the synchronized product documentation as the current module release.
+
+## 1.0.0 (public stable release)
 
 This first public release establishes the stable Go API commitment for the v1
 line. The documented public packages remain source-compatible within v1 except
 for explicitly documented, SemVer-compatible deprecations or additions. This
-entry is release preparation, not evidence that the immutable `v1.0.0` tag has
-already been created.
+entry records the first public baseline; the immutable `v1.0.0` tag is retained
+as the historical initial release.
 
 - Align with Contexture 0.16 symmetric optional Role process members:
   `PreProcess` / `PreProcess` and `PostProcess` / `PostProcess` are distinct

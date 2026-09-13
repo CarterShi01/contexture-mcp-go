@@ -11,26 +11,26 @@ Contexture 的 Go 实现。Contexture 是一个面向 MCP 应用的渐进披露�
 [Go](https://github.com/CarterShi01/contexture-mcp-go) ·
 [跨语言规范](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
 
-> **当前状态：`v1.0.0` 已作为首个公开稳定 Go 版本准备完毕。** 已记录的公开 package
+> **当前状态：`v1.0.1` 是当前公开稳定的 Go 版本。** 已记录的公开 package
 > 对 v1 版本线作出 source-compatibility 承诺。已验证证据覆盖固定的 Contexture 0.16
 > 合同及全部适用产品条目；公开的产品等价声明仍以当前 Host 和发布 gate 为条件，
-> 创建不可变的 `v1.0.0` tag 仍须单独获得维护者授权。
+> `v1.0.0` 是首个公开基线，当前补丁版本同步了产品文档。
 
 公开 package 包括 module root、`core/model`、`server`、`server/surface`、`web`、`demo`、
 `inspection` 与 `cli`。发布检查会创建独立 Go module，并通过本地 module replacement 导入每个 package。
 
 ## 安装 v1
 
-在 `v1.0.0` tag 发布后，使用下列命令将 library 加入 application：
+使用下列命令将当前 library 加入 application：
 
 ```bash
-go get github.com/CarterShi01/contexture-mcp-go@v1.0.0
+go get github.com/CarterShi01/contexture-mcp-go@v1.0.1
 ```
 
 使用下列命令安装项目 CLI：
 
 ```bash
-go install github.com/CarterShi01/contexture-mcp-go/cmd/contexture@v1.0.0
+go install github.com/CarterShi01/contexture-mcp-go/cmd/contexture@v1.0.1
 ```
 
 ## 节点模型

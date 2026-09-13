@@ -11,7 +11,7 @@ import (
 func TestFoundationVocabularyHasOneCanonicalSpelling(t *testing.T) {
 	t.Parallel()
 
-	if contexture.PackageName != "contexture" || contexture.Version != "1.0.0" {
+	if contexture.PackageName != "contexture" || contexture.Version != "1.0.1" {
 		t.Fatalf("root package vocabulary = (%q, %q), want Contexture v1 release facts", contexture.PackageName, contexture.Version)
 	}
 	if contexture.ReferenceSeparator != foundation.ReferenceSeparator {

@@ -1,22 +1,30 @@
-# Contexture for Go
+# Contexture
 
-[简体中文](README.zh-CN.md)
+[简体中文](README.zh-CN.md) · [Handbook](docs/handbook.md) · [Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec) · [Changelog](CHANGELOG.md)
 
-Go implementation of Contexture, a progressive-disclosure framework for
-building MCP applications whose capabilities remain navigable as they grow.
+Implementations: [Python](https://github.com/CarterShi01/contexture-mcp) · [TypeScript](https://github.com/CarterShi01/contexture-mcp-typescript) · [Go](https://github.com/CarterShi01/contexture-mcp-go)
 
-Implementations:
-[Python](https://github.com/CarterShi01/contexture-mcp) ·
-[TypeScript](https://github.com/CarterShi01/contexture-mcp-typescript) ·
-[Go](https://github.com/CarterShi01/contexture-mcp-go) ·
-[Specification](https://github.com/CarterShi01/contexture-mcp/tree/master/spec)
+Contexture is a Go implementation of a framework for exposing a large
+application capability graph to agents without placing every tool and
+instruction in the model's context at once. You declare Roles, Skills, and
+Tools; Contexture compiles an immutable graph and serves a small, fixed MCP
+gateway that discloses only the branch an agent chooses.
 
-> **Status: v1.0.0 is prepared as the first public stable Go release.** The
-> documented public packages make a source-compatibility commitment for the v1
-> line. Verified evidence covers the pinned Contexture 0.16 contract and all
-> applicable product rows; the public equivalence claim remains conditioned on
-> current Host and release gates, and creating the immutable `v1.0.0` tag still
-> requires separate maintainer authorization.
+The same application runtime can back explicit REST routes for human
+interfaces. Contexture is a Controller layer: it does not contain an agent
+loop, call a model, or replace your business services.
+
+- Go 1.23+
+- MCP stdio and Streamable HTTP
+- Typed bindings and language-native APIs
+- Apache-2.0
+- Stable 1.0 public API governed by Semantic Versioning
+
+> **Status: v1.0.1 is the current public stable Go release.** The documented
+> public packages follow Semantic Versioning: compatible additions use minor
+> releases and incompatible public API changes require a new major version.
+> The implementation is aligned with the pinned Contexture 0.16 contract and
+> applicable product rows.
 
 Public packages are the module root, `core/model`, `server`, `server/surface`,
 `web`, `demo`, `inspection`, and `cli`. The release check creates a separate Go
@@ -24,16 +32,16 @@ module and imports each package through a local module replacement.
 
 ## Install v1
 
-After the `v1.0.0` tag is published, add the library to an application with:
+Add the current release to an application with:
 
 ```bash
-go get github.com/CarterShi01/contexture-mcp-go@v1.0.0
+go get github.com/CarterShi01/contexture-mcp-go@v1.0.1
 ```
 
 Install the project CLI with:
 
 ```bash
-go install github.com/CarterShi01/contexture-mcp-go/cmd/contexture@v1.0.0
+go install github.com/CarterShi01/contexture-mcp-go/cmd/contexture@v1.0.1
 ```
 
 ## Node model
