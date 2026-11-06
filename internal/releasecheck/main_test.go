@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
+)
 
 func TestVersionPattern(t *testing.T) {
 	t.Parallel()
@@ -18,6 +22,10 @@ func TestVersionPattern(t *testing.T) {
 }
 
 func TestCurrentModulePathSupportsCandidateTag(t *testing.T) {
+	// The 1.0.1 metadata bump must not silently change this release oracle.
+	if foundation.PackageVersion != "1.0.1" {
+		t.Fatalf("package version = %q, want current candidate 1.0.1", foundation.PackageVersion)
+	}
 	path, err := modulePath()
 	if err != nil {
 		t.Fatal(err)
@@ -25,10 +33,10 @@ func TestCurrentModulePathSupportsCandidateTag(t *testing.T) {
 	if path != "github.com/CarterShi01/contexture-mcp-go" {
 		t.Fatalf("module path = %q", path)
 	}
-	if err := run([]string{"v1.0.0"}); err != nil {
+	if err := run([]string{"v" + foundation.PackageVersion}); err != nil {
 		t.Fatalf("candidate metadata = %v", err)
 	}
-	if err := run([]string{"v1.0.1"}); err == nil {
+	if err := run([]string{"v1.0.0"}); err == nil {
 		t.Fatal("releasecheck accepted a tag that does not match the package version")
 	}
 }
@@ -43,12 +51,12 @@ func TestValidateReleaseRequirements(t *testing.T) {
 		status  string
 		wantErr bool
 	}{
-		{name: "current stable release", version: "v1.0.0", path: "github.com/CarterShi01/contexture-mcp-go", status: "conformant"},
-		{name: "different v1 tag", version: "v1.0.1", path: "github.com/CarterShi01/contexture-mcp-go", status: "conformant", wantErr: true},
+		{name: "current stable release", version: "v1.0.1", path: "github.com/CarterShi01/contexture-mcp-go", status: "conformant"},
+		{name: "different v1 tag", version: "v1.0.0", path: "github.com/CarterShi01/contexture-mcp-go", status: "conformant", wantErr: true},
 		{name: "pre-release tag", version: "v1.0.0-rc.1", path: "github.com/CarterShi01/contexture-mcp-go", status: "conformant", wantErr: true},
-		{name: "suffixed v1 path", version: "v1.0.0", path: "github.com/CarterShi01/contexture-mcp-go/v1", status: "conformant", wantErr: true},
-		{name: "partial conformance", version: "v1.0.0", path: "github.com/CarterShi01/contexture-mcp-go", status: "partial", wantErr: true},
-		{name: "scaffold conformance", version: "v1.0.0", path: "github.com/CarterShi01/contexture-mcp-go", status: "scaffold", wantErr: true},
+		{name: "suffixed v1 path", version: "v1.0.1", path: "github.com/CarterShi01/contexture-mcp-go/v1", status: "conformant", wantErr: true},
+		{name: "partial conformance", version: "v1.0.1", path: "github.com/CarterShi01/contexture-mcp-go", status: "partial", wantErr: true},
+		{name: "scaffold conformance", version: "v1.0.1", path: "github.com/CarterShi01/contexture-mcp-go", status: "scaffold", wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			err := validateRelease(test.version, test.path, test.status)
