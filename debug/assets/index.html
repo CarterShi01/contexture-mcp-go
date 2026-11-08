@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Contexture Node Catalog</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header>
+    <div><span class="eyebrow">CONTEXTURE</span><h1>Node Catalog</h1></div>
+    <div id="status" role="status">Loading compiled graph…</div>
+  </header>
+  <main>
+    <aside>
+      <label for="search">Find a node</label>
+      <input id="search" type="search" placeholder="ref, name, or description">
+      <nav id="tree" aria-label="Compiled node tree"></nav>
+    </aside>
+    <article id="detail">
+      <p class="empty">Choose a Role, Skill, or Tool to inspect its compiled metadata.</p>
+    </article>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>
