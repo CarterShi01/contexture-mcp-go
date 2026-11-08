@@ -30,6 +30,23 @@ Public packages are the module root, `core/model`, `server`, `server/surface`,
 `web`, `demo`, `inspection`, and `cli`. The release check creates a separate Go
 module and imports each package through a local module replacement.
 
+### Native managed candidate
+
+The separate [`managed`](docs/managed-runtime.md) package adds a bounded native
+versioned-graph compiler, exact typed binding registry, exclusive resource
+generations, trusted release-authority adoption, context-bound requests, and
+boot-local run leases. This is **candidate implementation evidence**, not
+managed-profile acceptance, static-runtime replacement, complete Host integration,
+or completion of WP00-WP15. The separate [FileJournal release owner](docs/managed-releases.md)
+now persists candidate release intent, receipts, terminal preparation and local
+observations using required independent GraphOwner/Host ports. The stable contract
+and conformance pin above are unchanged.
+
+The [native graph owner](docs/managed-graph.md) now supplies actual approved
+bootstrap, preview/CAS authoring, same-Journal immutable history, complete
+checkpoint projection and release/catalog/watch bridges. Current authentication,
+policy, approvals and shared Host serialization remain explicit required ports.
+
 ## Install v1
 
 Add the current release to an application with:

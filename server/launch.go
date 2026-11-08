@@ -32,6 +32,7 @@ type ApplicationServerOptions struct {
 	// Instructions replaces Contexture's generated root roster. A nil value
 	// derives instructions from each selected root surface.
 	Instructions *string
+	Locale       *string
 }
 
 type rootSelectionContextKey struct{}
@@ -43,11 +44,12 @@ func BuildServer(application *contexture.Application) (*ApplicationServer, error
 
 // BuildServerWithOptions compiles one lazy declaration with explicit Host-facing options.
 func BuildServerWithOptions(application *contexture.Application, options ApplicationServerOptions) (*ApplicationServer, error) {
-	compiled, err := CompileApplication(application)
+	compiled, err := CompileApplicationWithOptions(application, CompilationOptions{Locale: options.Locale})
 	if err != nil {
 		return nil, err
 	}
-	return &ApplicationServer{application: compiled, identity: Identity{Name: application.Name(), Version: contexture.Version}, instructions: options.Instructions}, nil
+	return &ApplicationServer{application: compiled, identity: Identity{Name: application.Name(), Version: contexture.Version,
+		Title: compiled.Presentation.Title(), Description: compiled.Presentation.Description()}, instructions: options.Instructions}, nil
 }
 
 // Build constructs a fresh official-SDK server for one Contexture transport service.
@@ -79,7 +81,8 @@ func (server *ApplicationServer) BuildForSurfaces(selection contexture.SurfaceSe
 	if err != nil {
 		return nil, err
 	}
-	return newContextureMCPServerForRoots(server.identity, gateway, selection, instructions, server.application.Publications), nil
+	return newContextureMCPServerForPresentation(server.identity, gateway, selection, instructions,
+		server.application.Presentation.Gateway(), server.application.Publications)
 }
 
 // BuildForRoots is the compatibility spelling for BuildForSurfaces.

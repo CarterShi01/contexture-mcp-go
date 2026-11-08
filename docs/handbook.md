@@ -88,6 +88,52 @@ func main() {
 the application name. Use a factory for every Role, Skill, and Tool:
 compilation creates a fresh immutable graph snapshot from those factories.
 
+### Optional presentation and locales (additive candidate)
+
+The root facade exports immutable `Presentation`, `NodePresentation`,
+`GatewayPresentation`, `PresentationCatalog` and their error-returning
+`New...` constructors. Their SDK-neutral implementation is in `core/presentation`.
+Set `ApplicationDeclaration.Presentation` to a constructed neutral presentation
+or catalog; declaration never evaluates node factories. Constructors defensively
+copy maps, reject invalid/typed-nil values and normalized duplicate refs/tags.
+A catalog requires an explicit `DefaultLocale` present in `Locales`.
+
+`PresentationOptions` has optional `Title`, `Description`, `Gateway` and `Nodes`.
+`NodePresentationOptions` requires `Title` and allows `Description`.
+`GatewayPresentationOptions` overrides `Discover`, `Inspect`, `Open`,
+`InvokeReadOnly` and `Invoke` labels. Optional text fields are `*string`:
+nil means absent; a pointer to an empty/blank string is invalid rather than
+silently selecting a default. Constructed values expose read-only getters;
+`Nodes` returns a defensive map.
+
+`server.CompileApplicationWithOptions` and
+`server.CompileDisclosureApplicationWithOptions` accept
+`server.CompilationOptions{Locale: &requestedLocale}`.
+`server.BuildServerWithOptions` accepts the same optional `Locale` in
+`ApplicationServerOptions`. Existing constructors remain unchanged and select
+the default. `ResolvePresentation`, `NormalizeLocale` and
+`Disclosure.WithLocale` expose the same selection to embedding applications:
+exact tag, successively broader parents, then the explicit default, with no
+preferred language. All locales' canonical refs are checked at compilation,
+including inactive locales.
+
+Independent locale views preserve visibility ceilings, process designations,
+person/Prompt reservations, canonical names/refs and original instructions.
+Selected copy appears on routing/ACTIVE/INSPECT, nested members/uses/process
+cards, person navigation and generated startup rosters. Real MCP initialization
+uses explicit title/description; configured gateway titles retain the fixed
+five names, schemas, descriptions and safety annotations. No presentation by
+default preserves legacy payloads. Low-level SDK embedding can opt into the
+error-returning `NewContextureMCPServerWithPresentation` constructor.
+
+Full/contextual Unicode casing reuses maintained `golang.org/x/text/cases`,
+with local Casers rather than shared mutable transformers. A small cased-letter
+boundary adaptation matches the current Python `str.title` rule rather than
+Unicode word segmentation. The recorded Unicode15/reference/runtime comparison
+is not certification of every future Unicode version. This candidate does not
+upgrade pinned 0.16, accept managed schemas, complete Node Catalog/debug/CLI
+product deltas or claim full product parity.
+
 The root `contexture` package is the SDK-neutral declaration facade. Its
 native authoring inventory is `ApplicationDeclaration`, `Factory`, `Role`,
 `Skill`, `Tool`, `Channels`, `Principal`, `Prompt`, and `Resource`.
@@ -792,3 +838,143 @@ Read [architecture.md](architecture.md) for dependency boundaries,
 [RELEASING.md](../RELEASING.md) for the stable v1 release process. `v1.0.0`
 commits the documented public API to source compatibility across v1; it does
 not claim full-product parity beyond the focused conformance evidence.
+
+## 11. Inspect a static Node Catalog without running the application
+
+`introspection` is an SDK-neutral, trusted application/developer read model
+over one native immutable `core/model.Index`. It is **not** a gateway Tool,
+authorization surface, managed graph authority, or automatic model-context
+publication. Catalog construction never invokes Tool handlers, opens Channels,
+or evaluates declaration factories after compilation. A metadata contributor
+is explicitly trusted application code, not an automatic discovery plugin.
+
+```go
+compiled, err := server.CompileApplication(application)
+// Handle err before using compiled.
+catalog, err := compiled.Catalog(introspection.CatalogOptions{
+    View: introspection.ModelView,
+    Detail: introspection.DefinitionDetail,
+})
+// Handle err before using catalog.
+node, err := catalog.Get("operations")
+children, err := catalog.Children("operations")
+matches, err := catalog.List(introspection.ListOptions{
+    Kind: contexture.RoleKind, Query: "operations",
+})
+snapshot := catalog.Snapshot()
+indent := 2
+text, err := snapshot.ToJSON(&indent)
+_ = node
+_ = children
+_ = matches
+_ = text
+```
+
+Import `github.com/CarterShi01/contexture-mcp-go/introspection` alongside
+`server` and the declaration facade. Direct kernel users may call
+`introspection.New(index, options)`. `View` must be explicit; `Detail` defaults
+to `summary`. Application view includes model and prompt planes; model view
+excludes prompt roots and edges to them. Surface view additionally requires
+`SurfaceSelection`, promoting included deep anchors to parentless roots.
+Overlapping selectors are reduced through preorder parent propagation, not
+pairwise root/ancestor scans. Selection is explicit and never inherited from
+request-local `context.Context` facts.
+
+Descriptors, roots, JSON objects, schemas, and metadata returned by accessors
+are defensive copies. Mutating them cannot alter a Catalog or its
+`NodeCatalogSnapshot`. The snapshot validates unique roots/refs, counts,
+parent/member/visible ordinals, all five member slots and process designations,
+and reciprocal `uses`/`dependents`. `SnapshotFromJSON` rejects malformed
+envelopes and mismatched content digests.
+
+Definition detail retains exact authored and native ACTIVE effective
+instructions, including whitespace and framework process policy. Summary has
+no programs or Tool schemas. Runtime Tool schemas come from their existing
+Binding, preserving schema/validator/handler unity; disclosure-only Tools
+contain only `execution_available: false`. Raw descriptions remain separate
+from localized `presentation` copy. Locale resolution reuses immutable
+Presentation and its explicit fallback rules.
+
+To attach application metadata, implement `NodeMetadataContributor.Namespace`
+and `Describe(ref, node, index) (map[string]any, error)`. Register contributors
+explicitly through `CatalogOptions.Contributors`; namespaces require
+`owner/name` and must be unique. Each contributor runs once per included node.
+Nil metadata means absent metadata; errors propagate without fallback.
+Returned metadata is detached and must be finite, scalar, acyclic native JSON.
+Pointers, structs, functions, custom serialization objects, non-string map
+keys, non-finite floats, and invalid UTF-8 are rejected without calling
+serialization methods. Native integers, `big.Int`, and integer `json.Number`
+remain exact.
+
+Catalog `CanonicalDigest`/`FormatJSON` use the legacy Catalog profile, **not**
+managed JCS: Unicode code-point object key ordering, Python finite-float
+integral normalization, shortest fractional formatting and exponent style.
+Search uses maintained `x/text/cases.Fold`, qualified against Unicode 15.
+The thin search adapter preserves the 86 Cherokee capitals that Unicode
+default full folding leaves unchanged; the raw x/text 0.34 table also
+lowercases them. This is verified against all 1,530 reference mappings and
+all Unicode scalar inputs (1,616 raw library mappings), not an ASCII-only
+lowercase approximation.
+
+### Read-only loopback developer UI
+
+Both runtime and disclosure compiled containers expose `Debug(options)`.
+Alternatively, use `debug.New(catalog)` to serve the **same** snapshot:
+
+```go
+adapter, err := debug.New(catalog)
+// Handle err before starting.
+address, err := adapter.Start(ctx, debug.StartOptions{
+    Host: "localhost", Port: 8787,
+})
+// Handle err before using address; close it when finished.
+defer address.Close()
+```
+
+Import `github.com/CarterShi01/contexture-mcp-go/debug`. `Start` defaults to
+literal `127.0.0.1` and an ephemeral port; only explicit localhost/literal
+loopback IPs are accepted. Localhost binds literal IPv4 loopback without DNS.
+`Close` is idempotent and waits for the listener to exit; context cancellation
+also stops it. Debug never opens an application serving lifecycle.
+
+GET routes are `/`, `/app.css`, `/app.js`, `/healthz`, `/api/catalog`, and
+`/api/nodes/ENCODED_REF`. HEAD is supported only on `/api/catalog`. API routes
+return an exact quoted digest ETag and accept only an exact conditional tag
+for 304, not weak/wildcard/list tags. All writes and other methods are refused.
+Host/Origin checks reject userinfo, rebinding names, invalid ports, duplicate
+origins, cross-origin and absolute-form requests. Responses set CSP, nosniff,
+frame denial, no-referrer, and no-cache headers. The HTML/CSS/JS are
+byte-identical reference extension assets, not generated business UI.
+
+### Catalog/debug CLI
+
+```bash
+go run ./cmd/contexture catalog --json
+go run ./cmd/contexture catalog kubernetes-platform --detail definition --json
+go run ./cmd/contexture catalog --view surface --select kubernetes-platform/incident-response --locale zh-Hans --json
+go run ./cmd/contexture debug --host localhost --port 8787
+```
+
+The global CLI uses the generated `cmd/assistant` entry point when available;
+otherwise catalog/debug use the announced bundled demo. Project entry points
+continue to inject their one statically declared application through
+`cli.RunApplication(ctx, application, args, stdout, stderr)`. `--target`
+accepts that application's declared name or `application`; Go never imports
+arbitrary module expressions.
+
+Catalog defaults to model/summary. With no refs, JSON is a complete snapshot;
+with refs, JSON is a descriptor array. Text without refs includes application
+facts, digest, and an indented roster; named refs produce descriptor lines
+only. Supported flags are `--target`, `--view`, `--detail`, `--locale`,
+repeatable `--select`, and `--json`. Debug defaults to application/definition
+and loopback port 8787; it accepts `--host`/`--port`, no positional refs or
+`--json`, and blocks until context cancellation/Ctrl+C.
+
+The additive extension corpus lives in `conformance/node-catalog`, separately
+from pinned 0.16 wire assets. Its upstream acceptance metadata currently points
+to the **operations** fixture, while its Catalog golden describes
+**contexture-demo**. Tests explicitly construct the existing native reference
+demo declaration (including authored Role trailing newlines) and validate the
+golden/schema. Neither mismatched asset is rewritten, and the standalone
+production demo/default wire behavior is unchanged. This bounded STATIC
+extension does not imply full managed Host/operations or product parity.

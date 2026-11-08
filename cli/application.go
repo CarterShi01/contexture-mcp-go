@@ -25,11 +25,14 @@ func (err *UsageError) Unwrap() error { return contexture.ErrContexture }
 
 // RunApplication runs project-owned commands over one statically declared Go application.
 func RunApplication(ctx context.Context, application *contexture.Application, arguments []string, stdout, stderr io.Writer) int {
+	if len(arguments) > 0 && arguments[0] == "store" {
+		return RunStore(ctx, arguments[1:], stdout, stderr)
+	}
 	if application == nil {
 		return fail(stderr, 1, "Contexture application must not be nil.")
 	}
 	if len(arguments) == 0 {
-		return fail(stderr, 2, "expected check, list, inspect, call, or serve.")
+		return fail(stderr, 2, "expected check, list, inspect, catalog, debug, call, or serve.")
 	}
 	if err := validateCommandShape(arguments); err != nil {
 		return fail(stderr, 2, err.Error())
@@ -39,6 +42,8 @@ func RunApplication(ctx context.Context, application *contexture.Application, ar
 		return fail(stderr, 1, err.Error())
 	}
 	switch arguments[0] {
+	case "catalog", "debug":
+		return runCatalog(ctx, compiled, arguments[1:], stdout, stderr, arguments[0] == "debug")
 	case "check":
 		if len(arguments) != 1 {
 			return fail(stderr, 2, "use check with no project target; this executable already owns one application.")
@@ -85,7 +90,7 @@ func RunApplication(ctx context.Context, application *contexture.Application, ar
 	case "serve":
 		return runServe(ctx, application, arguments[1:], stdout, stderr)
 	default:
-		return fail(stderr, 2, "expected check, list, inspect, call, or serve.")
+		return fail(stderr, 2, "expected check, list, inspect, catalog, debug, call, or serve.")
 	}
 }
 
@@ -97,6 +102,10 @@ func validateCommandShape(arguments []string) error {
 		}
 	case "inspect":
 		// Detailed validation is owned by runInspect after compilation.
+	case "catalog", "debug":
+		if _, err := parseCatalogArguments(arguments[1:], arguments[0] == "debug"); err != nil {
+			return err
+		}
 	case "call":
 		if len(arguments) < 2 || strings.HasPrefix(arguments[1], "-") {
 			return fmt.Errorf("call needs a Tool ref")
@@ -106,7 +115,7 @@ func validateCommandShape(arguments []string) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("expected check, list, inspect, call, or serve")
+		return fmt.Errorf("expected check, list, inspect, catalog, debug, call, or serve")
 	}
 	return nil
 }

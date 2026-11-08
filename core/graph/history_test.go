@@ -1,6 +1,53 @@
 package graph
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
+
+func TestHistoryAppendAllocationsDoNotScaleWithValidatedPrefix(t *testing.T) {
+	state := txState(t, nil, "12", nil)
+	change, err := ResolveFacts(state, &state.definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := evEvent(t, state, change).JSON()
+	history, err := SeedHistory(state, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := history
+	small := history
+	for i := 2; i <= 4096; i++ {
+		history, err = history.Append(event, strconv.Itoa(i), ApplyEventOptions{Tombstones: []any{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 16 {
+			small = history
+		}
+	}
+	options := ApplyEventOptions{Tombstones: []any{}}
+	measure := func(prefix History) float64 {
+		return testing.AllocsPerRun(10, func() {
+			if _, err := prefix.Append(event, "4097", options); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	short, long := measure(small), measure(history)
+	if long > short+4 {
+		t.Fatalf("Append revalidated the prefix: small %.0f, large %.0f allocations", short, long)
+	}
+	if len(original.Records()) != 1 || original.Head().revision != "12" {
+		t.Fatal("Retained prefix mutated")
+	}
+	records := history.Records()
+	records[0], records[1] = records[1], records[0]
+	if _, err := NewHistory(records); err == nil {
+		t.Fatal("Public constructor skipped complete prefix validation")
+	}
+}
 
 func TestResolvedHistoryEndpointsNoopAndRetention(t *testing.T) {
 	s := txState(t, nil, "12", nil)
@@ -17,7 +64,8 @@ func TestResolvedHistoryEndpointsNoopAndRetention(t *testing.T) {
 	if h.Head().revision != "12" || next.Head().revision != "13" || next.RetainedLowerBound() != "12" {
 		t.Fatal("history mutated or wrong bounds")
 	}
-	noop, err := ResolveFacts(next.Head(), &next.records[1].state.definition)
+	accepted := next.records.Get(1).state
+	noop, err := ResolveFacts(next.Head(), &accepted.definition)
 	if err != nil {
 		t.Fatal(err)
 	}

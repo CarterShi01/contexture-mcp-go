@@ -120,10 +120,13 @@ type FileJournal struct {
 	meta             JournalObject
 	accepted         []JournalObject
 	receipts         map[[2]string]JournalObject
+	batches          map[any]bool
 	validators       map[string]*jsonschema.Resolved
 	recovery         []JournalObject
 	// Used only by the detached backup verifier, never a live owner.
 	backupBlobs map[string][]byte
+	// Logical graph custody is local to this physical Journal instance.
+	graphOwner *FileJournalGraphOwner
 }
 
 func newJournal(root string, o JournalOptions) *FileJournal {
@@ -134,7 +137,7 @@ func newJournal(root string, o JournalOptions) *FileJournal {
 	}
 	abs, e := filepath.Abs(root)
 	journalMust(e)
-	j := &FileJournal{root: abs, durability: journalDefault(o.Durability, "strict"), options: o, receipts: map[[2]string]JournalObject{}, validators: map[string]*jsonschema.Resolved{}, accepted: []JournalObject{}}
+	j := &FileJournal{root: abs, durability: journalDefault(o.Durability, "strict"), options: o, receipts: map[[2]string]JournalObject{}, batches: map[any]bool{}, validators: map[string]*jsonschema.Resolved{}, accepted: []JournalObject{}}
 	schema := journalMap(journalCopy(o.Schema))
 	var inspect func(any)
 	inspect = func(v any) {
@@ -254,6 +257,21 @@ func (j *FileJournal) guard(write bool) {
 	if write && j.unknown {
 		journalUnknown()
 	}
+}
+
+// AssertWritable is a synchronous I/O-free readiness check for shared owners.
+// Unknown publication, closed custody and callback/concurrent reentry refuse.
+func (j *FileJournal) AssertWritable() (err error) {
+	if j == nil {
+		return &JournalError{"closed", "Store owner is absent"}
+	}
+	if !j.mu.TryLock() {
+		return &JournalError{"resource_busy", "Store owner is busy or reentered"}
+	}
+	defer j.mu.Unlock()
+	defer journalCatch(&err)
+	j.guard(true)
+	return nil
 }
 func (j *FileJournal) hit(s string) {
 	if j.options.Fault != nil {
@@ -592,11 +610,11 @@ func (j *FileJournal) verifyRecord(r JournalObject, n int, previous any) {
 		}
 		if last != nil {
 			rev := last["revision"]
+			if result, ok := last["result_revision"]; ok {
+				rev = result
+			}
 			status := "committed"
 			if last["type"] == "CommandCompleted" {
-				if result, ok := last["result_revision"]; ok {
-					rev = result
-				}
 				status = "noop"
 			}
 			if c["graph_id"] != last["graph_id"] || c["revision"] != rev || c["request_digest"] != last["command_digest"] || c["status"] != status {
@@ -640,6 +658,7 @@ func (j *FileJournal) recover() {
 	sort.Strings(paths)
 	var previous any
 	batches := map[any]bool{}
+	j.batches = batches
 	for i, p := range paths {
 		if filepath.Base(p) != fmt.Sprintf("%020d.json", i+1) {
 			journalFail("corruption", "Missing or duplicate committed record")
@@ -730,7 +749,7 @@ func (j *FileJournal) Append(events any, o JournalAppendOptions) (r JournalObjec
 	defer j.mu.Unlock()
 	defer journalCatch(&err)
 	j.guard(true)
-	return journalMap(journalCopy(j.append(events, o))), nil
+	return j.append(events, o), nil
 }
 func (j *FileJournal) append(events any, o JournalAppendOptions) JournalObject {
 	n := len(j.accepted) + 1
@@ -747,7 +766,7 @@ func (j *FileJournal) append(events any, o JournalAppendOptions) JournalObject {
 			}
 			seq, e := strconv.Atoi(old["journal_seq"].(string))
 			journalMust(e)
-			return j.accepted[seq-1]
+			return journalMap(journalCopy(j.accepted[seq-1]))
 		}
 	}
 	var previous any
@@ -763,35 +782,34 @@ func (j *FileJournal) append(events any, o JournalAppendOptions) JournalObject {
 	r["payload_digest"] = journalDigest("contexture.journal-payload/v1", payload)
 	r["record_hash"] = journalDigest("contexture.journal-record/v1", r)
 	j.verifyRecord(r, n, previous)
-	for _, old := range j.accepted {
-		if old["event_batch_id"] == r["event_batch_id"] {
-			journalFail("schema_invalid", "Batch identity already accepted")
-		}
+	if j.batches[r["event_batch_id"]] {
+		journalFail("schema_invalid", "Batch identity already accepted")
 	}
 	for _, ref := range journalRefs(r) {
 		j.confirm(j.blobPath(ref["digest"]))
 	}
+	returned := journalMap(journalCopy(r))
 	j.publish(j.recordPath(big.NewInt(int64(n))), journalBytes(r), "record")
-	// Allocate the replacement index before advancing the confirmed watermark.
 	defer func() {
 		if p := recover(); p != nil {
 			j.unknown = true
+			delete(j.batches, r["event_batch_id"])
+			if receipt != nil {
+				delete(j.receipts, journalReceiptKey(receipt))
+			}
+			j.accepted = j.accepted[:n-1]
 			journalUnknown()
 		}
 	}()
-	next := make([]JournalObject, n)
-	copy(next, j.accepted)
-	next[n-1] = r
-	index := make(map[[2]string]JournalObject, len(j.receipts)+1)
-	for k, v := range j.receipts {
-		index[k] = v
-	}
+	j.batches[r["event_batch_id"]] = true
+	j.hit("record.batch_indexed")
 	if receipt != nil {
-		index[journalReceiptKey(receipt)] = receipt
+		j.receipts[journalReceiptKey(receipt)] = receipt
+		j.hit("record.receipt_indexed")
 	}
-	j.receipts = index
-	j.accepted = next
-	return r
+	j.accepted = append(j.accepted, r)
+	j.hit("record.memory_indexed")
+	return returned
 }
 func (j *FileJournal) project(records []JournalObject) JournalObject {
 	if j.options.Projector == nil {
@@ -1013,8 +1031,13 @@ func (j *FileJournal) ExportSnapshot() (b []byte, err error) {
 	v["backup_digest"] = journalDigest("contexture.file-journal-backup/v1", v)
 	return journalBytes(v), nil
 }
-func RestoreFileJournal(root string, snapshot []byte, o JournalOptions) (j *FileJournal, err error) {
-	defer journalCatch(&err)
+
+// verifyJournalSnapshot is shared by restore and read-only offline inspection.
+// It owns no file descriptor and performs no filesystem reads or writes.
+func verifyJournalSnapshot(root string, snapshot []byte, o JournalOptions) *FileJournal {
+	return verifyJournalSnapshotValue(root, decodeJournalSnapshot(snapshot), o)
+}
+func decodeJournalSnapshot(snapshot []byte) JournalObject {
 	raw, e := graph.DecodeJSON(snapshot)
 	journalMust(e)
 	v := journalMap(raw)
@@ -1031,9 +1054,9 @@ func RestoreFileJournal(root string, snapshot []byte, o JournalOptions) (j *File
 	if v["backup_digest"] != journalDigest("contexture.file-journal-backup/v1", sub) {
 		journalFail("backup_invalid", "Backup digest mismatch")
 	}
-	if journalExists(root) {
-		journalFail("restore_conflict", "Restore destination must not exist")
-	}
+	return v
+}
+func verifyJournalSnapshotValue(root string, v JournalObject, o JournalOptions) *FileJournal {
 	verifier := newJournal(root, o)
 	verifier.meta = journalMap(v["meta"])
 	verifier.validate("FileJournalMeta", verifier.meta)
@@ -1078,7 +1101,16 @@ func RestoreFileJournal(root string, snapshot []byte, o JournalOptions) (j *File
 	if v["checkpoint"] != nil {
 		verifier.checkCheckpoint(journalMap(v["checkpoint"]))
 	}
-	j, e = openFileJournal(root, o, snapshot)
+	return verifier
+}
+func RestoreFileJournal(root string, snapshot []byte, o JournalOptions) (j *FileJournal, err error) {
+	defer journalCatch(&err)
+	value := decodeJournalSnapshot(snapshot)
+	if journalExists(root) {
+		journalFail("restore_conflict", "Restore destination must not exist")
+	}
+	verifier := verifyJournalSnapshotValue(root, value, o)
+	j, e := openFileJournal(root, o, snapshot)
 	journalMust(e)
 	defer func() {
 		if p := recover(); p != nil {

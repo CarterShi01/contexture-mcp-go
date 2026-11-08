@@ -5,17 +5,19 @@ import (
 	"strings"
 
 	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
+	"github.com/CarterShi01/contexture-mcp-go/core/presentation"
 )
 
 // ApplicationDeclaration is the lazy composition-root input.
 type ApplicationDeclaration struct {
-	Name        string
-	Roots       []Factory
-	PromptRoots []Factory
-	Channels    Channels
-	Telemetry   Telemetry
-	Prompts     []PromptDeclaration
-	Resources   []ResourceDeclaration
+	Name         string
+	Roots        []Factory
+	PromptRoots  []Factory
+	Channels     Channels
+	Telemetry    Telemetry
+	Prompts      []PromptDeclaration
+	Resources    []ResourceDeclaration
+	Presentation presentation.Source
 }
 
 // PromptDeclaration is the SDK-free person-controlled MCP Prompt declaration.
@@ -34,17 +36,21 @@ type ResourceDeclaration = foundation.ResourceDeclaration
 
 // Application holds a validated declaration without evaluating its factories.
 type Application struct {
-	name        string
-	roots       []Factory
-	promptRoots []Factory
-	channels    ChannelHandle
-	telemetry   Telemetry
-	prompts     []PromptDeclaration
-	resources   []ResourceDeclaration
+	name         string
+	roots        []Factory
+	promptRoots  []Factory
+	channels     ChannelHandle
+	telemetry    Telemetry
+	prompts      []PromptDeclaration
+	resources    []ResourceDeclaration
+	presentation presentation.Source
 }
 
 // DeclareApplication validates a composition root without constructing nodes.
 func DeclareApplication(declaration ApplicationDeclaration) (*Application, error) {
+	if _, _, err := presentation.ResolvePresentation(declaration.Presentation, nil); err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(declaration.Name) == "" {
 		return nil, errors.Join(ErrInvalidDeclaration, errors.New("application name must not be empty"))
 	}
@@ -78,8 +84,11 @@ func DeclareApplication(declaration ApplicationDeclaration) (*Application, error
 			return nil, errors.Join(ErrInvalidDeclaration, errors.New("a Resource name must be non-empty when supplied"))
 		}
 	}
-	return &Application{name: strings.TrimSpace(declaration.Name), roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...), channels: declaration.Channels, telemetry: declaration.Telemetry, prompts: append([]PromptDeclaration(nil), declaration.Prompts...), resources: append([]ResourceDeclaration(nil), declaration.Resources...)}, nil
+	return &Application{name: strings.TrimSpace(declaration.Name), roots: append([]Factory(nil), declaration.Roots...), promptRoots: append([]Factory(nil), declaration.PromptRoots...), channels: declaration.Channels, telemetry: declaration.Telemetry, prompts: append([]PromptDeclaration(nil), declaration.Prompts...), resources: append([]ResourceDeclaration(nil), declaration.Resources...), presentation: declaration.Presentation}, nil
 }
+
+// Presentation returns optional immutable presentation, not machine identity.
+func (application *Application) Presentation() presentation.Source { return application.presentation }
 
 // Name returns the declared application name.
 func (application *Application) Name() string { return application.name }

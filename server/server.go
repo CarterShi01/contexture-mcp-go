@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	contexture "github.com/CarterShi01/contexture-mcp-go"
 	"github.com/CarterShi01/contexture-mcp-go/server/messages"
@@ -12,8 +13,10 @@ import (
 
 // Identity names one Contexture MCP server implementation.
 type Identity struct {
-	Name    string
-	Version string
+	Name        string
+	Version     string
+	Title       string
+	Description string
 }
 
 // NewMCPServer constructs the official MCP adapter without registering capabilities.
@@ -22,8 +25,10 @@ type Identity struct {
 // core.
 func NewMCPServer(identity Identity) *mcp.Server {
 	return mcp.NewServer(&mcp.Implementation{
-		Name:    identity.Name,
-		Version: identity.Version,
+		Name:        identity.Name,
+		Version:     identity.Version,
+		Title:       identity.Title,
+		Description: identity.Description,
 	}, nil)
 }
 
@@ -51,6 +56,35 @@ func NewContextureMCPServerForRoots(identity Identity, gateway *contexture.Gatew
 // bootstrap instructions. The public compatibility constructor above leaves
 // instructions empty for callers that own that policy themselves.
 func newContextureMCPServerForRoots(identity Identity, gateway *contexture.Gateway, selection contexture.RootSelection, instructions string, publications ...*surface.Publications) *ContextureMCPServer {
+	return newContextureMCPServerForTitles(identity, gateway, selection, instructions, nil, publications...)
+}
+
+// NewContextureMCPServerWithPresentation validates explicit titles before SDK assembly.
+func NewContextureMCPServerWithPresentation(identity Identity, gateway *contexture.Gateway, selection contexture.RootSelection,
+	presentation *contexture.GatewayPresentation, publications ...*surface.Publications) (*ContextureMCPServer, error) {
+	return newContextureMCPServerForPresentation(identity, gateway, selection, "", presentation, publications...)
+}
+
+func newContextureMCPServerForPresentation(identity Identity, gateway *contexture.Gateway, selection contexture.RootSelection,
+	instructions string, presentation *contexture.GatewayPresentation, publications ...*surface.Publications) (*ContextureMCPServer, error) {
+	if gateway == nil {
+		return nil, fmt.Errorf("Contexture gateway must not be nil")
+	}
+	titles := map[contexture.GatewayName]string{}
+	if presentation != nil {
+		for _, tool := range gateway.Tools() {
+			title, err := presentation.TitleFor(tool.Name)
+			if err != nil {
+				return nil, err
+			}
+			titles[tool.Name] = title
+		}
+	}
+	return newContextureMCPServerForTitles(identity, gateway, selection, instructions, titles, publications...), nil
+}
+
+func newContextureMCPServerForTitles(identity Identity, gateway *contexture.Gateway, selection contexture.RootSelection,
+	instructions string, titles map[contexture.GatewayName]string, publications ...*surface.Publications) *ContextureMCPServer {
 	server := NewMCPServer(identity)
 	if len(publications) > 0 && publications[0] != nil {
 		server = newMCPServer(identity, instructions, completionHandler(publications[0], selection))
@@ -62,7 +96,7 @@ func newContextureMCPServerForRoots(identity Identity, gateway *contexture.Gatew
 		publication = publications[0]
 	}
 	for _, tool := range gateway.Tools() {
-		registerGatewayTool(server, gateway, tool, selection, publication)
+		registerGatewayTool(server, gateway, tool, selection, publication, titles[tool.Name])
 	}
 	if len(publications) > 0 && publications[0] != nil {
 		registerPublications(server, publications[0], selection)
@@ -76,7 +110,8 @@ func newContextureMCPServerForRoots(identity Identity, gateway *contexture.Gatew
 
 func newMCPServer(identity Identity, instructions string, complete func(context.Context, *mcp.CompleteRequest) (*mcp.CompleteResult, error)) *mcp.Server {
 	options := &mcp.ServerOptions{Instructions: instructions, CompletionHandler: complete}
-	return mcp.NewServer(&mcp.Implementation{Name: identity.Name, Version: identity.Version}, options)
+	return mcp.NewServer(&mcp.Implementation{Name: identity.Name, Version: identity.Version,
+		Title: identity.Title, Description: identity.Description}, options)
 }
 
 // completionHandler exposes only goto's ref argument. It returns the selected
@@ -101,8 +136,8 @@ func completionHandler(publications *surface.Publications, selection contexture.
 	}
 }
 
-func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool contexture.GatewayTool, selection contexture.RootSelection, publications *surface.Publications) {
-	definition := &mcp.Tool{Name: string(tool.Name), Description: tool.Description, InputSchema: gatewaySchema(tool.Name), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: tool.ReadOnly}}
+func registerGatewayTool(server *mcp.Server, gateway *contexture.Gateway, tool contexture.GatewayTool, selection contexture.RootSelection, publications *surface.Publications, title string) {
+	definition := &mcp.Tool{Name: string(tool.Name), Title: title, Description: tool.Description, InputSchema: gatewaySchema(tool.Name), Annotations: &mcp.ToolAnnotations{ReadOnlyHint: tool.ReadOnly}}
 	if tool.Name == contexture.InspectGatewayName {
 		definition.OutputSchema = map[string]any{"type": "object", "additionalProperties": true, "title": "contexture_inspectDictOutput"}
 	}

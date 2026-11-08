@@ -27,8 +27,11 @@ func run(arguments []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	if len(arguments) == 0 {
-		_, _ = fmt.Fprintln(stderr, "contexture: expected new, list, check, call, inspect, serve, or demo.")
+		_, _ = fmt.Fprintln(stderr, "contexture: expected new, list, check, call, inspect, catalog, debug, serve, or demo.")
 		return 2
+	}
+	if arguments[0] == "store" {
+		return cli.RunStore(context.Background(), arguments[1:], stdout, stderr)
 	}
 	if arguments[0] != "new" {
 		return runProjectCommand(arguments, stdout, stderr)
@@ -87,13 +90,13 @@ func runProjectCommand(arguments []string, stdout, stderr io.Writer) int {
 		}
 		return cli.RunApplication(context.Background(), application, append([]string{"serve"}, arguments[1:]...), stdout, stderr)
 	}
-	if command != "list" && command != "check" && command != "call" && command != "inspect" && command != "serve" {
-		_, _ = fmt.Fprintln(stderr, "contexture: expected new, list, check, call, inspect, serve, or demo.")
+	if command != "list" && command != "check" && command != "call" && command != "inspect" && command != "catalog" && command != "debug" && command != "serve" {
+		_, _ = fmt.Fprintln(stderr, "contexture: expected new, list, check, call, inspect, catalog, debug, serve, or demo.")
 		return 2
 	}
 	root, err := findProject()
 	if err != nil {
-		if command == "inspect" && errors.Is(err, errNoProject) {
+		if command == "catalog" || command == "debug" || command == "inspect" && errors.Is(err, errNoProject) {
 			application, demoErr := demo.Application()
 			if demoErr != nil {
 				_, _ = fmt.Fprintf(stderr, "contexture: cannot build bundled demo: %v\n", demoErr)

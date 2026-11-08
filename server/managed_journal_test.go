@@ -228,6 +228,58 @@ func TestManagedJournalFaultBoundaries(t *testing.T) {
 	}
 }
 
+func TestManagedJournalPartialMemoryIndexesPreserveConfirmedCut(t *testing.T) {
+	for _, stage := range []string{"record.batch_indexed", "record.receipt_indexed", "record.memory_indexed"} {
+		t.Run(stage, func(t *testing.T) {
+			root := journalTestRoot(t)
+			options := journalTestOptions(t)
+			armed := false
+			options.Fault = func(current string) error {
+				if armed && current == stage {
+					return errors.New("index publication failed after mutation")
+				}
+				return nil
+			}
+			journal := journalTestOpen(t, root, options)
+			first := journalTestAppend(t, journal, "one")
+			armed = true
+			_, err := journal.Append(journalTestEvent("two"), JournalAppendOptions{
+				ActorRef: "actor", CommandReceipt: journalTestReceipt(2, "two", journal.durability),
+				EventBatchID: "batch-two"})
+			journalTestCode(t, err, "commit_unknown")
+			if watermark, err := journal.Watermark(); err != nil || watermark != "1" {
+				t.Fatal("Partial indexes exposed a new watermark", watermark, err)
+			}
+			records, err := journal.Records("0")
+			if err != nil || len(records) != 1 || !journalEqual(records[0], first) {
+				t.Fatal("Confirmed prefix changed", err)
+			}
+			if value, err := journal.GetReceipt("actor", "two"); err != nil || value != nil {
+				t.Fatal("Unconfirmed receipt exposed", value, err)
+			}
+			if journal.batches["batch-two"] {
+				t.Fatal("Partial batch index survived rollback")
+			}
+			if _, err := journal.Append(journalTestEvent("retry"), JournalAppendOptions{ActorRef: "actor"}); err == nil {
+				t.Fatal("Unknown allowed another write")
+			}
+			if err := journal.Close(); err != nil {
+				t.Fatal(err)
+			}
+			options.Fault = nil
+			reopened := journalTestOpen(t, root, options)
+			if watermark, err := reopened.Watermark(); err != nil || watermark != "2" {
+				t.Fatal("Reopen lost actually durable suffix", watermark, err)
+			}
+			if value, err := reopened.GetReceipt("actor", "two"); err != nil || value == nil {
+				t.Fatal("Reopen lost accepted receipt", err)
+			}
+			_, err = reopened.Append(journalTestEvent("duplicate"), JournalAppendOptions{ActorRef: "actor", EventBatchID: "batch-two"})
+			journalTestCode(t, err, "schema_invalid")
+		})
+	}
+}
+
 func TestManagedJournalCorruptionAndSafety(t *testing.T) {
 	for _, kind := range []string{"chain", "gap", "noncanonical", "missing_meta", "symlink", "hardlink", "permissions", "missing_blob", "checkpoint"} {
 		t.Run(kind, func(t *testing.T) {

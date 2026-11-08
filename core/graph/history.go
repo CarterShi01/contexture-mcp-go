@@ -2,7 +2,7 @@ package graph
 
 // Persistent detached historical values. Retention and journal integrity are
 // external; a retained checkpoint never invents earlier revisions.
-import "slices"
+import "github.com/benbjohnson/immutable"
 
 type RevisionRecord struct {
 	journalSeq string
@@ -31,20 +31,32 @@ func NewRevisionRecord(seq string, state RevisionState, event any) (out Revision
 	return RevisionRecord{seq, state, frozen, true}, nil
 }
 
-type History struct{ records []RevisionRecord }
+type History struct {
+	records *immutable.List[RevisionRecord]
+}
 
-func (h History) Records() []RevisionRecord { return slices.Clone(h.records) }
+func (h History) Records() []RevisionRecord {
+	if h.records == nil {
+		return nil
+	}
+	out := make([]RevisionRecord, h.records.Len())
+	for iterator := h.records.Iterator(); !iterator.Done(); {
+		index, value := iterator.Next()
+		out[index] = value
+	}
+	return out
+}
 func (h History) Head() RevisionState {
-	if len(h.records) == 0 {
+	if h.records == nil || h.records.Len() == 0 {
 		return RevisionState{}
 	}
-	return h.records[len(h.records)-1].state
+	return h.records.Get(h.records.Len() - 1).state
 }
 func (h History) RetainedLowerBound() string {
-	if len(h.records) == 0 {
+	if h.records == nil || h.records.Len() == 0 {
 		return ""
 	}
-	return h.records[0].state.revision
+	return h.records.Get(0).state.revision
 }
 func NewHistory(records []RevisionRecord) (out History, err error) {
 	defer catchModel(&err)
@@ -63,7 +75,7 @@ func NewHistory(records []RevisionRecord) (out History, err error) {
 			}
 		}
 	}
-	return History{slices.Clone(records)}, nil
+	return History{immutable.NewList(records...)}, nil
 }
 func SeedHistory(state RevisionState, seq string) (History, error) {
 	r, e := NewRevisionRecord(seq, state, nil)
@@ -85,10 +97,10 @@ func BootstrapHistory(base UnseededState, event any, seq string, contracts map[s
 }
 func (h History) Append(event any, seq string, options ApplyEventOptions) (out History, err error) {
 	defer catchModel(&err)
-	if len(h.records) == 0 {
+	if h.records == nil || h.records.Len() == 0 {
 		failModel("Invalid history")
 	}
-	if pureCounter(seq).Cmp(pureCounter(h.records[len(h.records)-1].journalSeq)) <= 0 {
+	if pureCounter(seq).Cmp(pureCounter(h.records.Get(h.records.Len()-1).journalSeq)) <= 0 {
 		eventFail("Historical sequence must increase")
 	}
 	s, e := ApplyEvent(h.Head(), event, options)
@@ -99,14 +111,22 @@ func (h History) Append(event any, seq string, options ApplyEventOptions) (out H
 	if e != nil {
 		return out, e
 	}
-	return NewHistory(append(h.Records(), r))
+	if s.definition.graphID != h.Head().definition.graphID {
+		eventFail("Historical graph mismatch")
+	}
+	return History{h.records.Append(r)}, nil
 }
 func (h History) At(revision string) (out RevisionState, err error) {
 	defer catchModel(&err)
 	pureCounter(revision)
-	for i := len(h.records) - 1; i >= 0; i-- {
-		if h.records[i].state.revision == revision {
-			return h.records[i].state, nil
+	if h.records != nil {
+		iterator := h.records.Iterator()
+		iterator.Last()
+		for !iterator.Done() {
+			_, record := iterator.Prev()
+			if record.state.revision == revision {
+				return record.state, nil
+			}
 		}
 	}
 	pureFail("history_unavailable", "Revision outside retained verified history")
@@ -125,9 +145,10 @@ func (h History) Diff(before, after string) (DefinitionDiff, error) {
 }
 func (h History) matching(projection func(RevisionState) any) []RevisionRecord {
 	out := []RevisionRecord{}
-	for i := 1; i < len(h.records); i++ {
-		if !pureEqual(projection(h.records[i-1].state), projection(h.records[i].state)) {
-			out = append(out, h.records[i])
+	records := h.Records()
+	for i := 1; i < len(records); i++ {
+		if !pureEqual(projection(records[i-1].state), projection(records[i].state)) {
+			out = append(out, records[i])
 		}
 	}
 	return out

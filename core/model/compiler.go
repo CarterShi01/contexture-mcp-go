@@ -8,23 +8,25 @@ import (
 	"strings"
 
 	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
+	"github.com/CarterShi01/contexture-mcp-go/core/presentation"
 )
 
 // Index is the immutable canonical address view of one fresh compilation.
 type Index struct {
-	name        string
-	roots       []Node
-	modelRoots  []Node
-	promptRoots []Node
-	channels    ChannelHandle
-	bound       bool
-	byRef       map[string]Node
-	refByNode   map[Node]string
-	parent      map[Node]*Role
-	dependents  map[string][]string
-	order       []string
-	byKind      map[Kind][]Node
-	branchRefs  map[string][]string
+	name         string
+	roots        []Node
+	modelRoots   []Node
+	promptRoots  []Node
+	channels     ChannelHandle
+	bound        bool
+	byRef        map[string]Node
+	refByNode    map[Node]string
+	parent       map[Node]*Role
+	dependents   map[string][]string
+	order        []string
+	byKind       map[Kind][]Node
+	branchRefs   map[string][]string
+	presentation presentation.Source
 }
 
 // Compile builds one fresh canonical forest from a lazy Application.
@@ -70,8 +72,31 @@ func compile(application *Application, bindTools bool) (*Index, error) {
 			state.index.dependents[target] = append(state.index.dependents[target], ref)
 		}
 	}
+	if application.presentation != nil {
+		variants, err := application.presentation.Variants()
+		if err != nil {
+			return nil, err
+		}
+		for _, variant := range variants {
+			refs := variant.Nodes()
+			ordered := make([]string, 0, len(refs))
+			for ref := range refs {
+				ordered = append(ordered, ref)
+			}
+			sort.Strings(ordered)
+			for _, ref := range ordered {
+				if _, exists := state.index.byRef[ref]; !exists {
+					return nil, errors.Join(ErrInvalidDeclaration, fmt.Errorf("presentation names an unknown node ref %q", ref))
+				}
+			}
+		}
+	}
+	state.index.presentation = application.presentation
 	return state.index, nil
 }
+
+// Presentation returns immutable author copy shared by independent locale views.
+func (index *Index) Presentation() presentation.Source { return index.presentation }
 
 // CompileDisclosure builds an independent navigation Index without execution
 // Bindings. It never invokes a Tool handler or opens application Channels.

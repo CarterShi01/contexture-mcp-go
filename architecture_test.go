@@ -38,7 +38,7 @@ func TestRootPackageDoesNotImportHostSDKs(t *testing.T) {
 func TestCorePackagesDoNotImportHostSDKs(t *testing.T) {
 	t.Parallel()
 
-	for _, directory := range []string{"core/foundation", "core/mcpinterface", "core/model"} {
+	for _, directory := range []string{"core/foundation", "core/mcpinterface", "core/model", "core/presentation"} {
 		err := filepath.WalkDir(directory, func(file string, entry fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr

@@ -41,6 +41,10 @@ type inspectionView interface {
 	RoutingCardsFor([]string) ([]CompiledContext, error)
 }
 
+type presentationView interface {
+	PresentCard(Node, CompiledContext) (CompiledContext, error)
+}
+
 // Node is the closed Contexture declaration set.
 // Its unexported methods prevent external kinds from entering the forest.
 type Node interface {
@@ -147,6 +151,9 @@ func CardOf(node Node, view View) (CompiledContext, error) {
 			card[key] = cloneCompiledValue(value)
 		}
 	}
+	if presented, ok := view.(presentationView); ok {
+		return presented.PresentCard(node, card)
+	}
 	return card, nil
 }
 
@@ -164,6 +171,9 @@ func RoutingCardOf(node Node, view View) (CompiledContext, error) {
 		return nil, err
 	}
 	card["ref"] = ref
+	if presented, ok := view.(presentationView); ok {
+		return presented.PresentCard(node, card)
+	}
 	return card, nil
 }
 
@@ -210,6 +220,20 @@ func GroupRoutingCards(nodes []Node, view View) (CompiledContext, error) {
 
 // CompileNode renders one Node at ROUTE or ACTIVE through an optional owning View.
 func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, error) {
+	return compileNode(node, level, view, nil)
+}
+
+// CompileNodeWithMembers reuses the native renderer with a trusted, preindexed
+// direct-member list. Catalog projections use this to avoid a forest scan per
+// Role. It is a read-model hook, not a new graph or execution authority.
+func CompileNodeWithMembers(node Node, level CompileLevel, view View, members []Node) (CompiledContext, error) {
+	return compileNode(node, level, view, func(Node) ([]Node, error) { return members, nil })
+}
+
+func compileNode(node Node, level CompileLevel, view View, membersOf func(Node) ([]Node, error)) (CompiledContext, error) {
+	if membersOf == nil {
+		membersOf = MembersOf
+	}
 	if nilNode(node) {
 		return nil, uncompiledNodeError()
 	}
@@ -229,7 +253,7 @@ func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, err
 		if err != nil {
 			return nil, err
 		}
-		members, err := MembersOf(node)
+		members, err := membersOf(node)
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +306,7 @@ func CompileNode(node Node, level CompileLevel, view View) (CompiledContext, err
 	card["instructions"] = instructions
 	if node.nodeKind() == RoleKind {
 		role, _ := roleNode(node)
-		members, err := MembersOf(node)
+		members, err := membersOf(node)
 		if err != nil {
 			return nil, err
 		}

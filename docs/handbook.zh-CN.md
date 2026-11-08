@@ -83,6 +83,39 @@ func main() {
 惰性 factory 并规范化 application 名称。每个 Role、Skill、Tool 都应通过 factory 声明；编译会
 从这些 factory 创建新的不可变 graph snapshot。
 
+### 可选 presentation 与 locale（增量候选）
+
+根入口导出不可变 `Presentation`、`NodePresentation`、`GatewayPresentation`、
+`PresentationCatalog` 及返回 error 的 `New...` constructor，SDK-neutral 实现在
+`core/presentation`。通过 `ApplicationDeclaration.Presentation` 提供已构造的 neutral
+presentation 或 catalog，不执行 node factory。构造时复制 map，拒绝非法值、typed nil、
+规范化后重复的 ref/tag；catalog 的 `DefaultLocale` 必须存在于 `Locales`。
+
+`PresentationOptions` 提供可选 `Title`、`Description`、`Gateway`、`Nodes`；
+`NodePresentationOptions` 要求 `Title`，可选 `Description`；
+`GatewayPresentationOptions` 覆盖 `Discover`、`Inspect`、`Open`、`InvokeReadOnly`、
+`Invoke` 的展示标题。可选文本使用 `*string`：nil 表示缺省，显式空字符串会报错，不偷偷回落默认值。
+getter 不暴露可写内部状态，`Nodes` 返回防御性副本。
+
+`server.CompileApplicationWithOptions`／`CompileDisclosureApplicationWithOptions`
+使用 `CompilationOptions{Locale: &requestedLocale}`；
+`BuildServerWithOptions` 在 `ApplicationServerOptions` 中接受同一可选 `Locale`。
+旧 constructor 不变并使用默认值。`NormalizeLocale`、`ResolvePresentation` 和
+`Disclosure.WithLocale` 按完整 tag、逐级父 tag、明确默认值解析，不偏爱某种语言。
+编译会校验所有语言中的 canonical ref，包括未选中的语言。
+
+独立 view 不扩大 visibility、不绕过 person／Prompt reservation，不改变 process designation、
+name/ref、原始 instructions 或 Tool 的 schema／validator／handler／effect。
+所选文案用于 routing／ACTIVE／INSPECT、成员／uses／process 卡片、person navigation、
+启动 roster，以及真实 MCP initialize 的 title/description 和显式 gateway title。
+五个 gateway 的机器名、schema、description、安全注解保持原样；没有 presentation 时保留旧 payload。
+底层 SDK 可显式使用返回 error 的 `NewContextureMCPServerWithPresentation`。
+
+完整 Unicode casing 复用 `golang.org/x/text/cases`，每次解析独立 Caser，避免共享 mutable transformer；
+少量 cased-letter boundary glue 对齐当前 Python `str.title`，不把 Unicode word segmentation
+当成相同语义。已记录验证仅针对具体 Unicode15/reference/runtime，不冒充所有未来版本认证。
+候选不升级 pinned 0.16、不接受 managed schema，也不表示 Node Catalog／debug／CLI 等剩余差异或全量 parity 已完成。
+
 根 `contexture` package 是 SDK-neutral 的 declaration facade。其原生 authoring inventory 包括
 `ApplicationDeclaration`、`Factory`、`Role`、`Skill`、`Tool`、`Channels`、`Principal`、`Prompt`
 和 `Resource`。`Prompt` 与 `Resource` 是数据 declaration（分别是保留的 `PromptDeclaration` 和
@@ -606,3 +639,82 @@ go run ./internal/releasecheck v1.0.0
 [CONTRIBUTING.md](../CONTRIBUTING.md) 了解贡献规则，阅读 [RELEASING.md](../RELEASING.md)
 了解稳定 v1 发布流程。`v1.0.0` 承诺已记录的公开 API 在 v1 内保持 source compatibility；它不会在
 已有定向 conformance 证据之外声称完整产品 parity。
+
+## 11. 不执行业务的静态 Node Catalog
+
+`introspection` 是 SDK-neutral 的受信任应用/开发者只读模型，复用同一个原生不可变
+`core/model.Index`、声明与 Disclosure。它不是 gateway Tool、授权面、managed graph
+authority，也不会自动进入模型上下文。编译完成后，Catalog 不再求值声明 factory，
+不调用 Tool handler、不打开 Channels。
+
+通过 `compiled.Catalog(introspection.CatalogOptions{View: introspection.ModelView,
+Detail: introspection.DefinitionDetail})` 构建，或直接调用 `introspection.New(index, options)`。
+`View` 必须显式指定；`Detail` 默认 `summary`。Application view 包含 model/prompt 两个
+plane；model view 排除 prompt 根及跨向它的边。Surface view 必须显式传入
+`SurfaceSelection`，深切根提升为无父节点的根。重叠 selector 通过 preorder 父链传播
+在线性 cut 中规范化，不做逐对祖先/兄弟扫描；不会继承 request-local context selection。
+
+`Get(ref)`、`Children(ref)`、`List(ListOptions{Kind, Query})` 与
+`Snapshot()` 提供类型化只读访问。所有返回的 descriptor、slice、map、schema、
+metadata 都是防御性副本，调用者修改不影响 Catalog。Snapshot 校验唯一根/ref、精确
+counts、parent/member/可见 ordinal、五种 slot、process designation 与
+`uses`/`dependents` 互反性；`SnapshotFromJSON` 同时校验严格 envelope 和内容 digest。
+
+Definition 保留 authored 与原生 ACTIVE effective instructions 的精确字节（含空白、
+process policy）；summary 不包含 program/schema。可执行 Tool 复用现有 Binding schema，
+保持 schema/validator/handler 一体；disclosure-only Tool 仅报告
+`execution_available: false`。原始 description 与本地化 presentation 分离，locale
+复用现有不可变 Presentation 的回退规则。
+
+应用 metadata 必须显式注册 `NodeMetadataContributor`，提供唯一 `owner/name` namespace，
+以及 `Describe(ref, node, index) (map[string]any, error)`。每个 contributor 对每个 included
+node 只调用一次；nil 表示无 metadata，error 原样上抛，不回退默认值。JSON 深复制并拒绝
+环、非有限 float、非法 UTF-8、非字符串键、pointer、struct、function、自定义序列化对象，
+不会调用序列化方法。原生整数、`big.Int`、整数 `json.Number` 保持精确。
+
+`CanonicalDigest`/`FormatJSON` 是 legacy Catalog profile，**不是** managed JCS：
+key 按 Unicode code point 排序，有限 float 使用 Python integral normalization 与最短
+fractional/exponent 格式。搜索复用 `x/text/cases.Fold` 并校准 Unicode 15；薄适配层保留
+Unicode full fold 本应不变、但 x/text 0.34 另行小写化的 86 个 Cherokee 大写 scalar。
+验证覆盖完整 1,530 reference mapping、全部 Unicode scalar 和 1,616 raw library mapping。
+
+### 只读 loopback 开发 UI
+
+Runtime/Disclosure compiled container 都提供 `Debug(options)`；也可用
+`debug.New(catalog)` 服务同一个 snapshot。调用
+`Start(ctx, debug.StartOptions{Host: "localhost", Port: 8787})` 后应关闭返回的 address。
+默认 literal `127.0.0.1` 与临时端口；仅允许明确 localhost/literal loopback IP。
+Localhost 不查 DNS，直接绑定 IPv4 loopback。`Close` 幂等且等待 listener 退出；
+context cancellation 同样停止服务，绝不打开应用 serving lifecycle。
+
+GET 路由为 `/`、`/app.css`、`/app.js`、`/healthz`、`/api/catalog`、
+`/api/nodes/ENCODED_REF`。HEAD 仅支持 `/api/catalog`；API 用完整 quoted digest ETag，
+只有 exact tag 可触发 304，weak/wildcard/list tag 均不匹配。所有写及其他 method 拒绝。
+Host/Origin 防护拒绝 userinfo、rebinding hostname、非法端口、重复 Origin、跨源和
+absolute-form request；响应包含 CSP、nosniff、frame denial、no-referrer、no-cache。
+HTML/CSS/JS 与 reference 扩展资产逐字节一致，不能被当作执行证据。
+
+### Catalog/debug CLI
+
+```bash
+go run ./cmd/contexture catalog --json
+go run ./cmd/contexture catalog kubernetes-platform --detail definition --json
+go run ./cmd/contexture catalog --view surface --select kubernetes-platform/incident-response --locale zh-Hans --json
+go run ./cmd/contexture debug --host localhost --port 8787
+```
+
+Global CLI 优先生成的 `cmd/assistant`，否则 catalog/debug 使用明确提示的 bundled demo。
+项目 CLI 仍通过 `cli.RunApplication(ctx, application, args, stdout, stderr)` 静态注入一个
+声明。`--target` 仅接受该应用声明名或 `application`，不支持任意 module import expression。
+
+Catalog 默认 model/summary：无 ref 的 JSON 是完整 snapshot，有 ref 的 JSON 是 descriptor
+array；无 ref 文本含应用事实、digest、缩进 roster，有 ref 则仅输出 descriptor line。
+支持 `--target`、`--view`、`--detail`、`--locale`、重复 `--select`、`--json`。
+Debug 默认 application/definition、loopback 8787，增加 `--host`/`--port`，不接受 positional
+ref/`--json`，阻塞至 context cancellation/Ctrl+C。
+
+新增资产独立存放于 `conformance/node-catalog`，不更改 pinned 0.16 wire assets。
+上游 acceptance metadata 指向 **operations** fixture，而 Catalog golden 描述
+**contexture-demo**。测试显式复用既有 Go 原生 reference-demo 声明（含 Role authored
+trailing newline）验证 golden/schema，不改写任何不匹配资产，也不改变 standalone
+production demo/default wire 行为。本有界 STATIC 扩展不代表 managed Host/ops 或全产品 parity。

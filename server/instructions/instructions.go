@@ -46,8 +46,23 @@ func Build(disclosure *contexture.Disclosure, requested contexture.RootSelection
 		entries := make([]string, 0, len(group))
 		cost := 0
 		for _, node := range group {
-			ref, _ := disclosure.Index().RefOf(node)
-			entry := fmt.Sprintf("- %s: %s", ref, node.NodeDescription())
+			ref, err := disclosure.Index().RefOf(node)
+			if err != nil {
+				return "", err
+			}
+			card, err := disclosure.RoutingCardOf(node)
+			if err != nil {
+				return "", err
+			}
+			label := ref
+			if title, ok := card["title"].(string); ok {
+				label = fmt.Sprintf("%s (%s)", title, ref)
+			}
+			description, ok := card["description"].(string)
+			if !ok {
+				return "", fmt.Errorf("a routing card must retain its description")
+			}
+			entry := fmt.Sprintf("- %s: %s", label, description)
 			entries = append(entries, entry)
 			cost += len(entry) + 1
 		}

@@ -77,12 +77,12 @@ func goldenLogsTool() contexture.Factory {
 	}
 }
 
-func goldenDemo(t *testing.T) (*contexture.Gateway, *surface.Publications) {
+func goldenApplication(t *testing.T, name string) *contexture.Application {
 	t.Helper()
 	crashLoop := goldenFixture(t, "CRASH_LOOP_RUNBOOK")
 	rollbackPolicy := goldenFixture(t, "ROLLBACK_POLICY")
 	application, err := contexture.DeclareApplication(contexture.ApplicationDeclaration{
-		Name: "demo",
+		Name: name,
 		Roots: []contexture.Factory{func() contexture.Node {
 			return &contexture.Role{Name: "kubernetes-platform", Description: "Operate a Kubernetes platform: diagnose incidents, and reverse releases.", Instructions: platformInstructions,
 				Children: []contexture.Factory{
@@ -123,6 +123,12 @@ func goldenDemo(t *testing.T) (*contexture.Gateway, *surface.Publications) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return application
+}
+
+func goldenDemo(t *testing.T) (*contexture.Gateway, *surface.Publications) {
+	t.Helper()
+	application := goldenApplication(t, "demo")
 	index, err := contexture.Compile(application)
 	if err != nil {
 		t.Fatal(err)

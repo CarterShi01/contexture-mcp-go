@@ -6,15 +6,17 @@ import (
 	"strings"
 
 	"github.com/CarterShi01/contexture-mcp-go/core/foundation"
+	"github.com/CarterShi01/contexture-mcp-go/core/presentation"
 )
 
 // Disclosure is a pure progressive navigation projection over one Index.
 type Disclosure struct {
-	index       *Index
-	selection   RootSelection
-	promptRoots map[string]struct{}
-	bound       bool
-	telemetry   Telemetry
+	index        *Index
+	selection    RootSelection
+	promptRoots  map[string]struct{}
+	bound        bool
+	telemetry    Telemetry
+	presentation *presentation.Presentation
 }
 
 // NewDisclosure creates a model navigation view. Prompt roots remain person-reachable only.
@@ -65,7 +67,25 @@ func newDisclosure(index *Index, selection RootSelection, bound bool, telemetry 
 		ref, _ := index.RefOf(node)
 		prompts[ref] = struct{}{}
 	}
-	return &Disclosure{index: index, selection: selection, promptRoots: prompts, bound: bound, telemetry: telemetry}, nil
+	_, copy, err := presentation.ResolvePresentation(index.presentation, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &Disclosure{index: index, selection: selection, promptRoots: prompts, bound: bound, telemetry: telemetry, presentation: copy}, nil
+}
+
+// WithLocale returns an independent view without changing authority or selection.
+func (view *Disclosure) WithLocale(locale *string) (*Disclosure, error) {
+	if view == nil {
+		return nil, errors.Join(ErrInvalidDeclaration, errors.New("Disclosure must not be nil"))
+	}
+	_, copy, err := presentation.ResolvePresentation(view.index.presentation, locale)
+	if err != nil {
+		return nil, err
+	}
+	projection := *view
+	projection.presentation = copy
+	return &projection, nil
 }
 
 // Index returns the immutable canonical graph projected by this Disclosure.
@@ -78,16 +98,42 @@ func (view *Disclosure) Unrestricted() *Disclosure {
 		return nil
 	}
 	return &Disclosure{
-		index:       view.index,
-		selection:   view.selection,
-		promptRoots: map[string]struct{}{},
-		bound:       view.bound,
-		telemetry:   view.telemetry,
+		index:        view.index,
+		selection:    view.selection,
+		promptRoots:  map[string]struct{}{},
+		bound:        view.bound,
+		telemetry:    view.telemetry,
+		presentation: view.presentation,
 	}
 }
 
 // RefOf returns the canonical address for a Node held by this View.
 func (view *Disclosure) RefOf(node Node) (string, error) { return view.index.RefOf(node) }
+
+// PresentCard adds only selected routing labels to a detached native card.
+func (view *Disclosure) PresentCard(node Node, card CompiledContext) (CompiledContext, error) {
+	ref, err := view.index.RefOf(node)
+	if err != nil {
+		return nil, err
+	}
+	return view.present(ref, card), nil
+}
+
+func (view *Disclosure) present(ref string, card CompiledContext) CompiledContext {
+	copy, exists := view.presentation.Node(ref)
+	if !exists {
+		return card
+	}
+	result := CompiledContext{}
+	for key, value := range card {
+		result[key] = cloneCompiledValue(value)
+	}
+	result["title"] = copy.Title()
+	if copy.Description() != "" {
+		result["description"] = copy.Description()
+	}
+	return result
+}
 
 // CardOf renders one policy-aware route card for a held Node.
 func (view *Disclosure) CardOf(node Node) (CompiledContext, error) {
@@ -349,7 +395,7 @@ func (view *Disclosure) card(node Node, bound bool) map[string]any {
 			card["input_schema"] = binding.Schema()
 		}
 	}
-	return card
+	return view.present(ref, card)
 }
 
 func (view *Disclosure) active(node Node, selection RootSelection) (map[string]any, error) {

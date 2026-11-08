@@ -32,6 +32,7 @@ import (
     "strings"
     contexture "github.com/CarterShi01/contexture-mcp-go"
     "github.com/CarterShi01/contexture-mcp-go/inspection"
+    "github.com/CarterShi01/contexture-mcp-go/managed"
     contexturecli "github.com/CarterShi01/contexture-mcp-go/cli"
     coremodel "github.com/CarterShi01/contexture-mcp-go/core/model"
     "github.com/CarterShi01/contexture-mcp-go/demo"
@@ -160,8 +161,55 @@ var _ = server.Launch{}
 var _ = server.ClaudeCodeConfig
 var _ = web.NewRestRouter
 var _ web.RestRoute
+var _ managed.ReleaseAuthority
+var _ managed.RequestAuthority
+var _ managed.RequestIdentity
+var _ *managed.RunLeaseContext
+var _ = managed.Compile
+var _ = managed.PrepareGeneration
+var _ = managed.NewLocalServingCoordinator
+var _ = managed.NewManagedRuntime
+var _ = managed.NewRunLeaseService
+var _ = managed.ParseReleaseRequest
+var _ = managed.ReplayReleases
+var _ = (*managed.LocalServingCoordinator).RetryObservation
+var _ managed.ServingObservationPort
+var _ server.ReleaseHostPort
+var _ server.ReleaseHistoryReader
+var _ server.ReleaseCompilePort
+var _ = server.ReleaseJournalProjector
+var _ = server.NewFileJournalReleaseOwner
+var _ = (*server.FileJournal).AssertWritable
+var _ = server.NewFileJournalGraphOwner
+var _ = server.GraphJournalProjector
+var _ server.GraphOwnerHost
+var _ server.GraphOwnerSerialization = (*server.SynchronousJournalSerialization)(nil)
+var _ *server.GraphPreview
+var _ managed.TransactionEnvelope
+var _ managed.PurePreparedTransaction
+var _ managed.History
+var _ = managed.NewGraphJournalProjection
+var _ = managed.ProjectGraphJournal
+var _ = managed.PrepareTransaction
+var _ = (*server.FileJournalGraphOwner).DefinitionReads
+var _ = (*server.FileJournalGraphOwner).CommittedReads
+var _ = (*server.FileJournalGraphOwner).ReleaseHistoryReader
+var _ = (*server.FileJournalGraphOwner).ReleaseHost
 
 func main() {
+    registration, registrationErr := managed.NewBindingRegistration(managed.BindingRegistrationOptions[struct{}]{
+        BindingID: "managed-consumer", Version: "1", Kind: "registered", Effect: "read_only",
+        ABI: managed.NativeABI, ArtifactDigest: "sha256:" + strings.Repeat("a", 64),
+        Portability: managed.Portability{Kind: "native", Language: "go", Version: "1.25", Factory: "consumer"},
+        InputSchema: map[string]any{"type": "object", "additionalProperties": false},
+        ValidatorContractID: "validate", DecoderContractID: "decode", DefaultContractID: "defaults.none", CoercionContractID: "coercion.none",
+        Decoder: func(managed.FrozenJSON) (struct{}, error) { return struct{}{}, nil },
+        Validator: func(struct{}) error { return nil },
+        Handler: func(context.Context, struct{}, managed.CallContext) (any, error) { return true, nil },
+    })
+    if registrationErr != nil { panic(registrationErr) }
+    managedResult, managedErr := registration.Call(context.Background(), map[string]any{}, managed.CallContext{})
+    if managedErr != nil || managedResult.JSON() != true { panic("public managed typed native entrypoint failed") }
     demoApplication, demoApplicationErr := demo.Application(); demoServer, demoServerErr := demo.Build(); if demoApplicationErr != nil || demoServerErr != nil || demoApplication.Name() != "contexture-demo" || demoServer == nil { panic("public demo package is incomplete") }
     if !errors.Is(&contexturecli.UsageError{Message: "usage"}, contexture.ErrContexture) { panic("public CLI UsageError is not classifiable") }
     if !strings.Contains(messages.Preamble, "contexture_open") || !strings.Contains(messages.RefRule, "never assemble") || messages.TruncatedCompletion(100, 103) != "... 3 more match; keep typing to narrow." { panic("public message contract is incomplete") }

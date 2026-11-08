@@ -16,6 +16,8 @@ type RuntimeApplication struct {
 	Runtime      *contexture.Runtime
 	Telemetry    contexture.Telemetry
 	Publications *surface.Publications
+	Presentation *contexture.Presentation
+	Locale       string
 }
 
 // DisclosureApplication is an independently compiled, non-executable Host
@@ -26,14 +28,28 @@ type DisclosureApplication struct {
 	Disclosure   *contexture.Disclosure
 	Telemetry    contexture.Telemetry
 	Publications *surface.Publications
+	Presentation *contexture.Presentation
+	Locale       string
 }
+
+// CompilationOptions fixes optional presentation locale independently of identity.
+type CompilationOptions struct{ Locale *string }
 
 // CompileApplication compiles the declaration once for every execution-capable surface.
 func CompileApplication(application *contexture.Application) (*RuntimeApplication, error) {
+	return CompileApplicationWithOptions(application, CompilationOptions{})
+}
+
+// CompileApplicationWithOptions resolves immutable copy on the same bound Index.
+func CompileApplicationWithOptions(application *contexture.Application, options CompilationOptions) (*RuntimeApplication, error) {
 	if application == nil {
 		return nil, fmt.Errorf("Contexture application must not be nil")
 	}
 	index, err := contexture.Compile(application)
+	if err != nil {
+		return nil, err
+	}
+	locale, copy, err := contexture.ResolvePresentation(application.Presentation(), options.Locale)
 	if err != nil {
 		return nil, err
 	}
@@ -45,6 +61,10 @@ func CompileApplication(application *contexture.Application) (*RuntimeApplicatio
 	if err != nil {
 		return nil, err
 	}
+	disclosure, err = disclosure.WithLocale(options.Locale)
+	if err != nil {
+		return nil, err
+	}
 	runtime, err := contexture.NewRuntime(index, contexture.AllRoots(), contexture.AllRoots(), telemetry)
 	if err != nil {
 		return nil, err
@@ -53,16 +73,25 @@ func CompileApplication(application *contexture.Application) (*RuntimeApplicatio
 	if err != nil {
 		return nil, err
 	}
-	return &RuntimeApplication{Application: application, Index: index, Disclosure: disclosure, Runtime: runtime, Telemetry: telemetry, Publications: publications}, nil
+	return &RuntimeApplication{Application: application, Index: index, Disclosure: disclosure, Runtime: runtime, Telemetry: telemetry, Publications: publications, Presentation: copy, Locale: locale}, nil
 }
 
 // CompileDisclosureApplication compiles one structural surface. Channels and
 // Resources are rejected by the unbound compiler rather than ignored.
 func CompileDisclosureApplication(application *contexture.Application) (*DisclosureApplication, error) {
+	return CompileDisclosureApplicationWithOptions(application, CompilationOptions{})
+}
+
+// CompileDisclosureApplicationWithOptions resolves copy without binding execution.
+func CompileDisclosureApplicationWithOptions(application *contexture.Application, options CompilationOptions) (*DisclosureApplication, error) {
 	if application == nil {
 		return nil, fmt.Errorf("Contexture application must not be nil")
 	}
 	index, err := contexture.CompileDisclosure(application)
+	if err != nil {
+		return nil, err
+	}
+	locale, copy, err := contexture.ResolvePresentation(application.Presentation(), options.Locale)
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +103,15 @@ func CompileDisclosureApplication(application *contexture.Application) (*Disclos
 	if err != nil {
 		return nil, err
 	}
+	disclosure, err = disclosure.WithLocale(options.Locale)
+	if err != nil {
+		return nil, err
+	}
 	publications, err := surface.NewPublications(application, disclosure, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &DisclosureApplication{Application: application, Index: index, Disclosure: disclosure, Telemetry: telemetry, Publications: publications}, nil
+	return &DisclosureApplication{Application: application, Index: index, Disclosure: disclosure, Telemetry: telemetry, Publications: publications, Presentation: copy, Locale: locale}, nil
 }
 
 // Server builds an official navigation-only MCP adapter over this exact container.
@@ -90,7 +123,14 @@ func (application *DisclosureApplication) Server() (*ContextureMCPServer, error)
 	if err != nil {
 		return nil, err
 	}
-	return NewContextureMCPServer(Identity{Name: application.Index.Name(), Version: contexture.Version}, gateway, application.Publications), nil
+	identity := Identity{Name: application.Index.Name(), Version: contexture.Version}
+	var titles *contexture.GatewayPresentation
+	if application.Presentation != nil {
+		identity.Title = application.Presentation.Title()
+		identity.Description = application.Presentation.Description()
+		titles = application.Presentation.Gateway()
+	}
+	return NewContextureMCPServerWithPresentation(identity, gateway, contexture.AllRoots(), titles, application.Publications)
 }
 
 // Gateway returns the fixed Contexture gateway over this application's runtime projections.
